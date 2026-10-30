@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: trestle-live
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # Free tier has no persistent disk: data/ is wiped on every deploy/restart/spin-down (OK for testing)
+      - key: DATA_DIR
+        value: ./data

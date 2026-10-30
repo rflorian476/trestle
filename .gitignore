@@ -1,0 +1,7 @@
+data/
+node_modules/
+shots/
+logs/
+cloudflared-bin
+*.log
+.DS_Store

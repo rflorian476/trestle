@@ -1,0 +1,12 @@
+{
+  "name": "trestle-live",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Trestle beta: multi-user contractor marketplace (Node + node:sqlite, no dependencies)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "rebuild-ui": "node build-live.js"
+  },
+  "engines": { "node": ">=22.13.0 <25" }
+}

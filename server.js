@@ -1,0 +1,136 @@
+// Trestle live beta server: Node http + node:sqlite. No external deps.
+"use strict";
+const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto"),vm=require("vm");
+const {DatabaseSync}=require("node:sqlite");
+const PORT=+process.env.PORT||8787;
+const HOST=process.env.HOST||"0.0.0.0";
+const TRUST_PROXY=process.env.TRUST_PROXY!=="0"; // Render/Cloudflare terminate TLS and set x-forwarded-proto
+const DATA=process.env.DATA_DIR||path.join(__dirname,"data");fs.mkdirSync(DATA,{recursive:true});
+const db=new DatabaseSync(path.join(DATA,"trestle.db"));
+db.exec(`PRAGMA journal_mode=WAL;
+CREATE TABLE IF NOT EXISTS accounts(uid TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,salt TEXT NOT NULL,hash TEXT NOT NULL,role TEXT NOT NULL,created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,uid TEXT NOT NULL,expires INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS appdata(k TEXT PRIMARY KEY,v TEXT NOT NULL,updated INTEGER NOT NULL);`);
+const getKV=db.prepare("SELECT v FROM appdata WHERE k=?"),setKV=db.prepare("INSERT INTO appdata(k,v,updated) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,updated=excluded.updated");
+const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs"];
+
+/* ---- shared business rules: the same A.* actions the UI was built on, run server-side ---- */
+let VER=Date.now(),allowAuto=false,dirty=false;
+function anyStub(){const f=function(){return p};const p=new Proxy(f,{get:(t,k)=>k===Symbol.toPrimitive?()=>"":k==="length"?0:p,set:()=>true,apply:()=>p,construct:()=>p});return p}
+const store={};
+const ctx={console,Date,Math,JSON,Object,Array,String,Number,Boolean,RegExp,Error,Set,Map,Promise,Intl,parseInt,parseFloat,isNaN,encodeURIComponent,decodeURIComponent,
+ localStorage:{getItem:k=>{if(k.startsWith("trestle_designs")){const o={};let any=false;for(const c of COLS){const r=getKV.get(c);if(r){o[c]=JSON.parse(r.v);any=true}}const m=getKV.get("meta");if(!any)return null;return JSON.stringify(Object.assign({v:1,me:null,theme:"light",recent:[]},m?JSON.parse(m.v):{},o))}return store[k]||null},
+  setItem:(k,v)=>{if(k.startsWith("trestle_designs"))dirty=true;else store[k]=v},removeItem:()=>{}},
+ setTimeout:(fn,ms)=>{if(!allowAuto)return 0;return setTimeout(()=>{try{fn();persist()}catch(e){}},ms)},clearTimeout,setInterval:()=>0,requestAnimationFrame:()=>0,
+ document:anyStub(),location:{hash:"",search:"",href:"",pathname:"/"},navigator:{userAgent:"node"},matchMedia:()=>({matches:false,addEventListener(){}}),history:anyStub(),
+ addEventListener(){},removeEventListener(){},getComputedStyle:()=>anyStub(),IntersectionObserver:function(){return anyStub()},ResizeObserver:function(){return anyStub()},MutationObserver:function(){return anyStub()},
+ scrollTo(){},innerWidth:1280,innerHeight:800,performance:{now:()=>Date.now()},crypto:require("crypto").webcrypto,alert(){},confirm:()=>true,Image:function(){return anyStub()}};
+ctx.window=ctx;ctx.globalThis=ctx;ctx.self=ctx;
+vm.createContext(ctx);
+try{vm.runInContext(fs.readFileSync(path.join(__dirname,"app-logic.js"),"utf8"),ctx,{filename:"app-logic.js"})}catch(e){console.error("logic load warning:",e.message)}
+const api=ctx.__api;if(!api)throw new Error("app logic failed to load");
+ctx.onData=null;
+function DB(){return api.DB}
+function persist(){const d=DB();for(const c of COLS)setKV.run(c,JSON.stringify(d[c]||[]),Date.now());setKV.run("meta",JSON.stringify({v:1,seeded:true}),Date.now());VER++;dirty=false}
+// first boot: seed demo data, clearly labeled
+{const d=DB();if(!getKV.get("meta")||!JSON.parse(getKV.get("meta").v).labeled){
+  d.users.forEach(u=>{u.demo=true;u.email=u.id+"@demo.invalid"});(d.projects||[]).forEach(p=>{p.demo=true;if(!/^Demo: /.test(p.title))p.title="Demo: "+p.title});(d.jobs||[]).forEach(j=>j.demo=true);
+  d.msgs=[];d.notifs=[];d.pmsgs=(d.pmsgs||[]);d.me=null;persist();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now());console.log("seeded demo data:",d.users.length,"users")}}
+// keep meta flag on later persists
+const _p=persist;persist=function(){_p();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now())};
+
+/* ---- auth ---- */
+const scrypt=(pw,salt)=>crypto.scryptSync(pw,salt,64,{N:16384,r:8,p:1}).toString("hex");
+const hashPw=pw=>{const salt=crypto.randomBytes(16).toString("hex");return{salt,hash:scrypt(pw,salt)}};
+const checkPw=(pw,salt,hash)=>{const h=Buffer.from(scrypt(pw,salt),"hex");return crypto.timingSafeEqual(h,Buffer.from(hash,"hex"))};
+const SESS_DAYS=30;
+function newSession(uid){const t=crypto.randomBytes(32).toString("base64url");db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(t,uid,Date.now()+SESS_DAYS*864e5);return t}
+function cookies(req){const o={};(req.headers.cookie||"").split(";").forEach(s=>{const i=s.indexOf("=");if(i>0)o[s.slice(0,i).trim()]=decodeURIComponent(s.slice(i+1).trim())});return o}
+function sessionUid(req){const t=cookies(req).tsid;if(!t)return null;const r=db.prepare("SELECT uid,expires FROM sessions WHERE token=?").get(t);if(!r||r.expires<Date.now())return null;return r.uid}
+function setCookie(res,req,t,maxAge){const secure=(req.socket.encrypted||(TRUST_PROXY&&(String(req.headers["x-forwarded-proto"]||"").split(",")[0].trim()==="https"||/https/.test(req.headers["cf-visitor"]||""))))?"; Secure":"";res.setHeader("Set-Cookie",`tsid=${t}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`)}
+const hits=new Map();
+function limited(key,max,winMs){const now=Date.now();const a=(hits.get(key)||[]).filter(t=>now-t<winMs);a.push(now);hits.set(key,a);return a.length>max}
+const ip=req=>(TRUST_PROXY&&(req.headers["cf-connecting-ip"]||(req.headers["x-forwarded-for"]||"").split(",")[0].trim()))||req.socket.remoteAddress;
+
+/* ---- validation ---- */
+const EMAIL=/^[^\s@<>"']{1,64}@[^\s@<>"']{1,190}\.[a-z]{2,}$/i;
+function clean(v,depth=0){ // strings capped, control chars removed, structure bounded
+ if(depth>8)return null;
+ if(typeof v==="string")return v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,"").slice(0,4000);
+ if(typeof v==="number")return Number.isFinite(v)?v:0;
+ if(typeof v==="boolean"||v===null)return v;
+ if(Array.isArray(v))return v.slice(0,60).map(x=>clean(x,depth+1));
+ if(typeof v==="object"){const o={};for(const k of Object.keys(v).slice(0,60)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;o[k]=clean(v[k],depth+1)}return o}
+ return null}
+const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend"]);
+const PRO_LOCKED=["id","role","email","verified","paid","founding","bg","demo","joined","favs"];
+
+/* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
+function snapshot(uid){const d=DB();const crewOf=p=>(p.roles||[]).flatMap(r=>r.filled||[]);
+ const users=d.users.map(u=>{const c=Object.assign({},u);if(u.id!==uid){delete c.email;if(u.role!=="contractor")delete c.phone;delete c.favs;delete c.plan}return c});
+ const myJobs=new Set(d.jobs.filter(j=>j.cust===uid).map(j=>j.id));
+ const quotes=d.quotes.map(q=>(q.cid===uid||myJobs.has(q.job))?q:Object.assign({},q,{price:null,note:""}));
+ const pm=new Map((d.projects||[]).map(p=>[p.id,p]));
+ const pmsgs=(d.pmsgs||[]).filter(m=>{const p=pm.get(m.pid);if(!p||!uid)return false;if(m.from===uid||m.to===uid)return true;return m.to==="all"&&(p.pm===uid||crewOf(p).includes(uid))});
+ return{v:1,_v:VER,users,jobs:d.jobs,reviews:d.reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:d.projects||[],pmsgs,me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
+
+function run(uid,name,args){const d=DB();d.me=uid;let r;try{r=api.A[name](...args)}catch(e){r={ok:false,msg:"That didn't work. The item may have changed, refresh and try again."}}finally{DB().me=null}if(dirty)persist();return r}
+
+/* ---- http ---- */
+const INDEX=()=>fs.readFileSync(path.join(__dirname,"public/index.html"));
+function send(res,code,obj,extra){if(code>=400&&code<500&&code!==404&&code!==405&&code!==415){obj.status=code;code=200}res.writeHead(code,Object.assign({"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"},extra||{}));res.end(JSON.stringify(obj))}
+function body(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>256e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>{try{ok(c.length?JSON.parse(Buffer.concat(c).toString()):{})}catch(e){no(e)}})})}
+const SEC={"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"same-origin","Permissions-Policy":"geolocation=(), camera=(), microphone=()"};
+const server=http.createServer(async(req,res)=>{
+ for(const[k,v]of Object.entries(SEC))res.setHeader(k,v);
+ const url=new URL(req.url,"http://x");const p=url.pathname;
+ try{
+ if(req.method==="GET"&&(p==="/"||p==="/index.html")){res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});return res.end(INDEX())}
+ if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:VER});
+ if(!p.startsWith("/api/"))return send(res,404,{error:"Not found"});
+ if(req.method==="POST"){const o=req.headers.origin;if(o&&req.headers.host&&new URL(o).host!==req.headers.host)return send(res,403,{error:"Bad origin"});if(!/application\/json/.test(req.headers["content-type"]||""))return send(res,415,{error:"JSON only"})}
+ if(limited("all:"+ip(req),600,60e3))return send(res,429,{error:"Too many requests, slow down."});
+ const uid=sessionUid(req);
+ if(req.method==="GET"&&p==="/api/state"){const v=+url.searchParams.get("v");if(v&&v===VER)return send(res,200,{same:true});return send(res,200,{state:snapshot(uid)})}
+ if(req.method!=="POST")return send(res,405,{error:"Method not allowed"});
+ const b=clean(await body(req));
+ if(p==="/api/login"){
+  if(limited("login:"+ip(req),10,15*60e3))return send(res,429,{error:"Too many login attempts. Try again in 15 minutes."});
+  const email=String(b.email||"").trim().toLowerCase(),pw=String(b.password||"");
+  const a=db.prepare("SELECT * FROM accounts WHERE email=?").get(email);
+  if(!a||!checkPw(pw,a.salt,a.hash))return send(res,401,{error:"Wrong email or password."});
+  const t=newSession(a.uid);setCookie(res,req,t,SESS_DAYS*86400);return send(res,200,{ok:true,state:snapshot(a.uid)})}
+ if(p==="/api/logout"){const t=cookies(req).tsid;if(t)db.prepare("DELETE FROM sessions WHERE token=?").run(t);setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}
+ if(p==="/api/signup"){
+  if(limited("signup:"+ip(req),20,60*60e3))return send(res,429,{error:"Too many sign-ups from this network. Try later."});
+  const kind=b.kind,d=b.data&&typeof b.data==="object"?b.data:{},pw=String(b.password||"");
+  if(!["customer","pro","pm"].includes(kind))return send(res,400,{error:"Bad account type"});
+  const email=String(d.email||"").trim().toLowerCase();
+  if(!EMAIL.test(email))return send(res,400,{error:"Enter a valid email."});
+  if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});
+  if(!String(d.name||"").trim()||String(d.name).length>80)return send(res,400,{error:"Enter your name (80 characters max)."});
+  if(db.prepare("SELECT 1 FROM accounts WHERE email=?").get(email)||DB().users.some(u=>(u.email||"").toLowerCase()===email))return send(res,409,{error:"That email already has an account. Log in instead."});
+  d.email=email;let r;DB().me=null;
+  try{r=kind==="customer"?api.A.signupCustomer(String(d.name),email,String(d.zip||"")):kind==="pm"?api.A.signupPM(d):api.A.signupPro(d)}catch(e){r={ok:false,msg:"Sign-up failed, check the form."}}
+  const newId=DB().me;DB().me=null;
+  if(!r||!r.ok||!newId){if(dirty)persist();return send(res,400,{error:(r&&r.msg)||"Sign-up failed"})}
+  const role=DB().users.find(u=>u.id===newId).role;const h=hashPw(pw);
+  db.prepare("INSERT INTO accounts VALUES(?,?,?,?,?,?)").run(newId,email,h.salt,h.hash,role,Date.now());persist();
+  const t=newSession(newId);setCookie(res,req,t,SESS_DAYS*86400);return send(res,200,{res:r,state:snapshot(newId)})}
+ if(p==="/api/act"){
+  const name=String(b.name||""),args=Array.isArray(b.args)?b.args.slice(0,6):[];
+  if(!ACTIONS.has(name))return send(res,400,{error:"Unknown action"});
+  if(!uid)return send(res,200,{error:"Sign in first",need:"login",state:snapshot(null)});
+  if(limited("act:"+uid,120,60e3))return send(res,429,{error:"Too many actions, slow down."});
+  if(name==="updatePro"&&args[0]&&typeof args[0]==="object")for(const k of PRO_LOCKED)delete args[0][k];
+  // demo accounts auto-reply (they're not real people); real users never get fake replies
+  const isDemo=id=>!!(DB().users.find(u=>u.id===id)||{}).demo;
+  allowAuto=(name==="send"&&isDemo(args[0]))||(name==="crewSend"&&(()=>{const pr=(DB().projects||[]).find(x=>x.id===args[0]);return pr&&pr.demo})());
+  const r=run(uid,name,args);allowAuto=false;
+  return send(res,200,{res:r===undefined?{ok:true}:r,state:snapshot(uid)})}
+ return send(res,404,{error:"Not found"});
+ }catch(e){console.error(e);return send(res,400,{error:"Bad request"})}
+});
+setInterval(()=>{db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());const now=Date.now();for(const[k,a]of hits)if(!a.some(t=>now-t<3600e3))hits.delete(k)},3600e3).unref();
+server.listen(PORT,HOST,()=>console.log(`Trestle live on http://${HOST}:${PORT} (data: ${DATA})`));
+for(const sig of ["SIGTERM","SIGINT"])process.on(sig,()=>{server.close();try{db.close()}catch(e){}process.exit(0)});
