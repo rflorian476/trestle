@@ -819,11 +819,10 @@ p{line-height:1.6}
 .bnav a.on,.tabbar a.on,.mnav a.on{color:var(--p-txt)!important}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* ===================== v2.2 ===================== */
-/* trade tiles / proof / how-it-works share the feature band's width */
-.tbproof,.tbhow,.tbtrades{max-width:var(--maxw);box-sizing:border-box}
-section.tbtrades,section.tbhow{padding-left:24px;padding-right:24px}
-.tbproof{margin-left:auto;margin-right:auto;width:calc(100% - 48px)}
-@media(max-width:700px){section.tbtrades,section.tbhow{padding-left:16px;padding-right:16px}.tbproof{width:calc(100% - 32px)}}
+/* align every home band (features, proof, how-it-works, trade tiles) to the header's content edge */
+section.spfeat,section.tbtrades,section.tbhow{padding-left:24px;padding-right:24px}
+.tbproof{margin-left:auto;margin-right:auto;max-width:calc(var(--maxw) - 48px);width:calc(100% - 48px);box-sizing:border-box;padding:0}
+@media(max-width:700px){section.spfeat,section.tbtrades,section.tbhow{padding-left:16px;padding-right:16px}.tbproof{width:calc(100% - 32px)}}
 /* inbox */
 .ib-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:22px 0 14px}
 .ibtabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}.ibt{display:inline-flex;gap:8px;align-items:center;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none;font-size:14px;font-weight:600;white-space:nowrap;transition:background .15s,border-color .15s}
