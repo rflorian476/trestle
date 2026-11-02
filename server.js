@@ -1,4 +1,4 @@
-// Toolbelt live beta server: Node http + node:sqlite. No external deps.
+// Sawyer live beta server: Node http + node:sqlite. No external deps.
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto"),vm=require("vm");
 const {DatabaseSync}=require("node:sqlite");
@@ -6,9 +6,9 @@ const PORT=+process.env.PORT||8787;
 const HOST=process.env.HOST||"0.0.0.0";
 const TRUST_PROXY=process.env.TRUST_PROXY!=="0"; // Render/Cloudflare terminate TLS and set x-forwarded-proto
 const DATA=process.env.DATA_DIR||path.join(__dirname,"data");fs.mkdirSync(DATA,{recursive:true});
-// migrate earlier database names (trestle.db -> spanwise.db -> toolbelt.db) so no data is lost
-{const dst=path.join(DATA,"toolbelt.db");if(!fs.existsSync(dst))for(const old of ["spanwise.db","trestle.db"]){const src=path.join(DATA,old);if(fs.existsSync(src)){for(const ext of ["","-wal","-shm"])if(fs.existsSync(src+ext))fs.renameSync(src+ext,dst+ext);console.log("migrated",old,"-> toolbelt.db");break}}}
-const db=new DatabaseSync(path.join(DATA,"toolbelt.db"));
+// migrate earlier database names (trestle.db -> spanwise.db -> toolbelt.db -> <slug>.db) so no data is lost
+{const dst=path.join(DATA,require("./brand.json").slug+".db");if(!fs.existsSync(dst))for(const old of ["toolbelt.db","spanwise.db","trestle.db"].filter(f=>f!==path.basename(dst))){const src=path.join(DATA,old);if(fs.existsSync(src)){for(const ext of ["","-wal","-shm"])if(fs.existsSync(src+ext))fs.renameSync(src+ext,dst+ext);console.log("migrated",old,"-> toolbelt.db");break}}}
+const db=new DatabaseSync(path.join(DATA,require("./brand.json").slug+".db"));
 db.exec(`PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS accounts(uid TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,salt TEXT NOT NULL,hash TEXT NOT NULL,role TEXT NOT NULL,created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,uid TEXT NOT NULL,expires INTEGER NOT NULL);
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS appdata(k TEXT PRIMARY KEY,v TEXT NOT NULL,updated IN
 CREATE TABLE IF NOT EXISTS uploads(name TEXT PRIMARY KEY,uid TEXT NOT NULL,type TEXT NOT NULL,size INTEGER NOT NULL,created INTEGER NOT NULL);`);
 const getKV=db.prepare("SELECT v FROM appdata WHERE k=?"),setKV=db.prepare("INSERT INTO appdata(k,v,updated) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,updated=excluded.updated");
 const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs","estimates"];
-const APP_VERSION="2.1.0-toolbelt";
+const BRAND=require("./brand.json");const APP_VERSION=require("./package.json").version+"-"+BRAND.slug;
 const UPLOADS=path.join(DATA,"uploads");fs.mkdirSync(UPLOADS,{recursive:true});
 const MAX_UPLOAD=5*1024*1024;
 
@@ -25,8 +25,8 @@ let VER=Date.now(),allowAuto=false,dirty=false;
 function anyStub(){const f=function(){return p};const p=new Proxy(f,{get:(t,k)=>k===Symbol.toPrimitive?()=>"":k==="length"?0:p,set:()=>true,apply:()=>p,construct:()=>p});return p}
 const store={};
 const ctx={console,Date,Math,JSON,Object,Array,String,Number,Boolean,RegExp,Error,Set,Map,Promise,Intl,parseInt,parseFloat,isNaN,encodeURIComponent,decodeURIComponent,
- localStorage:{getItem:k=>{if(k.startsWith("toolbelt_designs")){const o={};let any=false;for(const c of COLS){const r=getKV.get(c);if(r){o[c]=JSON.parse(r.v);any=true}}const m=getKV.get("meta");if(!any)return null;return JSON.stringify(Object.assign({v:1,me:null,theme:"light",recent:[]},m?JSON.parse(m.v):{},o))}return store[k]||null},
-  setItem:(k,v)=>{if(k.startsWith("toolbelt_designs"))dirty=true;else store[k]=v},removeItem:()=>{}},
+ localStorage:{getItem:k=>{if(k.startsWith("sawyer_designs")){const o={};let any=false;for(const c of COLS){const r=getKV.get(c);if(r){o[c]=JSON.parse(r.v);any=true}}const m=getKV.get("meta");if(!any)return null;return JSON.stringify(Object.assign({v:1,me:null,theme:"light",recent:[]},m?JSON.parse(m.v):{},o))}return store[k]||null},
+  setItem:(k,v)=>{if(k.startsWith("sawyer_designs"))dirty=true;else store[k]=v},removeItem:()=>{}},
  setTimeout:(fn,ms)=>{if(!allowAuto)return 0;return setTimeout(()=>{try{fn();persist()}catch(e){}},ms)},clearTimeout,setInterval:()=>0,requestAnimationFrame:()=>0,
  document:anyStub(),location:{hash:"",search:"",href:"",pathname:"/"},navigator:{userAgent:"node"},matchMedia:()=>({matches:false,addEventListener(){}}),history:anyStub(),
  addEventListener(){},removeEventListener(){},getComputedStyle:()=>anyStub(),IntersectionObserver:function(){return anyStub()},ResizeObserver:function(){return anyStub()},MutationObserver:function(){return anyStub()},
@@ -44,8 +44,8 @@ function hashPw0(pw){const salt=crypto.randomBytes(16).toString("hex");return{sa
   d.users.forEach(u=>{u.demo=true;u.email=u.id+"@demo.invalid"});(d.projects||[]).forEach(p=>{p.demo=true;if(!/^Demo: /.test(p.title))p.title="Demo: "+p.title});(d.jobs||[]).forEach(j=>j.demo=true);
   d.pmsgs=(d.pmsgs||[]);d.me=null;persist();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now());console.log("seeded demo data:",d.users.length,"users")}}
 // demo logins (README): fixed accounts for the seeded homeowner, pro and project manager
-const DEMO_PW="toolbelt-demo-2026";
-for(const[uid_,email]of[["u1","demo-homeowner@toolbelt.test"],["c1","demo-pro@toolbelt.test"],["m1","demo-pm@toolbelt.test"],["c26","demo-remodeler@toolbelt.test"]]){
+const DEMO_PW=BRAND.slug+"-demo-2026";
+for(const[uid_,email]of[["u1","demo-homeowner@"+BRAND.slug+".test"],["c1","demo-pro@"+BRAND.slug+".test"],["m1","demo-pm@"+BRAND.slug+".test"],["c26","demo-remodeler@"+BRAND.slug+".test"]]){
  const u=DB().users.find(x=>x.id===uid_);if(!u||db.prepare("SELECT 1 FROM accounts WHERE uid=? OR email=?").get(uid_,email))continue;
  const h=hashPw0(DEMO_PW);db.prepare("INSERT INTO accounts VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}
 // keep meta flag on later persists
@@ -74,7 +74,7 @@ function clean(v,depth=0){ // strings capped, control chars removed, structure b
  if(Array.isArray(v))return v.slice(0,60).map(x=>clean(x,depth+1));
  if(typeof v==="object"){const o={};for(const k of Object.keys(v).slice(0,60)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;o[k]=clean(v[k],depth+1)}return o}
  return null}
-const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy"]);
+const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy"]);
 const PRO_LOCKED=["id","role","email","verified","paid","founding","bg","demo","joined","favs"];
 
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
@@ -116,7 +116,7 @@ const server=http.createServer(async(req,res)=>{
  const url=new URL(req.url,"http://x");const p=url.pathname;
  try{
  if(req.method==="GET"&&(p==="/"||p==="/index.html")){res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});return res.end(INDEX())}
- if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:APP_VERSION,app:"Toolbelt",data:VER});
+ if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:APP_VERSION,app:BRAND.name,data:VER});
  if(req.method==="GET"&&/^\/u\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(p)){const f=path.join(UPLOADS,path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});const ext=p.split(".").pop();res.writeHead(200,{"Content-Type":ext==="jpg"?"image/jpeg":"image/"+ext,"Cache-Control":"public, max-age=31536000, immutable","Content-Security-Policy":"default-src 'none'; sandbox"});return fs.createReadStream(f).pipe(res)}
  if(!p.startsWith("/api/"))return send(res,404,{error:"Not found"});
  if(req.method==="POST"&&p==="/api/upload")return upload(req,res);
@@ -166,5 +166,5 @@ const server=http.createServer(async(req,res)=>{
  }catch(e){console.error(e);return send(res,400,{error:"Bad request"})}
 });
 setInterval(()=>{db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());const now=Date.now();for(const[k,a]of hits)if(!a.some(t=>now-t<3600e3))hits.delete(k)},3600e3).unref();
-server.listen(PORT,HOST,()=>console.log(`Toolbelt live on http://${HOST}:${PORT} (data: ${DATA})`));
+server.listen(PORT,HOST,()=>console.log(`${BRAND.name} live on http://${HOST}:${PORT} (data: ${DATA})`));
 for(const sig of ["SIGTERM","SIGINT"])process.on(sig,()=>{server.close();try{db.close()}catch(e){}process.exit(0)});

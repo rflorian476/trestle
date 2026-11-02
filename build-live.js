@@ -2,10 +2,13 @@
 const fs=require("fs"),path=require("path");
 const SRC=process.env.ULTIMATE_HTML||path.join(__dirname,"src/app.html");
 if(!fs.existsSync(SRC)){console.log("build-live: "+SRC+" not found; using committed public/index.html + app-logic.js");process.exit(0)}
-const src=fs.readFileSync(SRC,"utf8");
+const BRAND=require("./brand.json");
+// Brand tokens: change brand.json to rename the product (one line).
+const T=s=>s.split("__BRAND_LC__").join(BRAND.name.toLowerCase()).split("__BRAND__").join(BRAND.name).split("__TAGLINE__").join(BRAND.tagline);
+const src=T(fs.readFileSync(SRC,"utf8"));
 const a=src.indexOf("<script>"),b=src.lastIndexOf("</script>");
 let js=src.slice(a+8,b);
-const V2JS=fs.readFileSync(path.join(__dirname,"src/v2.js"),"utf8");
+const V2JS=T(fs.readFileSync(path.join(__dirname,"src/v2.js"),"utf8"));
 if(!js.includes("\nboot();"))throw new Error("boot anchor missing");
 js=js.replace("\nboot();","\n"+V2JS+"\nboot();");
 fs.writeFileSync(path.join(__dirname,"app-logic.js"),js+"\n;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY};\n");
@@ -21,12 +24,12 @@ c=rep(c,'<button class="linkbtn" id="resetBtn">Reset demo data</button>','');
 c=rep(c,'Demo prototype. Every business, person, license and review here is fictional.','Beta test. Listings marked (demo) are fictional sample data; everything else was posted by real beta users.');
 c+="\n"+fs.readFileSync(path.join(__dirname,"client-post.js"),"utf8");
 let html=src.slice(0,a+8)+c+src.slice(b);
-html=rep(html,'<body><a class="skip" href="#app">Skip to content</a>','<body><div class="betabar" role="status">Toolbelt beta · test mode · don\'t post sensitive info</div><a class="skip" href="#app">Skip to content</a>');
+html=rep(html,'<body><a class="skip" href="#app">Skip to content</a>','<body><div class="betabar" role="status">'+BRAND.name+' beta · test mode · don\'t post sensitive info</div><a class="skip" href="#app">Skip to content</a>');
 html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
 .testmode{margin-top:14px;padding:12px 14px;border-radius:12px;font-size:14px}
 .liveauth .fld{margin-bottom:10px}.livelogin{margin-top:18px}
 #resetBtn,.demo,[data-login]{display:none!important}
-`+fs.readFileSync(path.join(__dirname,"src/v2.css"),"utf8")+`
+`+T(fs.readFileSync(path.join(__dirname,"src/v2.css"),"utf8"))+`
 </style></head>`);
 fs.writeFileSync(path.join(__dirname,"public/index.html"),html);
 console.log("built",html.length);

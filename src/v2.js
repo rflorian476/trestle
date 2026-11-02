@@ -1,5 +1,5 @@
 /* =====================================================================
-   TOOLBELT v2 layer: crew builder, photo-verified work, mock milestone
+   SAWYER v2 layer: crew builder, photo-verified work, mock milestone
    escrow, photo-to-quote estimator, rapid responder badge, bid compare.
    Runs in the browser AND server-side (vm) — DOM work stays inside views.
    ===================================================================== */
@@ -280,10 +280,10 @@ const SPAN_CITIES=[["Seattle","98103"],["Denver","80205"],["Phoenix","85254"],["
  const cities=`<div class="spcities reveal" aria-label="Cities">${SPAN_CITIES.map(([c,z])=>`<a href="${href("find",null,{zip:z})}">${esc(c)}</a>`).join("")}</div>`;
  h=h.replace('<ul class="etrust reveal">',cities+'<ul class="etrust reveal">');
  const F=[["users","Crew builder","Post a multi-trade build with dates. We suggest pros free that exact window, and you book the whole crew in one tap.","project","p1",{tab:"builder"}],["camera","Photo-verified work","Before & after photos turn Verified only once the customer confirms the job is done.","pro","c1"],["lock","Milestone escrow","Fund each stage, release on sign-off. Test mode in the beta, no real money.","job","j11"],["calc","Photo-to-quote","A transparent ballpark by trade, size, urgency and region. Labeled as an estimate, always.","estimate"],["zap","Rapid responders","Pros with a median first reply under an hour get the badge and rank first in emergencies.","find",null,{emerg:"1",cat:"Plumbing"}],["layers","Side-by-side bids","Two or more bids? Compare price, timeline, rating, verified jobs and badges in one view.","compare","j1"]];
- const band=`<section class="wrap spfeat reveal"><div class="ehead"><span class="kick">What's new in Toolbelt</span><h2>Built for the whole job, not just the lead.</h2></div><div class="spf-g">${F.map(([ic,t,d,v,p,q],i)=>`<a class="spf" href="${href(v,p,q)}" style="--i:${i}"><span class="spf-i">${I(ic,20)}</span><b>${t}</b><p>${d}</p><span class="more">See it ${I("arrow",14)}</span></a>`).join("")}</div></section>`;
+ const band=`<section class="wrap spfeat reveal"><div class="ehead"><span class="kick">What's new in __BRAND__</span><h2>Built for the whole job, not just the lead.</h2></div><div class="spf-g">${F.map(([ic,t,d,v,p,q],i)=>`<a class="spf" href="${href(v,p,q)}" style="--i:${i}"><span class="spf-i">${I(ic,20)}</span><b>${t}</b><p>${d}</p><span class="more">See it ${I("arrow",14)}</span></a>`).join("")}</div></section>`;
  const k=h.indexOf('<section class="wrap uhelp');return k>=0?h.slice(0,k)+band+h.slice(k):h+band}}
 
-/* ===================== v2.1 Toolbelt upgrades ===================== */
+/* ===================== v2.1 __BRAND__ upgrades ===================== */
 {const ob=badgeList;badgeList=function(u){return ob(u).map(b=>b&&b.k==="found"?Object.assign({},b,{t:"Founding Pro · 3 months free"}):b)}}
 let V2RAPID=false;
 {const os=searchPros;searchPros=function(f){const r=os(f);return V2RAPID&&!(f&&f.favs)?r.filter(x=>isRapid(x.u.id)):r}}
@@ -292,7 +292,44 @@ let V2RAPID=false;
  return h.replace('<div class="fchips">',`<div class="fchips"><a class="fchip ${on?"on":""}" id="fRapid" aria-pressed="${on}" href="${link}">${I("zap",14)} Rapid responders</a>`)}}
 const TB_TRADES=[["Plumbing","drop"],["Electrical","zap"],["HVAC","flame"],["Roofing","home"],["Remodeling","wrench"],["Carpentry","wrench"],["Concrete & Masonry","wrench"],["Landscaping","wrench"]];
 {const ov=VIEWS.home;VIEWS.home=()=>{const h=ov();const pros=PROS();const cities=new Set(pros.map(u=>townOf(u.zip))).size;const vj=DB.jobs.filter(j=>confirmedJob(j)).length;const rs=DB.reviews.filter(r=>r.stars);const avg=rs.length?(rs.reduce((a,r)=>a+r.stars,0)/rs.length).toFixed(1):"5.0";
- const proof=`<section class="wrap tbproof reveal" aria-label="Toolbelt by the numbers"><div><b>${pros.length}</b><span>licensed pros</span></div><div><b>${cities}</b><span>cities</span></div><div><b>${vj}</b><span>customer-verified jobs</span></div><div><b>${avg}★</b><span>average rating</span></div></section>`;
- const tiles=`<section class="wrap tbtrades reveal"><div class="ehead"><span class="kick">Browse by trade</span><h2>Whatever the job, there's a pro on the belt.</h2></div><div class="tbt-g">${TB_TRADES.map(([t,ic])=>{const n=pros.filter(u=>u.trade===t).length;return`<a class="tbt" href="${href("find",null,{cat:t})}"><span class="tbt-i">${I(TRADE_ICON[t]||ic,22)}</span><b>${esc(t)}</b><small>${n} pro${n===1?"":"s"}</small></a>`}).join("")}</div></section>`;
+ const proof=`<section class="wrap tbproof reveal" aria-label="__BRAND__ by the numbers"><div><b>${pros.length}</b><span>licensed pros</span></div><div><b>${cities}</b><span>cities</span></div><div><b>${vj}</b><span>customer-verified jobs</span></div><div><b>${avg}★</b><span>average rating</span></div></section>`;
+ const tiles=`<section class="wrap tbtrades reveal"><div class="ehead"><span class="kick">Browse by trade</span><h2>Whatever the job, there's a pro for it.</h2></div><div class="tbt-g">${TB_TRADES.map(([t,ic])=>{const n=pros.filter(u=>u.trade===t).length;return`<a class="tbt" href="${href("find",null,{cat:t})}"><span class="tbt-i">${I(TRADE_ICON[t]||ic,22)}</span><b>${esc(t)}</b><small>${n} pro${n===1?"":"s"}</small></a>`}).join("")}</div></section>`;
  const how=`<section class="wrap tbhow reveal"><div class="ehead"><span class="kick">How it works</span><h2>Three steps. No lead fees.</h2></div><ol class="tbh-g">${[["camera","Describe or snap it","Post the job or get an instant photo-to-quote ballpark."],["layers","Compare real bids","Price, timeline, rating and verified jobs side by side."],["lock","Pay as work lands","Milestones release only when you sign off (test mode in beta)."]].map(([ic,t,d],i)=>`<li class="tbh"><span class="tbh-n">${i+1}</span>${I(ic,22)}<b>${t}</b><p>${d}</p></li>`).join("")}</ol></section>`;
  const k=h.indexOf('<section class="wrap spfeat');return k>=0?h.slice(0,k)+proof+how+tiles+h.slice(k):h+proof+how+tiles}}
+
+/* ===================== v2.2: inbox, pro setup checklist, richer profile ===================== */
+const NKIND=t=>/escrow|milestone|signed off|released|sign-off|funded/i.test(t)?"payments":/quote|bid|\$/i.test(t)?"bids":/invite|crew|booked|accepted|declined|applied/i.test(t)?"invites":"other";
+const NKI={bids:"dollar",invites:"users",payments:"lock",other:"bell"};
+VIEWS.inbox=(p,q)=>{const m=me();if(!m)return VIEWS.signup(null,{next:"/inbox"});q=q||{};const f=["bids","invites","payments"].includes(q.f)?q.f:"all";
+ const all=DB.notifs.filter(n=>n.to===m.id).sort((a,b)=>b.date-a.date);const ns=f==="all"?all:all.filter(n=>NKIND(n.text)===f);const un=all.filter(n=>!n.read).length;
+ const tab=(k,l)=>{const c=k==="all"?all.length:all.filter(n=>NKIND(n.text)===k).length;return`<a class="ibt ${f===k?"on":""}" href="${href("inbox",null,k==="all"?{}:{f:k})}" aria-current="${f===k}">${l}<span>${c}</span></a>`};
+ return`<section class="v2page ibx">${UH(I("bell",14)+" Inbox","Notifications",un?`${un} unread`:"All caught up")}<div class="wrap"><div class="ib-bar"><nav class="ibtabs" aria-label="Filter">${tab("all","All")}${tab("bids","Bids & quotes")}${tab("invites","Crew invites")}${tab("payments","Milestones")}</nav>${un?`<button class="btn sm" id="ibAll">${I("check",14)}Mark all read</button>`:""}</div>
+ ${ns.length?`<ul class="iblist">${ns.map(n=>{const k=NKIND(n.text);return`<li class="ibi ${n.read?"":"unread"}" data-kind="${k}"><a href="#" data-n="${n.id}"><span class="ib-i k-${k}">${I(NKI[k],16)}</span><span class="ib-t">${esc(n.text)}</span><time>${ago(n.date)}</time>${n.read?"":`<i class="ib-dot" aria-label="unread"></i>`}</a></li>`}).join("")}</ul>`:`<div class="uempty">${I("bell",26)}<b>Nothing here yet</b><small>${f==="all"?"Quotes, crew invites and milestone updates land here.":"No "+({bids:"bids",invites:"crew invites",payments:"milestone events"})[f]+" yet."}</small></div>`}</div></section>`};
+TITLES.inbox="Inbox";
+AFTER.inbox=()=>{const b=document.getElementById("ibAll");b&&(b.onclick=()=>act(A.readNotifs(),render));document.querySelectorAll(".ibx [data-n]").forEach(a=>a.onclick=e=>{e.preventDefault();act(A.readNotif(a.dataset.n),()=>{const n=DB.notifs.find(x=>x.id===a.dataset.n);n&&linkTo(n.link)})})};
+A.readNotif=id=>{const m=me();const n=m&&DB.notifs.find(x=>x.id===id&&x.to===m.id);if(!n)return{ok:false,msg:"Not found"};n.read=true;save();return{ok:true}};
+if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push("readNotif");
+{const os=SHELL;SHELL=function(){os.apply(this,arguments);const b=document.querySelector('#top a.iconbtn[aria-label^="Notifications"]');if(b){b.setAttribute("href",href("inbox"));b.id="bellBtn"}}}
+
+function proSetup(u){const vp=verifiedPhotos(u.id).length;return[
+ ["shield","Verify license & insurance",!!u.verified,"License number and a current certificate of insurance."],
+ ["edit","Write a 2-line bio",(u.bio||"").trim().length>=40,"Say what you do best and where."],
+ ["wrench","List 3+ services",(u.subs||[]).length>=3,"Customers filter by service."],
+ ["pin","Set your service radius",+u.radius>0,"We only show you jobs you'll drive to."],
+ ["clock","Add availability",(u.avail||[]).length>0,"Crew builder matches you to dated slots."],
+ ["camera","Get a photo verified",vp>0,"Add before/after photos on a job; the customer confirms."],
+ ["zap","Reply to a lead within an hour",isRapid(u.id),"Earns the Rapid responder badge."]]}
+function setupCard(u){const s=proSetup(u),d=s.filter(x=>x[2]).length,pct=Math.round(d/s.length*100);
+ return`<div class="ucard onb" id="onboard"><div class="ud-h"><h3>${I("sparkle",16)} Get set up</h3><b class="pct">${d}/${s.length}</b></div><div class="meter" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Profile setup"><i style="width:${pct}%"></i></div>
+ ${u.founding?`<p class="onb-f">${I("trophy",14)} <b>Founding Pro</b>: 3 months free is locked in.</p>`:""}<ol class="onb-l">${s.map(([ic,t,ok,h])=>`<li class="${ok?"done":""}" data-done="${ok}"><span class="onb-c">${I(ok?"check":ic,14)}</span><div><b>${t}</b>${ok?"":`<small>${h}</small>`}</div></li>`).join("")}</ol>${d<s.length?`<button class="btn sm primary" id="onbEdit">${I("edit",14)}Finish profile</button>`:`<p class="muted small">All set. You're fully visible in search.</p>`}</div>`}
+{const ov=VIEWS.dash;VIEWS.dash=(p,q)=>{const h=ov(p,q);const m=me();if(!m||m.role!=="contractor")return h;const k=h.indexOf('<aside><div class="ucard">');return k<0?h:h.slice(0,k+7)+setupCard(m)+h.slice(k+7)}}
+{const oa=AFTER.dash;AFTER.dash=(p,q)=>{oa&&oa(p,q);const b=document.getElementById("onbEdit");b&&(b.onclick=()=>{const e=document.getElementById("editP");e&&e.click()})}}
+
+{const ov=VIEWS.pro;VIEWS.pro=(id)=>{let h=ov(id);const u=U(id);if(!u||u.role!=="contractor")return h;const m=me(),own=m&&m.id===u.id;const rs=respStats(u.id);
+ const svc=`<section class="wrap pxsvc"><div class="ehead"><span class="kick">${I("wrench",14)} Services</span><h2>What ${esc(u.biz)} takes on</h2></div><div class="svc-g">${(u.subs||[]).map(s=>`<a class="svc" href="${href("post",null,{invite:u.id,cat:u.trade,title:s})}"><b>${esc(s)}</b><small>${esc(u.trade)} · quote in ${rs.n?mins(rs.med):"a few hours"}</small><span class="svc-go">${I("arrow",14)}</span></a>`).join("")||`<p class="muted">No services listed yet.</p>`}</div>
+ <div class="pxresp"><div>${I("zap",20)}</div><div><b>${rs.n?"Usually replies in "+mins(rs.med):"New to "+"__BRAND__"+": reply time not measured yet"}</b><small>${rs.n?`Median first reply across ${rs.n} conversation${rs.n===1?"":"s"}`:"We measure the median first reply once a few customers reach out."}${isRapid(u.id)?" · Rapid responder":""}</small></div></div></section>`;
+ const cta=own?"":`<div class="pxcta" role="region" aria-label="Contact ${esc(u.biz)}"><div><b>${esc(u.biz)}</b><small>${rating(u.id).n?rating(u.id).avg.toFixed(1)+"★ · ":""}${esc(u.trade)}</small></div><a class="btn primary" id="pxQuote" href="${href("post",null,{invite:u.id})}">${I("send",15)}Request a quote</a></div>`;
+ const k=h.indexOf('<section class="wrap v2pro">');h=k<0?h+svc:h.slice(0,k)+svc+h.slice(k);
+ if(own){const j=h.indexOf('<section class="wrap pxsvc">');h=h.slice(0,j)+`<section class="wrap pxown">${setupCard(u)}</section>`+h.slice(j)}
+ return h+cta}}
+{const oa=AFTER.pro;AFTER.pro=(id)=>{oa&&oa(id);const b=document.getElementById("onbEdit");b&&(b.onclick=()=>linkTo("dash"))}}

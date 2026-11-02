@@ -1,4 +1,4 @@
-// Multi-user end-to-end test against a running Toolbelt live server (v2 features included).
+// Multi-user end-to-end test against a running Sawyer live server (v2 features included).
 // usage (from designs/src for playwright): node /workspace/contractor-app/live/test/e2e.js <BASE_URL> <shotdir>
 const {chromium}=require("playwright");
 const [BASE,OUT]=process.argv.slice(2);
@@ -36,7 +36,7 @@ for(const [vw,vh,name] of [[1440,900,"desktop"],[390,844,"mobile"]]){
  await step("6 wrong password rejected; log out + log back in",async()=>{const r=await cu.evaluate(async()=>{const o=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"nobody@example.com",password:"wrongwrong"})});return o.json()});if(!(r.error&&r.status===401))throw Error("bad login "+JSON.stringify(r));await cu.evaluate(()=>{act(A.logout());go("home")});await cu.waitForTimeout(400);await go(cu,"/signup");await cu.fill("#li-e",cuEmail);await cu.fill("#li-p","another-pass-42");await cu.click("#loginf button[type=submit]");await cu.waitForTimeout(800);const me=await cu.evaluate(()=>DB.me);if(me!==custId)throw Error("log back in failed")});
 
  const png=await cu.screenshot({clip:{x:0,y:0,width:320,height:240}});
- const login=async(p,email)=>{await p.goto(BASE+"/");const r=await p.evaluate(async e=>{const o=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:"toolbelt-demo-2026"})});return o.json()},email);if(!r.ok)throw Error("demo login failed "+email);await p.reload();await p.waitForTimeout(600)};
+ const login=async(p,email)=>{await p.goto(BASE+"/");const r=await p.evaluate(async e=>{const o=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:"sawyer-demo-2026"})});return o.json()},email);if(!r.ok)throw Error("demo login failed "+email);await p.reload();await p.waitForTimeout(600)};
  let jid2;
  await step("7 escrow (test mode): milestones funded, sign-off requested, released",async()=>{await go(cu,"/post");await cu.fill("#pf-title","Gutter + fascia repair "+run);await cu.fill("#pf-desc","Gutter pulled off the fascia on the back of the house after a storm.");if(await cu.$("#pf-cat"))await cu.selectOption("#pf-cat","Roofing");await cu.click("#postf button.primary");await cu.waitForTimeout(900);jid2=(await cu.evaluate(()=>location.hash)).split("/job/")[1].split(/[?/]/)[0];
   await go(pr,"/job/"+jid2);await pr.click("#doQuote");await pr.fill("#qp","1200");await pr.fill("#qd","3");await pr.fill("#qn","Rehang 30 ft of gutter, replace rotten fascia");await pr.click("#qf button.primary");await pr.waitForTimeout(600);
@@ -62,7 +62,7 @@ for(const [vw,vh,name] of [[1440,900,"desktop"],[390,844,"mobile"]]){
   const o=await cu.evaluate(()=>{const ids=[...new Set([...document.querySelectorAll("#app a[href^='#/pro/']")].map(a=>a.getAttribute("href").split("/pro/")[1].split(/[?/]/)[0]))];return ids.map(id=>isRapid(id))});
   if(!o.length||!o[0])throw Error("top result not a rapid responder "+o);const firstSlow=o.indexOf(false);if(firstSlow>=0&&o.slice(firstSlow).includes(true))throw Error("rapid pros not ranked first "+o);if(!await cu.$(".badge.b-rapid"))throw Error("no badge");
   const med=await cu.evaluate(()=>{const u=DB.users.find(x=>x.id==="c25");return u.rs&&u.rs.med});if(!(med<36e5))throw Error("c25 median not < 1h");await shot(cu,"10-emergency-rapid")});
- await step("11 side-by-side bid compare (2+ bids)",async()=>{const dm=await mk("demo");await login(dm,"demo-homeowner@toolbelt.test");await go(dm,"/job/j1");await dm.click("#cmpBtn");await dm.waitForSelector(".cmp");
+ await step("11 side-by-side bid compare (2+ bids)",async()=>{const dm=await mk("demo");await login(dm,"demo-homeowner@sawyer.test");await go(dm,"/job/j1");await dm.click("#cmpBtn");await dm.waitForSelector(".cmp");
   const n=await dm.$$eval("[data-bid]",x=>x.length);if(n<2)throw Error("compare shows "+n);for(const k of["Price","Timeline","Rating","Verified jobs","Badges"])if(!await dm.$(`[data-bid] [data-k='${k}']`))throw Error("missing "+k);if(!await dm.$("[data-bid] .b-rapid"))throw Error("no badges in compare");
   await shot(dm,"11-compare");await dm.click("[data-chire] >> nth=0");await dm.waitForSelector("#cfCHire");await dm.click("#modal .mclose");await dm.context().close()});
  await step("12 crew builder: dated slots, available suggestions, invite + book whole crew",async()=>{const r=await pm.evaluate(t=>A.postProject({title:"Dock + deck rebuild "+t[0],type:"custom",zip:"33602",start:t[1]?"2027-06-01":"2027-09-01",end:t[1]?"2027-06-20":"2027-09-20",budget:"$30k",desc:"Canal dock rebuild",roles:[{trade:"Decks & Docks",need:1,label:"Dock builder"},{trade:"Concrete & Masonry",need:1,label:"Seawall cap"},{trade:"Electrical",need:1,label:"Dock lighting"}]}),[run,name==="desktop"]);if(!r.ok)throw Error(r.msg);
@@ -71,10 +71,24 @@ for(const [vw,vh,name] of [[1440,900,"desktop"],[390,844,"mobile"]]){
   await pm.click("#cbBook");await pm.click("#cbConfirm");await pm.waitForTimeout(800);
   await wait(pm,()=>[...document.querySelectorAll(".cb-status")].every(x=>/^(\d+) \/ \1 filled$/.test(x.textContent.trim())),null,20000);await pm.evaluate(()=>document.getElementById("crewBuilder").scrollIntoView());await pm.waitForTimeout(300);await pm.screenshot({path:`${OUT}/${name}-12-crew-booked.png`})});
 
- await step("13 Toolbelt home sections, rapid filter, founding badge, brand",async()=>{await go(cu,"/");for(const sel of[".tbproof",".tbhow",".tbtrades .tbt",".spfeat"])await cu.waitForSelector(sel);const t=await cu.title();if(!/Toolbelt/.test(t))throw Error("title "+t);if(/Spanwise|Trestle/i.test(await cu.textContent("body")))throw Error("old brand visible");
+ await step("13 Sawyer home sections, rapid filter, founding badge, brand",async()=>{await go(cu,"/");for(const sel of[".tbproof",".tbhow",".tbtrades .tbt",".spfeat"])await cu.waitForSelector(sel);const t=await cu.title();if(!/^Sawyer/.test(t)||!/trust with your house/.test(t))throw Error("title "+t);for(const r of["/","/find?cat=Plumbing","/pro/c1","/inbox","/pricing","/join"]){await go(cu,r);const html=await cu.content();const m=html.match(/toolbelt|spanwise|trestle/i);if(m)throw Error("old brand \""+m[0]+"\" on "+r);if(!/Sawyer/.test(await cu.textContent("body")))throw Error("no Sawyer on "+r)}await go(cu,"/");
   await go(cu,"/find?cat=Plumbing");await cu.click("#fRapid");await cu.waitForTimeout(600);const o=await cu.evaluate(()=>[...new Set([...document.querySelectorAll("#app a[href^='#/pro/']")].map(a=>a.getAttribute("href").split("/pro/")[1].split(/[?/]/)[0]))].map(id=>isRapid(id)));if(!o.length||o.includes(false))throw Error("rapid filter "+o);await shot(cu,"13-rapid-filter");
   await go(cu,"/pro/c26");if(!/Founding Pro · 3 months free/.test(await cu.textContent("#app")))throw Error("no founding badge");
-  const hz=await (await cu.request.get(BASE+"/healthz")).json();if(hz.v!=="2.1.0-toolbelt"||hz.app!=="Toolbelt")throw Error("healthz "+JSON.stringify(hz))});
+  const hz=await (await cu.request.get(BASE+"/healthz")).json();if(!/^2\.2\.0-sawyer$/.test(hz.v)||hz.app!=="Sawyer")throw Error("healthz "+JSON.stringify(hz))});
+
+ await step("14 inbox: persisted notifications for bids, crew invites, milestones; read state survives reload",async()=>{
+  await go(cu,"/inbox?f=bids");await cu.waitForSelector(".ibi");const k=await cu.$$eval(".ibi",x=>x.map(e=>e.dataset.kind));if(k.some(x=>x!=="bids"))throw Error("filter "+k);if(!/sent a quote/.test(await cu.textContent(".iblist")))throw Error("no quote notif");
+  await go(pm,"/inbox?f=invites");await pm.waitForSelector(".ibi[data-kind=invites]");
+  await go(pr,"/inbox?f=payments");await pr.waitForSelector(".ibi[data-kind=payments]");if(!/funded|Signed off/.test(await pr.textContent(".iblist")))throw Error("no milestone notif");
+  await go(cu,"/inbox");await cu.waitForSelector("#bellBtn .dot");await shot(cu,"14-inbox");
+  await cu.click("#ibAll");await cu.waitForTimeout(800);await cu.reload();await cu.waitForTimeout(1200);await go(cu,"/inbox");
+  if(await cu.$(".ibi.unread"))throw Error("unread after mark all");if(await cu.$("#bellBtn .dot"))throw Error("bell still shows count");
+  const un=await cu.evaluate(()=>unreadCount());if(un)throw Error("server still has unread "+un)});
+ await step("15 rich pro profile (services, response, sticky CTA) + new-pro setup checklist",async()=>{
+  await go(cu,"/pro/c1");for(const sel of[".svc",".pxresp",".vwork",".v2stats","#pxQuote"])await cu.waitForSelector(sel);if(!(await cu.getAttribute("#pxQuote","href")).includes("invite=c1"))throw Error("cta href");if(await cu.$("#onboard"))throw Error("checklist shown to customer");
+  await shot(cu,"15-pro-profile-rich");await cu.evaluate(()=>document.querySelector(".pxsvc").scrollIntoView());await cu.waitForTimeout(300);await cu.screenshot({path:`${OUT}/${name}-15-pro-services.png`});
+  await go(pr,"/pro/"+proId);await pr.waitForSelector("#onboard");const t=(await pr.textContent("#onboard .pct")).trim();if(!/^\d\/7$/.test(t))throw Error("pct "+t);const d=await pr.$$eval("#onboard li",x=>x.filter(e=>e.dataset.done==="true").length);if(d!==+t[0])throw Error("count mismatch");
+  await go(pr,"/dash");await pr.waitForSelector("#onboard");await pr.evaluate(()=>document.getElementById("onboard").scrollIntoView());await pr.waitForTimeout(300);await pr.screenshot({path:`${OUT}/${name}-15-pro-setup.png`})});
  await shot(cu,"home-customer");for(const p of[cu,pr,pm])await p.context().close();
 }
 await b.close();console.log(results.join("\n"));console.log(errs.length?"CONSOLE ERRORS:\n"+errs.join("\n"):"ZERO console errors");})();

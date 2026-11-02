@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: trestle-live  # kept so the existing Render service + URL stay the same (app is branded Toolbelt)
+    name: trestle-live  # kept so the existing Render service + URL stay the same (app is branded Sawyer)
     runtime: node
     plan: free
     buildCommand: npm install --omit=dev
