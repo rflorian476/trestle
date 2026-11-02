@@ -1,18 +1,18 @@
-# Spanwise (beta) — v2.0.0
+# Toolbelt (beta) — v2.1.0
 
-**Spanwise** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
+**Toolbelt** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.0.0-spanwise"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.1.0-toolbelt"}`
 
 ## Demo logins
-All demo accounts share the password **`spanwise-demo-2026`**. Every person and business in the seed data is fictional.
+All demo accounts share the password **`toolbelt-demo-2026`**. Every person and business in the seed data is fictional.
 
 | Role | Email | What to try |
 |---|---|---|
-| Homeowner (Pat, Austin TX) | `demo-homeowner@spanwise.test` | **Compare bids** on "Water heater leaking" (3 bids). **Escrow sign-off** on "Primary bath remodel" (one milestone waiting). Saved **photo-to-quote** estimate. |
-| Pro (Bluebonnet Plumbing) | `demo-pro@spanwise.test` | Rapid responder badge, photo-verified portfolio, dashboard reply-time tile. |
-| Pro (Barton Creek Remodeling) | `demo-remodeler@spanwise.test` | Hired on the bath remodel: upload before/after photos, request milestone sign-off. |
-| Project manager (Dana, Copperline Build Group) | `demo-pm@spanwise.test` | **Crew builder** on the Tampa deck & seawall project: dated slots, available-pro suggestions, invite or book the whole crew. |
+| Homeowner (Pat, Austin TX) | `demo-homeowner@toolbelt.test` | **Compare bids** on "Water heater leaking" (3 bids). **Escrow sign-off** on "Primary bath remodel" (one milestone waiting). Saved **photo-to-quote** estimate. |
+| Pro (Bluebonnet Plumbing) | `demo-pro@toolbelt.test` | Rapid responder badge, photo-verified portfolio, dashboard reply-time tile. |
+| Pro (Barton Creek Remodeling) | `demo-remodeler@toolbelt.test` | Hired on the bath remodel: upload before/after photos, request milestone sign-off. |
+| Project manager (Dana, Copperline Build Group) | `demo-pm@toolbelt.test` | **Crew builder** on the Tampa deck & seawall project: dated slots, available-pro suggestions, invite or book the whole crew. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
@@ -27,7 +27,7 @@ Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, M
 ## What's here
 | File | Purpose |
 |---|---|
-| `server.js` | Node 24 HTTP server with no npm dependencies. Uses `node:sqlite` (`data/spanwise.db`) and `crypto.scrypt` password hashes. |
+| `server.js` | Node 24 HTTP server with no npm dependencies. Uses `node:sqlite` (`data/toolbelt.db`) and `crypto.scrypt` password hashes. |
 | `app-logic.js` | The app's own business rules (`A.*` actions), run **server-side** in a `vm` sandbox. The server sets the session user, runs the action, saves to SQLite and returns a user-scoped snapshot. |
 | `public/index.html` | The ultimate UI. Storage is patched so every action goes to `/api/act`. It polls `/api/state` every 4 seconds. |
 | `build-live.js`, `client-pre.js`, `client-post.js` | Regenerate `public/` and `app-logic.js` from `src/app.html` + `src/v2.js` + `src/v2.css`. Run with `node build-live.js`. |

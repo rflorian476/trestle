@@ -1,8 +1,8 @@
 {
-  "name": "spanwise-live",
-  "version": "2.0.0",
+  "name": "toolbelt-live",
+  "version": "2.1.0",
   "private": true,
-  "description": "Spanwise beta: multi-user contractor marketplace (Node + node:sqlite, no dependencies)",
+  "description": "Toolbelt beta: multi-user contractor marketplace (Node + node:sqlite, no dependencies)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

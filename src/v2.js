@@ -1,5 +1,5 @@
 /* =====================================================================
-   SPANWISE v2 layer: crew builder, photo-verified work, mock milestone
+   TOOLBELT v2 layer: crew builder, photo-verified work, mock milestone
    escrow, photo-to-quote estimator, rapid responder badge, bid compare.
    Runs in the browser AND server-side (vm) — DOM work stays inside views.
    ===================================================================== */
@@ -280,5 +280,19 @@ const SPAN_CITIES=[["Seattle","98103"],["Denver","80205"],["Phoenix","85254"],["
  const cities=`<div class="spcities reveal" aria-label="Cities">${SPAN_CITIES.map(([c,z])=>`<a href="${href("find",null,{zip:z})}">${esc(c)}</a>`).join("")}</div>`;
  h=h.replace('<ul class="etrust reveal">',cities+'<ul class="etrust reveal">');
  const F=[["users","Crew builder","Post a multi-trade build with dates. We suggest pros free that exact window, and you book the whole crew in one tap.","project","p1",{tab:"builder"}],["camera","Photo-verified work","Before & after photos turn Verified only once the customer confirms the job is done.","pro","c1"],["lock","Milestone escrow","Fund each stage, release on sign-off. Test mode in the beta, no real money.","job","j11"],["calc","Photo-to-quote","A transparent ballpark by trade, size, urgency and region. Labeled as an estimate, always.","estimate"],["zap","Rapid responders","Pros with a median first reply under an hour get the badge and rank first in emergencies.","find",null,{emerg:"1",cat:"Plumbing"}],["layers","Side-by-side bids","Two or more bids? Compare price, timeline, rating, verified jobs and badges in one view.","compare","j1"]];
- const band=`<section class="wrap spfeat reveal"><div class="ehead"><span class="kick">What's new in Spanwise</span><h2>Built for the whole job, not just the lead.</h2></div><div class="spf-g">${F.map(([ic,t,d,v,p,q],i)=>`<a class="spf" href="${href(v,p,q)}" style="--i:${i}"><span class="spf-i">${I(ic,20)}</span><b>${t}</b><p>${d}</p><span class="more">See it ${I("arrow",14)}</span></a>`).join("")}</div></section>`;
+ const band=`<section class="wrap spfeat reveal"><div class="ehead"><span class="kick">What's new in Toolbelt</span><h2>Built for the whole job, not just the lead.</h2></div><div class="spf-g">${F.map(([ic,t,d,v,p,q],i)=>`<a class="spf" href="${href(v,p,q)}" style="--i:${i}"><span class="spf-i">${I(ic,20)}</span><b>${t}</b><p>${d}</p><span class="more">See it ${I("arrow",14)}</span></a>`).join("")}</div></section>`;
  const k=h.indexOf('<section class="wrap uhelp');return k>=0?h.slice(0,k)+band+h.slice(k):h+band}}
+
+/* ===================== v2.1 Toolbelt upgrades ===================== */
+{const ob=badgeList;badgeList=function(u){return ob(u).map(b=>b&&b.k==="found"?Object.assign({},b,{t:"Founding Pro · 3 months free"}):b)}}
+let V2RAPID=false;
+{const os=searchPros;searchPros=function(f){const r=os(f);return V2RAPID&&!(f&&f.favs)?r.filter(x=>isRapid(x.u.id)):r}}
+{const ov=VIEWS.find;VIEWS.find=(p,q)=>{q=q||{};V2RAPID=q.rapid==="1";let h;try{h=ov(p,q)}finally{V2RAPID=false}
+ const on=q.rapid==="1";const link=href("find",null,Object.assign({},q,{rapid:on?"":"1"}));
+ return h.replace('<div class="fchips">',`<div class="fchips"><a class="fchip ${on?"on":""}" id="fRapid" aria-pressed="${on}" href="${link}">${I("zap",14)} Rapid responders</a>`)}}
+const TB_TRADES=[["Plumbing","drop"],["Electrical","zap"],["HVAC","flame"],["Roofing","home"],["Remodeling","wrench"],["Carpentry","wrench"],["Concrete & Masonry","wrench"],["Landscaping","wrench"]];
+{const ov=VIEWS.home;VIEWS.home=()=>{const h=ov();const pros=PROS();const cities=new Set(pros.map(u=>townOf(u.zip))).size;const vj=DB.jobs.filter(j=>confirmedJob(j)).length;const rs=DB.reviews.filter(r=>r.stars);const avg=rs.length?(rs.reduce((a,r)=>a+r.stars,0)/rs.length).toFixed(1):"5.0";
+ const proof=`<section class="wrap tbproof reveal" aria-label="Toolbelt by the numbers"><div><b>${pros.length}</b><span>licensed pros</span></div><div><b>${cities}</b><span>cities</span></div><div><b>${vj}</b><span>customer-verified jobs</span></div><div><b>${avg}★</b><span>average rating</span></div></section>`;
+ const tiles=`<section class="wrap tbtrades reveal"><div class="ehead"><span class="kick">Browse by trade</span><h2>Whatever the job, there's a pro on the belt.</h2></div><div class="tbt-g">${TB_TRADES.map(([t,ic])=>{const n=pros.filter(u=>u.trade===t).length;return`<a class="tbt" href="${href("find",null,{cat:t})}"><span class="tbt-i">${I(TRADE_ICON[t]||ic,22)}</span><b>${esc(t)}</b><small>${n} pro${n===1?"":"s"}</small></a>`}).join("")}</div></section>`;
+ const how=`<section class="wrap tbhow reveal"><div class="ehead"><span class="kick">How it works</span><h2>Three steps. No lead fees.</h2></div><ol class="tbh-g">${[["camera","Describe or snap it","Post the job or get an instant photo-to-quote ballpark."],["layers","Compare real bids","Price, timeline, rating and verified jobs side by side."],["lock","Pay as work lands","Milestones release only when you sign off (test mode in beta)."]].map(([ic,t,d],i)=>`<li class="tbh"><span class="tbh-n">${i+1}</span>${I(ic,22)}<b>${t}</b><p>${d}</p></li>`).join("")}</ol></section>`;
+ const k=h.indexOf('<section class="wrap spfeat');return k>=0?h.slice(0,k)+proof+how+tiles+h.slice(k):h+proof+how+tiles}}

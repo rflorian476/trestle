@@ -21,7 +21,7 @@ c=rep(c,'<button class="linkbtn" id="resetBtn">Reset demo data</button>','');
 c=rep(c,'Demo prototype. Every business, person, license and review here is fictional.','Beta test. Listings marked (demo) are fictional sample data; everything else was posted by real beta users.');
 c+="\n"+fs.readFileSync(path.join(__dirname,"client-post.js"),"utf8");
 let html=src.slice(0,a+8)+c+src.slice(b);
-html=rep(html,'<body><a class="skip" href="#app">Skip to content</a>','<body><div class="betabar" role="status">Spanwise beta · test mode · don\'t post sensitive info</div><a class="skip" href="#app">Skip to content</a>');
+html=rep(html,'<body><a class="skip" href="#app">Skip to content</a>','<body><div class="betabar" role="status">Toolbelt beta · test mode · don\'t post sensitive info</div><a class="skip" href="#app">Skip to content</a>');
 html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
 .testmode{margin-top:14px;padding:12px 14px;border-radius:12px;font-size:14px}
 .liveauth .fld{margin-bottom:10px}.livelogin{margin-top:18px}

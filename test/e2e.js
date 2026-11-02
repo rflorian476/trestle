@@ -1,4 +1,4 @@
-// Multi-user end-to-end test against a running Spanwise live server (v2 features included).
+// Multi-user end-to-end test against a running Toolbelt live server (v2 features included).
 // usage (from designs/src for playwright): node /workspace/contractor-app/live/test/e2e.js <BASE_URL> <shotdir>
 const {chromium}=require("playwright");
 const [BASE,OUT]=process.argv.slice(2);
@@ -36,7 +36,7 @@ for(const [vw,vh,name] of [[1440,900,"desktop"],[390,844,"mobile"]]){
  await step("6 wrong password rejected; log out + log back in",async()=>{const r=await cu.evaluate(async()=>{const o=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"nobody@example.com",password:"wrongwrong"})});return o.json()});if(!(r.error&&r.status===401))throw Error("bad login "+JSON.stringify(r));await cu.evaluate(()=>{act(A.logout());go("home")});await cu.waitForTimeout(400);await go(cu,"/signup");await cu.fill("#li-e",cuEmail);await cu.fill("#li-p","another-pass-42");await cu.click("#loginf button[type=submit]");await cu.waitForTimeout(800);const me=await cu.evaluate(()=>DB.me);if(me!==custId)throw Error("log back in failed")});
 
  const png=await cu.screenshot({clip:{x:0,y:0,width:320,height:240}});
- const login=async(p,email)=>{await p.goto(BASE+"/");const r=await p.evaluate(async e=>{const o=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:"spanwise-demo-2026"})});return o.json()},email);if(!r.ok)throw Error("demo login failed "+email);await p.reload();await p.waitForTimeout(600)};
+ const login=async(p,email)=>{await p.goto(BASE+"/");const r=await p.evaluate(async e=>{const o=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:"toolbelt-demo-2026"})});return o.json()},email);if(!r.ok)throw Error("demo login failed "+email);await p.reload();await p.waitForTimeout(600)};
  let jid2;
  await step("7 escrow (test mode): milestones funded, sign-off requested, released",async()=>{await go(cu,"/post");await cu.fill("#pf-title","Gutter + fascia repair "+run);await cu.fill("#pf-desc","Gutter pulled off the fascia on the back of the house after a storm.");if(await cu.$("#pf-cat"))await cu.selectOption("#pf-cat","Roofing");await cu.click("#postf button.primary");await cu.waitForTimeout(900);jid2=(await cu.evaluate(()=>location.hash)).split("/job/")[1].split(/[?/]/)[0];
   await go(pr,"/job/"+jid2);await pr.click("#doQuote");await pr.fill("#qp","1200");await pr.fill("#qd","3");await pr.fill("#qn","Rehang 30 ft of gutter, replace rotten fascia");await pr.click("#qf button.primary");await pr.waitForTimeout(600);
@@ -62,7 +62,7 @@ for(const [vw,vh,name] of [[1440,900,"desktop"],[390,844,"mobile"]]){
   const o=await cu.evaluate(()=>{const ids=[...new Set([...document.querySelectorAll("#app a[href^='#/pro/']")].map(a=>a.getAttribute("href").split("/pro/")[1].split(/[?/]/)[0]))];return ids.map(id=>isRapid(id))});
   if(!o.length||!o[0])throw Error("top result not a rapid responder "+o);const firstSlow=o.indexOf(false);if(firstSlow>=0&&o.slice(firstSlow).includes(true))throw Error("rapid pros not ranked first "+o);if(!await cu.$(".badge.b-rapid"))throw Error("no badge");
   const med=await cu.evaluate(()=>{const u=DB.users.find(x=>x.id==="c25");return u.rs&&u.rs.med});if(!(med<36e5))throw Error("c25 median not < 1h");await shot(cu,"10-emergency-rapid")});
- await step("11 side-by-side bid compare (2+ bids)",async()=>{const dm=await mk("demo");await login(dm,"demo-homeowner@spanwise.test");await go(dm,"/job/j1");await dm.click("#cmpBtn");await dm.waitForSelector(".cmp");
+ await step("11 side-by-side bid compare (2+ bids)",async()=>{const dm=await mk("demo");await login(dm,"demo-homeowner@toolbelt.test");await go(dm,"/job/j1");await dm.click("#cmpBtn");await dm.waitForSelector(".cmp");
   const n=await dm.$$eval("[data-bid]",x=>x.length);if(n<2)throw Error("compare shows "+n);for(const k of["Price","Timeline","Rating","Verified jobs","Badges"])if(!await dm.$(`[data-bid] [data-k='${k}']`))throw Error("missing "+k);if(!await dm.$("[data-bid] .b-rapid"))throw Error("no badges in compare");
   await shot(dm,"11-compare");await dm.click("[data-chire] >> nth=0");await dm.waitForSelector("#cfCHire");await dm.click("#modal .mclose");await dm.context().close()});
  await step("12 crew builder: dated slots, available suggestions, invite + book whole crew",async()=>{const r=await pm.evaluate(t=>A.postProject({title:"Dock + deck rebuild "+t[0],type:"custom",zip:"33602",start:t[1]?"2027-06-01":"2027-09-01",end:t[1]?"2027-06-20":"2027-09-20",budget:"$30k",desc:"Canal dock rebuild",roles:[{trade:"Decks & Docks",need:1,label:"Dock builder"},{trade:"Concrete & Masonry",need:1,label:"Seawall cap"},{trade:"Electrical",need:1,label:"Dock lighting"}]}),[run,name==="desktop"]);if(!r.ok)throw Error(r.msg);
@@ -70,6 +70,11 @@ for(const [vw,vh,name] of [[1440,900,"desktop"],[390,844,"mobile"]]){
   await pm.$$eval("[data-pick]",xs=>xs.forEach(x=>{if(!x.dataset.pick.startsWith("r1:")&&x.checked)x.click()}));await pm.evaluate(()=>document.getElementById("crewBuilder").scrollIntoView());await pm.waitForTimeout(300);await pm.screenshot({path:`${OUT}/${name}-12-crew-builder.png`});await pm.click("#cbInvite");await pm.waitForSelector(".cb-role[data-rid=r1] .cb-crew li.inv");
   await pm.click("#cbBook");await pm.click("#cbConfirm");await pm.waitForTimeout(800);
   await wait(pm,()=>[...document.querySelectorAll(".cb-status")].every(x=>/^(\d+) \/ \1 filled$/.test(x.textContent.trim())),null,20000);await pm.evaluate(()=>document.getElementById("crewBuilder").scrollIntoView());await pm.waitForTimeout(300);await pm.screenshot({path:`${OUT}/${name}-12-crew-booked.png`})});
+
+ await step("13 Toolbelt home sections, rapid filter, founding badge, brand",async()=>{await go(cu,"/");for(const sel of[".tbproof",".tbhow",".tbtrades .tbt",".spfeat"])await cu.waitForSelector(sel);const t=await cu.title();if(!/Toolbelt/.test(t))throw Error("title "+t);if(/Spanwise|Trestle/i.test(await cu.textContent("body")))throw Error("old brand visible");
+  await go(cu,"/find?cat=Plumbing");await cu.click("#fRapid");await cu.waitForTimeout(600);const o=await cu.evaluate(()=>[...new Set([...document.querySelectorAll("#app a[href^='#/pro/']")].map(a=>a.getAttribute("href").split("/pro/")[1].split(/[?/]/)[0]))].map(id=>isRapid(id)));if(!o.length||o.includes(false))throw Error("rapid filter "+o);await shot(cu,"13-rapid-filter");
+  await go(cu,"/pro/c26");if(!/Founding Pro · 3 months free/.test(await cu.textContent("#app")))throw Error("no founding badge");
+  const hz=await (await cu.request.get(BASE+"/healthz")).json();if(hz.v!=="2.1.0-toolbelt"||hz.app!=="Toolbelt")throw Error("healthz "+JSON.stringify(hz))});
  await shot(cu,"home-customer");for(const p of[cu,pr,pm])await p.context().close();
 }
 await b.close();console.log(results.join("\n"));console.log(errs.length?"CONSOLE ERRORS:\n"+errs.join("\n"):"ZERO console errors");})();
