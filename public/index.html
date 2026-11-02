@@ -909,6 +909,102 @@ section.spfeat,section.tbtrades,section.tbhow{padding-left:24px;padding-right:24
 /* programmatic focus targets (headings / tabindex=-1) get no visible box; real controls keep focus rings */
 [tabindex="-1"]:focus,h1:focus:not(:focus-visible),h2:focus:not(:focus-visible),main:focus,[tabindex="-1"]:focus-visible{outline:none!important;box-shadow:none!important}
 
+/* ===== v4 design system ===== */
+:root:not([data-theme=dark]){--bg:#FFFFFF;--surface:#FFFFFF;--surface2:#F5F7FA;--ink:#0F2A44;--muted:#526173;--line:#E3E8EF;--line-strong:#CBD3DD;--p:#0F2A44;--p-h:#0A1F33;--p-ink:#fff;--p-bg:#EAF0F6;--p-txt:#0F2A44;--acc:#E8692E;--acc-h:#D15A22;--acc-ink:#fff;--acc-bg:#FDEEE6;--brass:#E8692E;--brass-bg:#FDEEE6;--star:#E8692E;--gold:#C2521C;--gold-bg:#FDEEE6;--navy:#0F2A44;--warm:#F5F7FA;--glass:rgba(255,255,255,.9);--sw-acc:#E8692E;--sw-house:#0F2A44;--shadow:0 1px 2px rgba(15,42,68,.06),0 2px 8px rgba(15,42,68,.04);--shadow-h:0 12px 32px -8px rgba(15,42,68,.18)}
+[data-theme=dark]{--bg:#0B1622;--surface:#122133;--surface2:#0F1C2B;--ink:#EEF2F7;--muted:#9AA8B8;--line:#1F3247;--line-strong:#2B4259;--p:#F07B3F;--p-h:#F48E57;--p-ink:#0B1622;--p-bg:#2A1B12;--p-txt:#F7A274;--acc:#F07B3F;--acc-h:#F48E57;--acc-ink:#0B1622;--acc-bg:#2A1B12;--brass:#F07B3F;--star:#F07B3F;--gold:#F07B3F;--gold-bg:#2A1B12;--navy:#08111B;--warm:#0F1C2B;--glass:rgba(11,22,34,.9);--sw-acc:#F07B3F;--shadow:0 1px 2px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.2);--shadow-h:0 16px 40px -8px rgba(0,0,0,.5)}
+:root{--font-d:"Jakarta E",ui-sans-serif,system-ui,sans-serif;--r:16px;--r-sm:12px;--r-btn:12px;--s1:8px;--s2:16px;--s3:24px;--s4:32px;--s5:48px;--s6:64px;--s7:96px}
+body{background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+h1,h2,h3,.h1,.h2{font-family:var(--font-d)!important;font-style:normal!important;letter-spacing:-.025em}
+h1{font-weight:800}h2{font-weight:800}h3{font-weight:700}
+h1 em,h2 em,h1 i,h2 i,.grad{font-style:normal!important;background:none!important;-webkit-text-fill-color:currentColor!important;color:inherit!important}
+.btn{border-radius:var(--r-btn)!important;font-weight:700;letter-spacing:-.005em}
+.btn.primary,.btn.dark{background:var(--p);color:var(--p-ink);border-color:var(--p)}
+.btn.primary:hover,.btn.dark:hover{background:var(--p-h)}
+input,select,textarea{border-radius:12px}
+.card,.v2card,.pcard,.v3card{border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--shadow)}
+/* ---- home ---- */
+.v4w{max-width:1200px;margin:0 auto;padding:0 24px}
+.v4hero{padding:64px 0 72px}
+.v4hero-g{display:grid;grid-template-columns:1fr 1.08fr;gap:64px;align-items:center}
+.v4eye{display:inline-flex;align-items:center;gap:8px;margin:0 0 16px;font-weight:700;font-size:14px;color:var(--acc);letter-spacing:.01em}
+.v4hero h1{font-size:clamp(40px,5.4vw,68px);line-height:1.02;letter-spacing:-.03em;margin:0 0 24px;color:var(--ink)}
+.v4sub{font-size:19px;line-height:1.55;color:var(--muted);margin:0 0 32px;max-width:520px}
+.v4search{display:flex;align-items:stretch;background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;box-shadow:0 8px 28px -10px rgba(15,42,68,.22);padding:8px;gap:0;max-width:600px}
+.v4f{display:flex;flex-direction:column;justify-content:center;padding:8px 16px;min-width:0;cursor:text}
+.v4f-q{flex:1.4}.v4f-z{flex:1;border-left:1px solid var(--line)}
+.v4f span{font-size:12px;font-weight:700;color:var(--ink);letter-spacing:.02em}
+.v4f input,.v4f select{border:0!important;background:transparent!important;padding:2px 0!important;font-size:16px;color:var(--ink);outline:none;box-shadow:none!important;min-height:0;width:100%;border-radius:0}
+.v4f select{appearance:auto;cursor:pointer}
+.v4go{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:12px;background:var(--acc);color:var(--acc-ink);font:inherit;font-weight:700;font-size:16px;padding:0 24px;cursor:pointer;transition:background .15s}
+.v4go:hover{background:var(--acc-h)}
+.v4ticks{display:flex;flex-wrap:wrap;gap:8px 24px;list-style:none;padding:0;margin:24px 0 0;color:var(--muted);font-size:14px;font-weight:600}
+.v4ticks li{display:flex;align-items:center;gap:8px}.v4ticks svg{color:var(--acc)}
+.v4hero-img{position:relative;border-radius:24px;overflow:hidden;aspect-ratio:5/4;box-shadow:0 24px 64px -24px rgba(15,42,68,.35)}
+.v4hero-img img{width:100%;height:100%;object-fit:cover;object-position:70% 40%;display:block}
+.v4band{background:var(--surface2);border-block:1px solid var(--line)}
+.v4stats{display:grid;grid-template-columns:repeat(4,1fr);padding-block:32px}
+.v4stats div{text-align:center}.v4stats div+div{border-left:1px solid var(--line)}
+.v4stats b{display:block;font-size:32px;font-weight:800;letter-spacing:-.03em;color:var(--ink)}.v4stats span{color:var(--muted);font-size:14px;font-weight:600}
+.v4sec{padding-block:96px}
+.v4alt{background:var(--surface2)}
+.v4head{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:32px}
+.v4head h2{font-size:clamp(28px,3.4vw,40px);line-height:1.1;margin:0}
+.v4head.v4c{flex-direction:column;align-items:center;text-align:center}.v4head p{margin:8px 0 0;color:var(--muted);font-size:18px}
+.v4c{text-align:center}
+.v4link{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--ink);text-decoration:none;white-space:nowrap}
+.v4link:hover{color:var(--acc)}
+.v4cat-g{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+.v4cat{display:block;text-decoration:none;color:var(--ink)}
+.v4cat img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:16px;display:block;transition:transform .25s,box-shadow .25s}
+.v4cat:hover img{transform:translateY(-3px);box-shadow:var(--shadow-h)}
+.v4cat span{display:block;margin-top:12px;font-weight:700;font-size:16px}
+.v4more{display:flex;flex-wrap:wrap;gap:8px;margin-top:32px}
+.v4more a{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--line);border-radius:999px;text-decoration:none;color:var(--ink);font-weight:600;font-size:14px;background:var(--surface)}
+.v4more a:hover{border-color:var(--ink)}.v4more svg{color:var(--muted)}
+.v4steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;list-style:none;margin:0;padding:0}
+.v4steps li{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:32px}
+.v4steps i{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--ink);color:var(--bg);font-style:normal;font-weight:800;margin-bottom:24px}
+.v4steps h3,.v4why-c h3{font-size:20px;margin:0 0 8px}.v4steps p,.v4why-c p{margin:0;color:var(--muted);line-height:1.55}
+.v4why{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+.v4why-c{border:1px solid var(--line);border-radius:16px;padding:32px 24px;background:var(--surface);box-shadow:var(--shadow)}
+.v4ic{display:grid;place-items:center;width:48px;height:48px;border-radius:12px;background:var(--acc-bg);color:var(--acc);margin-bottom:24px}
+.v4fine{margin:32px 0 0}
+.v4pro-g{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+.v4pro{display:block;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-decoration:none;color:var(--ink);transition:box-shadow .2s,transform .2s}
+.v4pro:hover{box-shadow:var(--shadow-h);transform:translateY(-2px)}
+.v4pro-img{position:relative}.v4pro-img img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.v4ver{position:absolute;left:12px;top:12px;display:inline-flex;align-items:center;gap:4px;background:#fff;color:#0F2A44;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.v4ver svg{color:#1F8A4C}
+.v4pro-b{padding:16px}.v4pro-h{display:flex;justify-content:space-between;gap:8px;align-items:center}.v4pro-h b{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v4pro small{display:block;color:var(--muted);margin-top:4px;font-size:14px}
+.v4rt{display:inline-flex;align-items:center;gap:4px;font-size:14px;white-space:nowrap}.v4rt svg{color:var(--acc);fill:currentColor}.v4rt span{color:var(--muted)}.v4new{color:var(--muted);font-weight:600}
+.v4split{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.v4cta{position:relative;display:block;border-radius:24px;overflow:hidden;min-height:400px;color:#fff;text-decoration:none}
+.v4cta img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.v4cta:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,42,68,0) 30%,rgba(15,42,68,.88))}
+.v4cta div{position:absolute;left:32px;right:32px;bottom:32px;z-index:1}
+.v4cta small{font-weight:700;font-size:14px;opacity:.9}.v4cta h3{font-size:32px;line-height:1.1;margin:8px 0 24px;color:#fff;letter-spacing:-.03em}
+.v4btn{display:inline-flex;align-items:center;gap:8px;padding:14px 24px;border-radius:12px;font-weight:700}
+.v4btn-acc{background:#E8692E;color:#fff}.v4btn-w{background:#fff;color:#0F2A44}
+[data-theme=dark] .v4search{box-shadow:0 8px 28px -10px rgba(0,0,0,.6)}
+[data-theme=dark] .v4steps i{background:var(--acc);color:var(--acc-ink)}
+@media(max-width:980px){.v4hero-g{grid-template-columns:1fr;gap:32px}.v4hero-img{order:-1;aspect-ratio:16/10}.v4cat-g{grid-template-columns:repeat(3,1fr)}.v4why,.v4pro-g{grid-template-columns:repeat(2,1fr)}.v4steps{grid-template-columns:1fr}}
+@media(max-width:640px){.v4w{padding:0 16px}.v4hero{padding:16px 0 48px}.v4hero h1{font-size:40px}.v4sub{font-size:17px;margin-bottom:24px}
+.v4search{flex-direction:column;padding:8px}.v4f-z{border-left:0;border-top:1px solid var(--line)}.v4f{padding:12px}.v4go{justify-content:center;padding:14px;margin-top:4px}
+.v4stats{grid-template-columns:repeat(2,1fr);gap:24px 0}.v4stats div:nth-child(3){border-left:0}
+.v4sec{padding-block:64px}.v4head{flex-direction:column;align-items:flex-start}.v4cat-g{grid-template-columns:repeat(2,1fr);gap:12px}.v4why,.v4pro-g,.v4split{grid-template-columns:1fr}.v4cta{min-height:320px}.v4cta h3{font-size:26px}}
+.efoot .btn.primary{background:#E8692E!important;border-color:#E8692E!important;color:#fff!important}
+.efoot .btn.glass{background:rgba(255,255,255,.08)!important;color:#fff!important;border:1px solid rgba(255,255,255,.25)!important}
+.v4split{padding-bottom:96px;padding-top:0}
+img.v4art{width:100%;height:100%;object-fit:cover;display:block;aspect-ratio:16/11}
+.pc-img img.v4art,.udc-art img.v4art,.fc-art img.v4art{position:absolute;inset:0;aspect-ratio:auto}
+.pc-img,.udc-art,.fc-art{position:relative}
+.pstats b,.pstat b,.kpi b{color:var(--ink)!important}
+.px-stats b{color:var(--ink)!important}
+.phx-art{display:none!important}
+.phx{background:var(--surface2)!important;border-bottom:1px solid var(--line)}
+.phx h1{letter-spacing:-.03em}
+
 </style></head><body><div class="betabar" role="status">Sawyer beta · test mode · don't post sensitive info</div><a class="skip" href="#app">Skip to content</a>
 <header class="top" id="top"></header>
 <main id="app" tabindex="-1"></main>
@@ -2216,6 +2312,41 @@ AFTER.account=()=>{const $=s=>document.getElementById(s);if(!$("acctForm"))retur
  $("addPasskey").onclick=async()=>{try{await addPasskey();toast("Passkey added. Next time, sign in with one tap.");render()}catch(e){toast(e.name==="NotAllowedError"?"Passkey setup was cancelled":e.message,"err")}};
  $("setPw").onclick=()=>openModal(`<h2>Set a password</h2><div class="fld"><label for="npw">New password (8+ characters)</label><input id="npw" type="password" autocomplete="new-password" minlength="8"></div><button class="btn primary block" id="npwGo">Save password</button>`,()=>{$("npwGo").onclick=async()=>{const r=await jpost("/api/account/password",{password:$("npw").value});if(r.error)toast(r.error,"err");else{closeModal();toast("Password saved");render()}}});
  document.querySelectorAll("[data-delpk]").forEach(b=>b.onclick=async()=>{if(!confirm("Remove this passkey?"))return;await jpost("/api/passkey/delete",{id:b.dataset.delpk});render()})};
+
+/* v4 redesign: photo hero, one search, clean sections */
+const V4IMG={Plumbing:"t-plumbing",Electrical:"t-electrical",HVAC:"t-hvac",Roofing:"t-roofing",Remodeling:"t-remodel",Painting:"t-painting"};
+const v4img=(n,alt,cls,eager)=>`<img class="${cls||""}" src="/img/${n}.webp" alt="${esc(alt||"")}" ${eager?'fetchpriority="high"':'loading="eager"'} decoding="async">`;
+const v4stars=r=>r.n?`<span class="v4rt">${I("star",14)}<b>${r.avg.toFixed(1)}</b><span>(${r.n})</span></span>`:`<span class="v4rt v4new">New</span>`;
+VIEWS.home=()=>{const m=me(),z=(m&&m.zip)||"78704";let top=searchPros({zip:z,miles:120,sort:"rating"}).filter(x=>x.r.n);if(top.length<4)top=searchPros({zip:z,miles:5000,sort:"rating"}).filter(x=>x.r.n);
+ const seen=new Set();top=top.filter(x=>x.u.trade!=="Property Management"&&!seen.has(x.u.trade)&&seen.add(x.u.trade)).slice(0,4);
+ const pros=PROS(),cities=new Set(pros.map(u=>townOf(u.zip))).size,vj=DB.jobs.filter(j=>typeof confirmedJob==="function"?confirmedJob(j):j.status==="done").length;
+ const cats=Object.keys(V4IMG),more=TRADES.filter(c=>!V4IMG[c]).slice(0,10);let pi=0;
+ return`<section class="v4hero"><div class="v4w v4hero-g"><div class="v4hero-t">
+ <p class="v4eye">${I("shield",16)}Licensed, insured, reviewed</p>
+ <h1>The right pro for every home project</h1>
+ <p class="v4sub">Find trusted local pros for any job. Compare up to 3 quotes, chat without sharing your number, and pay only when the work is done.</p>
+ <form class="v4search" id="hsf" role="search"><label class="v4f v4f-q"><span>What</span><input id="hq" name="q" placeholder="Plumber, roof repair, panel upgrade" autocomplete="off"></label><label class="v4f v4f-z"><span>Where</span><select id="hz" name="zip">${zipOpts(z)}</select></label><button class="v4go" aria-label="Search">${I("search",20)}<span>Search</span></button></form>
+ <ul class="v4ticks"><li>${I("check",16)}Free for homeowners</li><li>${I("check",16)}No spam calls</li><li>${I("check",16)}Max 3 pros per job</li></ul>
+ </div><div class="v4hero-img">${v4img("hero","Electrician installing a light fixture in a bright kitchen","",1)}</div></div></section>
+ <section class="v4band" aria-label="Sawyer by the numbers"><div class="v4w v4stats"><div><b>${pros.length}</b><span>licensed pros</span></div><div><b>${cities}</b><span>cities</span></div><div><b>${vj}</b><span>verified jobs</span></div><div><b>$0</b><span>lead fees, ever</span></div></div></section>
+ <section class="v4sec v4w v4cats"><div class="v4head"><h2>Popular services</h2><a class="v4link" href="${href("find")}">See all trades ${I("arrow",16)}</a></div>
+ <div class="v4cat-g">${cats.map(c=>`<a class="v4cat" href="${href("find",null,{cat:c})}">${v4img(V4IMG[c],c+" pro at work")}<span>${esc(c)}</span></a>`).join("")}</div>
+ <div class="v4more">${more.map(c=>`<a href="${href("find",null,{cat:c})}">${I((typeof TRADE_ICON!=="undefined"&&TRADE_ICON[c])||"wrench",18)}${esc(c)}</a>`).join("")}</div></section>
+ <section class="v4sec v4alt v4how"><div class="v4w"><div class="v4head v4c"><h2>How it works</h2><p>Three steps. No phone tag, no surprise fees.</p></div><ol class="v4steps">
+ <li><i>1</i><h3>Tell us the job</h3><p>Search or describe it in plain English. Add a photo for a ballpark price in seconds.</p></li>
+ <li><i>2</i><h3>Compare up to 3 pros</h3><p>See licenses, insurance, verified reviews and price ranges. Chat in the app, your number stays private.</p></li>
+ <li><i>3</i><h3>Hire and pay safely</h3><p>Funds release by milestone, only after you sign off. Then leave a review that actually counts.</p></li></ol></div></section>
+ <section class="v4sec v4w" id="whySawyer"><div class="v4head v4c"><h2>Why homeowners and pros choose Sawyer</h2><p>We fixed what people hate about lead marketplaces.</p></div><div class="v4why">
+ ${[["dollar","No lead fees. Ever.","Pros pay a flat $20/mo with one-click cancel. No pay-per-lead, so nobody inflates your quote to cover it."],["users","Max 3 pros per job","Your request goes to at most 3 pros, shown openly. No bidding wars, no flood of calls."],["lock","Your number stays private","Message pros in the app. Share your phone only if and when you choose. No-spam promise."],["shield","Verified reviews only","Reviews come from finished jobs. Pros can reply, and disputes are handled by a person."]].map(([ic,t,d])=>`<article class="v4why-c"><span class="v4ic">${I(ic,22)}</span><h3>${t}</h3><p>${d}</p></article>`).join("")}</div>
+ <p class="v4c v4fine"><a class="v4link" href="${href("pricing")}">See how we compare ${I("arrow",16)}</a></p></section>
+ <section class="v4sec v4alt v4feat"><div class="v4w"><div class="v4head"><h2>Top-rated pros near ${esc(townOf(z).split(",")[0])}</h2><a class="v4link" href="${href("find",null,{sort:"rating",zip:z})}">Browse all ${I("arrow",16)}</a></div><div class="v4pro-g">
+ ${top.map(({u,r})=>{const im=V4IMG[u.trade]||["pro-1","pro-2","pro-3"][pi++%3];return`<a class="v4pro" href="${href("pro",u.id)}"><div class="v4pro-img">${v4img(im,u.trade)}${u.verified?`<span class="v4ver">${I("check",14)}Verified</span>`:""}</div><div class="v4pro-b"><div class="v4pro-h"><b>${esc(u.biz||nameOf(u))}</b>${v4stars(r)}</div><small>${esc(u.trade)} · ${esc(townOf(u.zip))}</small></div></a>`}).join("")}</div></div></section>
+ <section class="v4w v4split"><a class="v4cta" href="${href("post")}">${v4img("home-ext","A finished craftsman home at dusk")}<div><small>For homeowners & businesses</small><h3>Get your project done right.</h3><span class="v4btn v4btn-acc">Post a job free ${I("arrow",16)}</span></div></a>
+ <a class="v4cta" href="${href("join")}">${v4img("pro-1","A smiling general contractor on a job site")}<div><small>For pros</small><h3>$20 a month. Every lead included.</h3><span class="v4btn v4btn-w">Join as a pro ${I("arrow",16)}</span></div></a></section>`};
+{const oa=AFTER.home;AFTER.home=(...a)=>{try{oa&&oa(...a)}catch(e){}}}
+let V4N={},V4Q=0;
+{const oart=art;art=function(seed,trade,label){if(typeof document==="undefined")return oart(seed,trade,label);const own=V4IMG[trade],pool=own?[own,"t-remodel","home-ext","t-painting"]:["t-remodel","home-ext","t-painting"];if(!V4Q){V4Q=1;setTimeout(()=>{V4N={};V4Q=0})}const k=V4N[trade]=(V4N[trade]||0)+1;const n=pool[(k-1)%pool.length];
+ return`<img class="art v4art" src="/img/${n}.webp" alt="${esc(label||trade+" project photo")}" loading="lazy" decoding="async">`}}
 
 boot();
 /* ---- LIVE: route actions to the server ---- */

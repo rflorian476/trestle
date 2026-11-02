@@ -127,6 +127,7 @@ const server=http.createServer(async(req,res)=>{
  const url=new URL(req.url,"http://x");const p=url.pathname;
  try{
  if(req.method==="GET"&&(p==="/"||p==="/index.html")){res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});return res.end(INDEX())}
+ if(req.method==="GET"&&/^\/img\/[a-z0-9-]+\.webp$/.test(p)){const f=path.join(__dirname,"public/img",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"image/webp","Cache-Control":"public, max-age=604800"});return res.end(fs.readFileSync(f))}
  if(req.method==="GET"&&/^\/icons\/[a-z0-9-]+\.(png|svg|webmanifest)$/.test(p)){const f=path.join(__dirname,"public/icons",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});const ty={png:"image/png",svg:"image/svg+xml",webmanifest:"application/manifest+json"}[p.split(".").pop()];res.writeHead(200,{"Content-Type":ty,"Cache-Control":"public, max-age=86400","X-Content-Type-Options":"nosniff"});return res.end(fs.readFileSync(f))}
  if(req.method==="GET"&&p==="/favicon.ico"){res.writeHead(200,{"Content-Type":"image/png","Cache-Control":"public, max-age=86400"});return res.end(fs.readFileSync(path.join(__dirname,"public/icons/favicon-32.png")))}
  if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:APP_VERSION,app:BRAND.name,data:VER});

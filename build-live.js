@@ -8,7 +8,7 @@ const T=s=>s.split("__BRAND_LC__").join(BRAND.name.toLowerCase()).split("__BRAND
 const src=T(fs.readFileSync(SRC,"utf8"));
 const a=src.indexOf("<script>"),b=src.lastIndexOf("</script>");
 let js=src.slice(a+8,b);
-const V2JS=T(fs.readFileSync(path.join(__dirname,"src/v2.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.js"),"utf8"));
+const V2JS=T(fs.readFileSync(path.join(__dirname,"src/v2.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v4.js"),"utf8"));
 if(!js.includes("\nboot();"))throw new Error("boot anchor missing");
 js=js.replace("\nboot();","\n"+V2JS+"\nboot();");
 fs.writeFileSync(path.join(__dirname,"app-logic.js"),js+"\n;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY};\n");
@@ -29,7 +29,7 @@ html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
 .testmode{margin-top:14px;padding:12px 14px;border-radius:12px;font-size:14px}
 .liveauth .fld{margin-bottom:10px}.livelogin{margin-top:18px}
 #resetBtn,.demo,[data-login]{display:none!important}
-`+T(fs.readFileSync(path.join(__dirname,"src/v2.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.css"),"utf8"))+`
+`+T(fs.readFileSync(path.join(__dirname,"src/v2.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v4.css"),"utf8"))+`
 </style></head>`);
 fs.writeFileSync(path.join(__dirname,"public/index.html"),html);
 console.log("built",html.length);
