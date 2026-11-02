@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,uid TEXT NOT NULL,exp
 CREATE TABLE IF NOT EXISTS appdata(k TEXT PRIMARY KEY,v TEXT NOT NULL,updated INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS uploads(name TEXT PRIMARY KEY,uid TEXT NOT NULL,type TEXT NOT NULL,size INTEGER NOT NULL,created INTEGER NOT NULL);`);
 const getKV=db.prepare("SELECT v FROM appdata WHERE k=?"),setKV=db.prepare("INSERT INTO appdata(k,v,updated) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,updated=excluded.updated");
-const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs","estimates"];
+const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs","estimates","tcalls"];
 const BRAND=require("./brand.json");const APP_VERSION=require("./package.json").version+"-"+BRAND.slug;
 const UPLOADS=path.join(DATA,"uploads");fs.mkdirSync(UPLOADS,{recursive:true});
 const MAX_UPLOAD=5*1024*1024;
@@ -37,7 +37,7 @@ try{vm.runInContext(fs.readFileSync(path.join(__dirname,"app-logic.js"),"utf8"),
 const api=ctx.__api;if(!api)throw new Error("app logic failed to load");
 ctx.onData=null;
 function DB(){return api.DB}
-function persist(){const d=DB();for(const c of COLS)setKV.run(c,JSON.stringify(d[c]||[]),Date.now());setKV.run("meta",JSON.stringify({v:1,seeded:true}),Date.now());VER++;dirty=false}
+function persist(){const d=DB();for(const c of COLS)setKV.run(c,JSON.stringify(d[c]||[]),Date.now());setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:!!getKV.get("meta")}),Date.now());VER++;dirty=false}
 function hashPw0(pw){const salt=crypto.randomBytes(16).toString("hex");return{salt,hash:crypto.scryptSync(pw,salt,64,{N:16384,r:8,p:1}).toString("hex")}}
 // first boot: seed demo data, clearly labeled
 {const d=DB();if(!getKV.get("meta")||!JSON.parse(getKV.get("meta").v).labeled){
@@ -48,6 +48,8 @@ const DEMO_PW=BRAND.slug+"-demo-2026";
 for(const[uid_,email]of[["u1","demo-homeowner@"+BRAND.slug+".test"],["c1","demo-pro@"+BRAND.slug+".test"],["m1","demo-pm@"+BRAND.slug+".test"],["c26","demo-remodeler@"+BRAND.slug+".test"]]){
  const u=DB().users.find(x=>x.id===uid_);if(!u||db.prepare("SELECT 1 FROM accounts WHERE uid=? OR email=?").get(uid_,email))continue;
  const h=hashPw0(DEMO_PW);db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created) VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}
+// v5: travel work collection added to existing databases
+if(!getKV.get("tcalls")){if(!Array.isArray(DB().tcalls)&&ctx.__v5)ctx.__v5.seedTravel();persist();console.log("travel work seeded:",(DB().tcalls||[]).length,"calls")}
 // keep meta flag on later persists
 const _p=persist;persist=function(){_p();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now())};
 
@@ -74,7 +76,7 @@ function clean(v,depth=0){ // strings capped, control chars removed, structure b
  if(Array.isArray(v))return v.slice(0,60).map(x=>clean(x,depth+1));
  if(typeof v==="object"){const o={};for(const k of Object.keys(v).slice(0,60)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;o[k]=clean(v[k],depth+1)}return o}
  return null}
-const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy","flagLead","reportNoShow","disputeReview","sharePhone","cancelPlan","resumePlan","requestCOI","sendCOI","addLocation","addRecurring","updateMe"]);
+const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy","flagLead","reportNoShow","disputeReview","sharePhone","cancelPlan","resumePlan","requestCOI","sendCOI","addLocation","addRecurring","updateMe","saveTravel","travAvail","postTravel","applyTravel","withdrawTravel","decideTravel","inviteTraveler","closeTravel"]);
 const PRO_LOCKED=["id","role","email","verified","paid","founding","bg","demo","joined","favs"];
 
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
@@ -86,7 +88,7 @@ function snapshot(uid){const d=DB();const crewOf=p=>(p.roles||[]).flatMap(r=>r.f
  const quotes=d.quotes.map(q=>(q.cid===uid||myJobs.has(q.job))?q:Object.assign({},q,{price:null,note:""}));
  const pm=new Map((d.projects||[]).map(p=>[p.id,p]));
  const pmsgs=(d.pmsgs||[]).filter(m=>{const p=pm.get(m.pid);if(!p||!uid)return false;if(m.from===uid||m.to===uid)return true;return m.to==="all"&&(p.pm===uid||crewOf(p).includes(uid))});
- return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews:d.reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:d.projects||[],pmsgs,me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
+ return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews:d.reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:d.projects||[],pmsgs,tcalls:(d.tcalls||[]).map(c=>c.by===uid?c:Object.assign({},c,{apps:(c.apps||[]).filter(a=>a.status==="hired"||(uid&&a.uid===uid)).map(a=>a.uid===uid?a:{uid:a.uid,status:a.status,date:a.date}),invites:(c.invites||[]).filter(x=>x===uid)})),me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
 
 function run(uid,name,args){const d=DB();d.me=uid;let r;try{r=api.A[name](...args)}catch(e){r={ok:false,msg:"That didn't work. The item may have changed, refresh and try again."}}finally{DB().me=null}if(dirty)persist();return r}
 
