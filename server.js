@@ -47,7 +47,7 @@ function hashPw0(pw){const salt=crypto.randomBytes(16).toString("hex");return{sa
 const DEMO_PW=BRAND.slug+"-demo-2026";
 for(const[uid_,email]of[["u1","demo-homeowner@"+BRAND.slug+".test"],["c1","demo-pro@"+BRAND.slug+".test"],["m1","demo-pm@"+BRAND.slug+".test"],["c26","demo-remodeler@"+BRAND.slug+".test"]]){
  const u=DB().users.find(x=>x.id===uid_);if(!u||db.prepare("SELECT 1 FROM accounts WHERE uid=? OR email=?").get(uid_,email))continue;
- const h=hashPw0(DEMO_PW);db.prepare("INSERT INTO accounts VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}
+ const h=hashPw0(DEMO_PW);db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created) VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}
 // keep meta flag on later persists
 const _p=persist;persist=function(){_p();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now())};
 
@@ -74,13 +74,13 @@ function clean(v,depth=0){ // strings capped, control chars removed, structure b
  if(Array.isArray(v))return v.slice(0,60).map(x=>clean(x,depth+1));
  if(typeof v==="object"){const o={};for(const k of Object.keys(v).slice(0,60)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;o[k]=clean(v[k],depth+1)}return o}
  return null}
-const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy"]);
+const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy","flagLead","reportNoShow","disputeReview","sharePhone","cancelPlan","resumePlan","requestCOI","sendCOI","addLocation","addRecurring","updateMe"]);
 const PRO_LOCKED=["id","role","email","verified","paid","founding","bg","demo","joined","favs"];
 
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
 function snapshot(uid){const d=DB();const crewOf=p=>(p.roles||[]).flatMap(r=>r.filled||[]);
  const rc=ctx.__v2&&ctx.__v2.respCalc;
- const users=d.users.map(u=>{const c=Object.assign({},u);if(u.id!==uid){delete c.email;if(u.role!=="contractor")delete c.phone;delete c.favs;delete c.plan}if(u.role==="contractor"&&rc){try{c.rs=rc(u.id)}catch(e){}}return c});
+ const users=d.users.map(u=>{const c=Object.assign({},u);if(u.id!==uid){delete c.email;if(u.role!=="contractor"&&!(u.sharedWith||[]).includes(uid))delete c.phone;delete c.sharedWith;delete c.credits;delete c.coiReqs;delete c.flags;delete c.favs;delete c.plan}if(u.role==="contractor"&&rc){try{c.rs=rc(u.id)}catch(e){}}return c});
  const jobs=d.jobs.map(j=>{const party=uid&&(j.cust===uid||j.hired===uid);if(party)return j;const c=Object.assign({},j);delete c.escrow;const done=j.status==="completed"&&j.custConfirmed;if(!done)delete c.photos;return c});
  const myJobs=new Set(d.jobs.filter(j=>j.cust===uid).map(j=>j.id));
  const quotes=d.quotes.map(q=>(q.cid===uid||myJobs.has(q.job))?q:Object.assign({},q,{price:null,note:""}));
@@ -111,6 +111,17 @@ function upload(req,res){
   const name=crypto.randomBytes(16).toString("hex")+"."+t.ext;fs.writeFileSync(path.join(UPLOADS,name),buf);
   db.prepare("INSERT INTO uploads VALUES(?,?,?,?,?)").run(name,uid,type,buf.length,Date.now());send(res,200,{ok:true,url:"/u/"+name})})}
 const ownsUpload=(uid,url)=>{const m=/^\/u\/([a-f0-9]{32}\.(?:jpg|png|webp))$/.exec(String(url||""));return !!(m&&db.prepare("SELECT 1 FROM uploads WHERE name=? AND uid=?").get(m[1],uid))};
+/* ---- passwordless, passkeys, OAuth (lib/auth.js) ---- */
+function htmlPage(res,code,title,inner){const e=v=>String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));res.writeHead(code,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'"});
+ res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${e(title)} · ${BRAND.name}</title><style>body{font:16px/1.5 system-ui,sans-serif;background:#F7F5F0;color:#14202B;display:grid;place-items:center;min-height:100vh;margin:0;padding:20px}main{background:#fff;max-width:420px;width:100%;padding:28px;border-radius:16px;box-shadow:0 10px 40px -20px rgba(0,0,0,.3)}h1{font-size:22px;margin:0 0 12px}.demo{background:#FFF4D6;border:1px solid #E8C25A;color:#6B4E00;font-weight:700;font-size:13px;letter-spacing:.04em;padding:8px 12px;border-radius:8px;margin-bottom:14px}label{display:block;font-weight:600;font-size:14px;margin:12px 0 0}input{display:block;width:100%;box-sizing:border-box;padding:11px 12px;margin-top:6px;border:1px solid #C9CFD4;border-radius:10px;font:inherit}button{margin-top:18px;width:100%;padding:12px;border:0;border-radius:10px;background:#14202B;color:#fff;font:600 16px system-ui;cursor:pointer}a{color:#1D5FA8}</style></head><body><main><h1>${e(title)}</h1>${inner}</main></body></html>`)}
+function createUser({role,name,email,phone}){const d=DB();d.me=null;const nm=String(name||"").trim().slice(0,80);const em=email||("sms-"+String(phone).replace(/\D/g,"")+"@phone.invalid");
+ if(db.prepare("SELECT 1 FROM accounts WHERE email=?").get(em))return{ok:false,msg:"That email already has an account"};
+ let r;try{r=role==="pro"?api.A.signupPro({name:nm||"New pro",email:em,biz:(nm||"New")+" (finish setup)",trade:"Handyman",zip:"78704",phone:phone||""}):role==="pm"?api.A.signupPM({name:nm||"New member",biz:"Your company",email:em,zip:"78704"}):api.A.signupCustomer(nm||"New member",em,"78704")}catch(e){r={ok:false}}
+ const id=d.me;d.me=null;if(!r||!r.ok||!id){if(dirty)persist();return{ok:false,msg:(r&&r.msg)||"Sign-up failed"}}
+ const u=d.users.find(x=>x.id===id);u.needsSetup=true;if(phone)u.phone=phone;if(!email)u.emailHidden=true;if(role==="business"){u.acct="business";u.locations=[];u.recurring=[]}
+ db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created,phone) VALUES(?,?,?,?,?,?,?)").run(id,em,"","",u.role,Date.now(),phone||null);persist();return{ok:true,uid:id}}
+const AUTH=require("./lib/auth.js")({db,limited,ip:r=>ip(r),newSession,setCookie,sessionUid,send,createUser,SESS_DAYS,brand:BRAND,html:htmlPage});
+function formBody(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>16e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>ok(Object.fromEntries(new URLSearchParams(Buffer.concat(c).toString()))))})}
 const server=http.createServer(async(req,res)=>{
  for(const[k,v]of Object.entries(SEC))res.setHeader(k,v);
  const url=new URL(req.url,"http://x");const p=url.pathname;
@@ -120,20 +131,38 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==="GET"&&p==="/favicon.ico"){res.writeHead(200,{"Content-Type":"image/png","Cache-Control":"public, max-age=86400"});return res.end(fs.readFileSync(path.join(__dirname,"public/icons/favicon-32.png")))}
  if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:APP_VERSION,app:BRAND.name,data:VER});
  if(req.method==="GET"&&/^\/u\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(p)){const f=path.join(UPLOADS,path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});const ext=p.split(".").pop();res.writeHead(200,{"Content-Type":ext==="jpg"?"image/jpeg":"image/"+ext,"Cache-Control":"public, max-age=31536000, immutable","Content-Security-Policy":"default-src 'none'; sandbox"});return fs.createReadStream(f).pipe(res)}
+ if(req.method==="GET"&&p==="/auth/magic")return AUTH.magic(req,res,url);
+ {const m=/^\/auth\/oauth\/(google|apple|microsoft|facebook)\/(start|demo|callback)$/.exec(p);if(m){
+  if(m[2]==="start"&&req.method==="GET")return AUTH.oauthStart(req,res,m[1],url);
+  if(m[2]==="demo"&&req.method==="GET")return AUTH.oauthDemo(req,res,m[1],url);
+  if(m[2]==="callback"){if(req.method==="POST"){if(!/x-www-form-urlencoded/.test(req.headers["content-type"]||""))return htmlPage(res,415,"Bad request","");const o=req.headers.origin;if(o&&o!=="null"&&new URL(o).host!==req.headers.host&&m[1]!=="apple")return htmlPage(res,403,"Blocked","<p>Cross-site form post refused.</p>");return AUTH.oauthCallback(req,res,m[1],url,await formBody(req))}return AUTH.oauthCallback(req,res,m[1],url,null)}
+  return htmlPage(res,405,"Method not allowed","")}}
  if(!p.startsWith("/api/"))return send(res,404,{error:"Not found"});
  if(req.method==="POST"&&p==="/api/upload")return upload(req,res);
  if(req.method==="POST"){const o=req.headers.origin;if(o&&req.headers.host&&new URL(o).host!==req.headers.host)return send(res,403,{error:"Bad origin"});if(!/application\/json/.test(req.headers["content-type"]||""))return send(res,415,{error:"JSON only"})}
  if(limited("all:"+ip(req),600,60e3))return send(res,429,{error:"Too many requests, slow down."});
  const uid=sessionUid(req);
  if(req.method==="GET"&&p==="/api/state"){const v=+url.searchParams.get("v");if(v&&v===VER)return send(res,200,{same:true});return send(res,200,{state:snapshot(uid)})}
+ if(req.method==="GET"&&p==="/api/auth/methods")return send(res,200,AUTH.methods());
+ if(req.method==="GET"&&p==="/api/account"){if(!uid)return send(res,401,{error:"Sign in first"});const a=db.prepare("SELECT email,phone,hash FROM accounts WHERE uid=?").get(uid)||{};return send(res,200,{email:/@phone\.invalid$/.test(a.email||"")?null:a.email,phone:a.phone||null,password:!!a.hash,passkeys:AUTH.pkList(uid),linked:AUTH.linked(uid),methods:AUTH.methods()})}
  if(req.method!=="POST")return send(res,405,{error:"Method not allowed"});
  const b=clean(await body(req));
  if(p==="/api/login"){
-  if(limited("login:"+ip(req),10,15*60e3))return send(res,429,{error:"Too many login attempts. Try again in 15 minutes."});
+  if(limited("login:"+ip(req),+process.env.LOGIN_RATE_MAX||10,15*60e3))return send(res,429,{error:"Too many login attempts. Try again in 15 minutes."});
   const email=String(b.email||"").trim().toLowerCase(),pw=String(b.password||"");
   const a=db.prepare("SELECT * FROM accounts WHERE email=?").get(email);
-  if(!a||!checkPw(pw,a.salt,a.hash))return send(res,401,{error:"Wrong email or password."});
+  if(!a||!a.hash||!checkPw(pw,a.salt,a.hash))return send(res,401,{error:"Wrong email or password."});
   const t=newSession(a.uid);setCookie(res,req,t,SESS_DAYS*86400);return send(res,200,{ok:true,state:snapshot(a.uid)})}
+ if(p==="/api/auth/start")return AUTH.start(req,res,b);
+ if(p==="/api/auth/verify")return AUTH.verify(req,res,b);
+ if(p==="/api/passkey/login/options")return AUTH.pkLoginOptions(req,res);
+ if(p==="/api/passkey/login/verify")return AUTH.pkLoginVerify(req,res,b);
+ if(p.startsWith("/api/passkey/")||p==="/api/account/password"){if(!uid)return send(res,401,{error:"Sign in first"});const u=DB().users.find(x=>x.id===uid)||{};
+  if(p==="/api/passkey/register/options")return AUTH.pkRegOptions(req,res,uid,{email:(db.prepare("SELECT email FROM accounts WHERE uid=?").get(uid)||{}).email,name:u.name});
+  if(p==="/api/passkey/register/verify")return AUTH.pkRegVerify(req,res,uid,b);
+  if(p==="/api/passkey/delete")return send(res,200,{ok:AUTH.pkDelete(uid,b.id)});
+  if(p==="/api/account/password"){const pw=String(b.password||"");if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});const h=hashPw(pw);db.prepare("UPDATE accounts SET salt=?,hash=? WHERE uid=?").run(h.salt,h.hash,uid);return send(res,200,{ok:true})}
+  return send(res,404,{error:"Not found"})}
  if(p==="/api/logout"){const t=cookies(req).swsid;if(t)db.prepare("DELETE FROM sessions WHERE token=?").run(t);setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}
  if(p==="/api/signup"){
   if(limited("signup:"+ip(req),20,60*60e3))return send(res,429,{error:"Too many sign-ups from this network. Try later."});
@@ -149,7 +178,7 @@ const server=http.createServer(async(req,res)=>{
   const newId=DB().me;DB().me=null;
   if(!r||!r.ok||!newId){if(dirty)persist();return send(res,400,{error:(r&&r.msg)||"Sign-up failed"})}
   const role=DB().users.find(u=>u.id===newId).role;const h=hashPw(pw);
-  db.prepare("INSERT INTO accounts VALUES(?,?,?,?,?,?)").run(newId,email,h.salt,h.hash,role,Date.now());persist();
+  db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created) VALUES(?,?,?,?,?,?)").run(newId,email,h.salt,h.hash,role,Date.now());persist();
   const t=newSession(newId);setCookie(res,req,t,SESS_DAYS*86400);return send(res,200,{res:r,state:snapshot(newId)})}
  if(p==="/api/act"){
   const name=String(b.name||""),args=Array.isArray(b.args)?b.args.slice(0,6):[];
