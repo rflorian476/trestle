@@ -38,3 +38,5 @@
 :root:not([data-theme=dark]){--surface:#FFFFFF;--line:#DCD8CF;--line-strong:#C7C2B6;--muted:#4A5260;--ink:#0E1B2B;--shadow:0 1px 2px rgba(14,27,43,.06),0 4px 14px rgba(14,27,43,.06);--star:#B5532F;--gold:#9A4426;--gold-bg:#F6E7DF}
 [data-theme=dark]{--line:#26374E;--line-strong:#33465F;--muted:#A3AEBD;--star:#E08A5F;--gold:#E08A5F;--gold-bg:#2E1E17;--shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25)}
 .card,.v2card,.pcard,.v3card{border-color:var(--line)}
+/* programmatic focus targets (headings / tabindex=-1) get no visible box; real controls keep focus rings */
+[tabindex="-1"]:focus,h1:focus:not(:focus-visible),h2:focus:not(:focus-visible),main:focus,[tabindex="-1"]:focus-visible{outline:none!important;box-shadow:none!important}
