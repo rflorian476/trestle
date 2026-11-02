@@ -1,4 +1,4 @@
-// Trestle live beta server: Node http + node:sqlite. No external deps.
+// Spanwise live beta server: Node http + node:sqlite. No external deps.
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto"),vm=require("vm");
 const {DatabaseSync}=require("node:sqlite");
@@ -6,21 +6,25 @@ const PORT=+process.env.PORT||8787;
 const HOST=process.env.HOST||"0.0.0.0";
 const TRUST_PROXY=process.env.TRUST_PROXY!=="0"; // Render/Cloudflare terminate TLS and set x-forwarded-proto
 const DATA=process.env.DATA_DIR||path.join(__dirname,"data");fs.mkdirSync(DATA,{recursive:true});
-const db=new DatabaseSync(path.join(DATA,"trestle.db"));
+const db=new DatabaseSync(path.join(DATA,"spanwise.db"));
 db.exec(`PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS accounts(uid TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,salt TEXT NOT NULL,hash TEXT NOT NULL,role TEXT NOT NULL,created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,uid TEXT NOT NULL,expires INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS appdata(k TEXT PRIMARY KEY,v TEXT NOT NULL,updated INTEGER NOT NULL);`);
+CREATE TABLE IF NOT EXISTS appdata(k TEXT PRIMARY KEY,v TEXT NOT NULL,updated INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS uploads(name TEXT PRIMARY KEY,uid TEXT NOT NULL,type TEXT NOT NULL,size INTEGER NOT NULL,created INTEGER NOT NULL);`);
 const getKV=db.prepare("SELECT v FROM appdata WHERE k=?"),setKV=db.prepare("INSERT INTO appdata(k,v,updated) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,updated=excluded.updated");
-const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs"];
+const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs","estimates"];
+const APP_VERSION="2.0.0-spanwise";
+const UPLOADS=path.join(DATA,"uploads");fs.mkdirSync(UPLOADS,{recursive:true});
+const MAX_UPLOAD=5*1024*1024;
 
 /* ---- shared business rules: the same A.* actions the UI was built on, run server-side ---- */
 let VER=Date.now(),allowAuto=false,dirty=false;
 function anyStub(){const f=function(){return p};const p=new Proxy(f,{get:(t,k)=>k===Symbol.toPrimitive?()=>"":k==="length"?0:p,set:()=>true,apply:()=>p,construct:()=>p});return p}
 const store={};
 const ctx={console,Date,Math,JSON,Object,Array,String,Number,Boolean,RegExp,Error,Set,Map,Promise,Intl,parseInt,parseFloat,isNaN,encodeURIComponent,decodeURIComponent,
- localStorage:{getItem:k=>{if(k.startsWith("trestle_designs")){const o={};let any=false;for(const c of COLS){const r=getKV.get(c);if(r){o[c]=JSON.parse(r.v);any=true}}const m=getKV.get("meta");if(!any)return null;return JSON.stringify(Object.assign({v:1,me:null,theme:"light",recent:[]},m?JSON.parse(m.v):{},o))}return store[k]||null},
-  setItem:(k,v)=>{if(k.startsWith("trestle_designs"))dirty=true;else store[k]=v},removeItem:()=>{}},
+ localStorage:{getItem:k=>{if(k.startsWith("spanwise_designs")){const o={};let any=false;for(const c of COLS){const r=getKV.get(c);if(r){o[c]=JSON.parse(r.v);any=true}}const m=getKV.get("meta");if(!any)return null;return JSON.stringify(Object.assign({v:1,me:null,theme:"light",recent:[]},m?JSON.parse(m.v):{},o))}return store[k]||null},
+  setItem:(k,v)=>{if(k.startsWith("spanwise_designs"))dirty=true;else store[k]=v},removeItem:()=>{}},
  setTimeout:(fn,ms)=>{if(!allowAuto)return 0;return setTimeout(()=>{try{fn();persist()}catch(e){}},ms)},clearTimeout,setInterval:()=>0,requestAnimationFrame:()=>0,
  document:anyStub(),location:{hash:"",search:"",href:"",pathname:"/"},navigator:{userAgent:"node"},matchMedia:()=>({matches:false,addEventListener(){}}),history:anyStub(),
  addEventListener(){},removeEventListener(){},getComputedStyle:()=>anyStub(),IntersectionObserver:function(){return anyStub()},ResizeObserver:function(){return anyStub()},MutationObserver:function(){return anyStub()},
@@ -32,10 +36,16 @@ const api=ctx.__api;if(!api)throw new Error("app logic failed to load");
 ctx.onData=null;
 function DB(){return api.DB}
 function persist(){const d=DB();for(const c of COLS)setKV.run(c,JSON.stringify(d[c]||[]),Date.now());setKV.run("meta",JSON.stringify({v:1,seeded:true}),Date.now());VER++;dirty=false}
+function hashPw0(pw){const salt=crypto.randomBytes(16).toString("hex");return{salt,hash:crypto.scryptSync(pw,salt,64,{N:16384,r:8,p:1}).toString("hex")}}
 // first boot: seed demo data, clearly labeled
 {const d=DB();if(!getKV.get("meta")||!JSON.parse(getKV.get("meta").v).labeled){
   d.users.forEach(u=>{u.demo=true;u.email=u.id+"@demo.invalid"});(d.projects||[]).forEach(p=>{p.demo=true;if(!/^Demo: /.test(p.title))p.title="Demo: "+p.title});(d.jobs||[]).forEach(j=>j.demo=true);
-  d.msgs=[];d.notifs=[];d.pmsgs=(d.pmsgs||[]);d.me=null;persist();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now());console.log("seeded demo data:",d.users.length,"users")}}
+  d.pmsgs=(d.pmsgs||[]);d.me=null;persist();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now());console.log("seeded demo data:",d.users.length,"users")}}
+// demo logins (README): fixed accounts for the seeded homeowner, pro and project manager
+const DEMO_PW="spanwise-demo-2026";
+for(const[uid_,email]of[["u1","demo-homeowner@spanwise.test"],["c1","demo-pro@spanwise.test"],["m1","demo-pm@spanwise.test"],["c26","demo-remodeler@spanwise.test"]]){
+ const u=DB().users.find(x=>x.id===uid_);if(!u||db.prepare("SELECT 1 FROM accounts WHERE uid=? OR email=?").get(uid_,email))continue;
+ const h=hashPw0(DEMO_PW);db.prepare("INSERT INTO accounts VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}
 // keep meta flag on later persists
 const _p=persist;persist=function(){_p();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now())};
 
@@ -46,8 +56,8 @@ const checkPw=(pw,salt,hash)=>{const h=Buffer.from(scrypt(pw,salt),"hex");return
 const SESS_DAYS=30;
 function newSession(uid){const t=crypto.randomBytes(32).toString("base64url");db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(t,uid,Date.now()+SESS_DAYS*864e5);return t}
 function cookies(req){const o={};(req.headers.cookie||"").split(";").forEach(s=>{const i=s.indexOf("=");if(i>0)o[s.slice(0,i).trim()]=decodeURIComponent(s.slice(i+1).trim())});return o}
-function sessionUid(req){const t=cookies(req).tsid;if(!t)return null;const r=db.prepare("SELECT uid,expires FROM sessions WHERE token=?").get(t);if(!r||r.expires<Date.now())return null;return r.uid}
-function setCookie(res,req,t,maxAge){const secure=(req.socket.encrypted||(TRUST_PROXY&&(String(req.headers["x-forwarded-proto"]||"").split(",")[0].trim()==="https"||/https/.test(req.headers["cf-visitor"]||""))))?"; Secure":"";res.setHeader("Set-Cookie",`tsid=${t}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`)}
+function sessionUid(req){const t=cookies(req).swsid;if(!t)return null;const r=db.prepare("SELECT uid,expires FROM sessions WHERE token=?").get(t);if(!r||r.expires<Date.now())return null;return r.uid}
+function setCookie(res,req,t,maxAge){const secure=(req.socket.encrypted||(TRUST_PROXY&&(String(req.headers["x-forwarded-proto"]||"").split(",")[0].trim()==="https"||/https/.test(req.headers["cf-visitor"]||""))))?"; Secure":"";res.setHeader("Set-Cookie",`swsid=${t}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`)}
 const hits=new Map();
 function limited(key,max,winMs){const now=Date.now();const a=(hits.get(key)||[]).filter(t=>now-t<winMs);a.push(now);hits.set(key,a);return a.length>max}
 const ip=req=>(TRUST_PROXY&&(req.headers["cf-connecting-ip"]||(req.headers["x-forwarded-for"]||"").split(",")[0].trim()))||req.socket.remoteAddress;
@@ -62,17 +72,19 @@ function clean(v,depth=0){ // strings capped, control chars removed, structure b
  if(Array.isArray(v))return v.slice(0,60).map(x=>clean(x,depth+1));
  if(typeof v==="object"){const o={};for(const k of Object.keys(v).slice(0,60)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;o[k]=clean(v[k],depth+1)}return o}
  return null}
-const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend"]);
+const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy"]);
 const PRO_LOCKED=["id","role","email","verified","paid","founding","bg","demo","joined","favs"];
 
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
 function snapshot(uid){const d=DB();const crewOf=p=>(p.roles||[]).flatMap(r=>r.filled||[]);
- const users=d.users.map(u=>{const c=Object.assign({},u);if(u.id!==uid){delete c.email;if(u.role!=="contractor")delete c.phone;delete c.favs;delete c.plan}return c});
+ const rc=ctx.__v2&&ctx.__v2.respCalc;
+ const users=d.users.map(u=>{const c=Object.assign({},u);if(u.id!==uid){delete c.email;if(u.role!=="contractor")delete c.phone;delete c.favs;delete c.plan}if(u.role==="contractor"&&rc){try{c.rs=rc(u.id)}catch(e){}}return c});
+ const jobs=d.jobs.map(j=>{const party=uid&&(j.cust===uid||j.hired===uid);if(party)return j;const c=Object.assign({},j);delete c.escrow;const done=j.status==="completed"&&j.custConfirmed;if(!done)delete c.photos;return c});
  const myJobs=new Set(d.jobs.filter(j=>j.cust===uid).map(j=>j.id));
  const quotes=d.quotes.map(q=>(q.cid===uid||myJobs.has(q.job))?q:Object.assign({},q,{price:null,note:""}));
  const pm=new Map((d.projects||[]).map(p=>[p.id,p]));
  const pmsgs=(d.pmsgs||[]).filter(m=>{const p=pm.get(m.pid);if(!p||!uid)return false;if(m.from===uid||m.to===uid)return true;return m.to==="all"&&(p.pm===uid||crewOf(p).includes(uid))});
- return{v:1,_v:VER,users,jobs:d.jobs,reviews:d.reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:d.projects||[],pmsgs,me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
+ return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews:d.reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:d.projects||[],pmsgs,me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
 
 function run(uid,name,args){const d=DB();d.me=uid;let r;try{r=api.A[name](...args)}catch(e){r={ok:false,msg:"That didn't work. The item may have changed, refresh and try again."}}finally{DB().me=null}if(dirty)persist();return r}
 
@@ -81,13 +93,31 @@ const INDEX=()=>fs.readFileSync(path.join(__dirname,"public/index.html"));
 function send(res,code,obj,extra){if(code>=400&&code<500&&code!==404&&code!==405&&code!==415){obj.status=code;code=200}res.writeHead(code,Object.assign({"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"},extra||{}));res.end(JSON.stringify(obj))}
 function body(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>256e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>{try{ok(c.length?JSON.parse(Buffer.concat(c).toString()):{})}catch(e){no(e)}})})}
 const SEC={"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"same-origin","Permissions-Policy":"geolocation=(), camera=(), microphone=()"};
+/* ---- photo uploads: images only, 5 MB max, magic bytes checked, stored under DATA_DIR/uploads ---- */
+const IMG={"image/jpeg":{ext:"jpg",ok:b=>b[0]===0xff&&b[1]===0xd8&&b[2]===0xff},"image/png":{ext:"png",ok:b=>b.slice(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))},"image/webp":{ext:"webp",ok:b=>b.slice(0,4).toString("latin1")==="RIFF"&&b.slice(8,12).toString("latin1")==="WEBP"}};
+function upload(req,res){
+ const send=(res,code,o)=>{if(code!==200)o.status=code;res.writeHead(200,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"});res.end(JSON.stringify(o))};
+ const o=req.headers.origin;if(o&&req.headers.host&&new URL(o).host!==req.headers.host)return send(res,403,{error:"Bad origin"});
+ const uid=sessionUid(req);if(!uid){req.resume();return send(res,401,{error:"Sign in to upload photos"})}
+ const type=String(req.headers["content-type"]||"").split(";")[0].trim().toLowerCase(),t=IMG[type];
+ if(!t){req.resume();return send(res,415,{error:"JPEG, PNG or WebP images only"})}
+ if(+req.headers["content-length"]>MAX_UPLOAD){req.resume();return send(res,413,{error:"Photos must be 5 MB or smaller"})}
+ if(limited("up:"+uid,30,60*60e3)){req.resume();return send(res,429,{error:"Upload limit reached, try again later"})}
+ let n=0,c=[],dead=false;
+ req.on("data",b=>{if(dead)return;n+=b.length;if(n>MAX_UPLOAD){dead=true;send(res,413,{error:"Photos must be 5 MB or smaller"});req.resume()}else c.push(b)});
+ req.on("end",()=>{if(dead)return;const buf=Buffer.concat(c);if(buf.length<12||!t.ok(buf))return send(res,415,{error:"That file isn't a valid image"});
+  const name=crypto.randomBytes(16).toString("hex")+"."+t.ext;fs.writeFileSync(path.join(UPLOADS,name),buf);
+  db.prepare("INSERT INTO uploads VALUES(?,?,?,?,?)").run(name,uid,type,buf.length,Date.now());send(res,200,{ok:true,url:"/u/"+name})})}
+const ownsUpload=(uid,url)=>{const m=/^\/u\/([a-f0-9]{32}\.(?:jpg|png|webp))$/.exec(String(url||""));return !!(m&&db.prepare("SELECT 1 FROM uploads WHERE name=? AND uid=?").get(m[1],uid))};
 const server=http.createServer(async(req,res)=>{
  for(const[k,v]of Object.entries(SEC))res.setHeader(k,v);
  const url=new URL(req.url,"http://x");const p=url.pathname;
  try{
  if(req.method==="GET"&&(p==="/"||p==="/index.html")){res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});return res.end(INDEX())}
- if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:VER});
+ if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:APP_VERSION,app:"Spanwise",data:VER});
+ if(req.method==="GET"&&/^\/u\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(p)){const f=path.join(UPLOADS,path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});const ext=p.split(".").pop();res.writeHead(200,{"Content-Type":ext==="jpg"?"image/jpeg":"image/"+ext,"Cache-Control":"public, max-age=31536000, immutable","Content-Security-Policy":"default-src 'none'; sandbox"});return fs.createReadStream(f).pipe(res)}
  if(!p.startsWith("/api/"))return send(res,404,{error:"Not found"});
+ if(req.method==="POST"&&p==="/api/upload")return upload(req,res);
  if(req.method==="POST"){const o=req.headers.origin;if(o&&req.headers.host&&new URL(o).host!==req.headers.host)return send(res,403,{error:"Bad origin"});if(!/application\/json/.test(req.headers["content-type"]||""))return send(res,415,{error:"JSON only"})}
  if(limited("all:"+ip(req),600,60e3))return send(res,429,{error:"Too many requests, slow down."});
  const uid=sessionUid(req);
@@ -100,7 +130,7 @@ const server=http.createServer(async(req,res)=>{
   const a=db.prepare("SELECT * FROM accounts WHERE email=?").get(email);
   if(!a||!checkPw(pw,a.salt,a.hash))return send(res,401,{error:"Wrong email or password."});
   const t=newSession(a.uid);setCookie(res,req,t,SESS_DAYS*86400);return send(res,200,{ok:true,state:snapshot(a.uid)})}
- if(p==="/api/logout"){const t=cookies(req).tsid;if(t)db.prepare("DELETE FROM sessions WHERE token=?").run(t);setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}
+ if(p==="/api/logout"){const t=cookies(req).swsid;if(t)db.prepare("DELETE FROM sessions WHERE token=?").run(t);setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}
  if(p==="/api/signup"){
   if(limited("signup:"+ip(req),20,60*60e3))return send(res,429,{error:"Too many sign-ups from this network. Try later."});
   const kind=b.kind,d=b.data&&typeof b.data==="object"?b.data:{},pw=String(b.password||"");
@@ -122,15 +152,17 @@ const server=http.createServer(async(req,res)=>{
   if(!ACTIONS.has(name))return send(res,400,{error:"Unknown action"});
   if(!uid)return send(res,200,{error:"Sign in first",need:"login",state:snapshot(null)});
   if(limited("act:"+uid,120,60e3))return send(res,429,{error:"Too many actions, slow down."});
+  if(name==="addPhoto"&&!ownsUpload(uid,args[2]))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
+  if(name==="saveEstimate"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
   if(name==="updatePro"&&args[0]&&typeof args[0]==="object")for(const k of PRO_LOCKED)delete args[0][k];
   // demo accounts auto-reply (they're not real people); real users never get fake replies
   const isDemo=id=>!!(DB().users.find(u=>u.id===id)||{}).demo;
-  allowAuto=(name==="send"&&isDemo(args[0]))||(name==="crewSend"&&(()=>{const pr=(DB().projects||[]).find(x=>x.id===args[0]);return pr&&pr.demo})());
+  allowAuto=(name==="send"&&isDemo(args[0]))||name==="inviteCrew"||(name==="crewSend"&&(()=>{const pr=(DB().projects||[]).find(x=>x.id===args[0]);return pr&&pr.demo})());
   const r=run(uid,name,args);allowAuto=false;
   return send(res,200,{res:r===undefined?{ok:true}:r,state:snapshot(uid)})}
  return send(res,404,{error:"Not found"});
  }catch(e){console.error(e);return send(res,400,{error:"Bad request"})}
 });
 setInterval(()=>{db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());const now=Date.now();for(const[k,a]of hits)if(!a.some(t=>now-t<3600e3))hits.delete(k)},3600e3).unref();
-server.listen(PORT,HOST,()=>console.log(`Trestle live on http://${HOST}:${PORT} (data: ${DATA})`));
+server.listen(PORT,HOST,()=>console.log(`Spanwise live on http://${HOST}:${PORT} (data: ${DATA})`));
 for(const sig of ["SIGTERM","SIGINT"])process.on(sig,()=>{server.close();try{db.close()}catch(e){}process.exit(0)});

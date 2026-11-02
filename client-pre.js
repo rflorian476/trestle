@@ -1,5 +1,5 @@
 /* ---- LIVE: server-backed storage ---- */
-const PREFKEY="trestle_live_prefs";let LIVEV=0;
+const PREFKEY="spanwise_prefs";let LIVEV=0;
 function __prefs(){try{return JSON.parse(localStorage.getItem(PREFKEY))||{}}catch(e){return{}}}
 function save(){try{if(DB)localStorage.setItem(PREFKEY,JSON.stringify({theme:DB.theme,recent:DB.recent||[]}))}catch(e){}}
 function __xhr(method,url,body){const x=new XMLHttpRequest();x.open(method,url,false);if(body)x.setRequestHeader("Content-Type","application/json");try{x.send(body?JSON.stringify(body):null)}catch(e){return{error:"Network error, please try again"}}let r;try{r=JSON.parse(x.responseText)}catch(e){r={error:"Server error ("+x.status+")"}}return r}

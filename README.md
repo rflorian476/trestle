@@ -1,14 +1,36 @@
-# Trestle Live (beta)
+# Spanwise (beta) — v2.0.0
 
-This is the multi-user version of the ultimate Trestle UI. It has real accounts, and all data is shared through a server.
+**Spanwise** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
+
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.0.0-spanwise"}`
+
+## Demo logins
+All demo accounts share the password **`spanwise-demo-2026`**. Every person and business in the seed data is fictional.
+
+| Role | Email | What to try |
+|---|---|---|
+| Homeowner (Pat, Austin TX) | `demo-homeowner@spanwise.test` | **Compare bids** on "Water heater leaking" (3 bids). **Escrow sign-off** on "Primary bath remodel" (one milestone waiting). Saved **photo-to-quote** estimate. |
+| Pro (Bluebonnet Plumbing) | `demo-pro@spanwise.test` | Rapid responder badge, photo-verified portfolio, dashboard reply-time tile. |
+| Pro (Barton Creek Remodeling) | `demo-remodeler@spanwise.test` | Hired on the bath remodel: upload before/after photos, request milestone sign-off. |
+| Project manager (Dana, Copperline Build Group) | `demo-pm@spanwise.test` | **Crew builder** on the Tampa deck & seawall project: dated slots, available-pro suggestions, invite or book the whole crew. |
+
+Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+## v2 features
+- **Crew builder**: project slots with dates; suggestions match trade + distance and hide pros who are booked in that window (their blocked dates or other crews); invite (slots fill as pros accept; demo pros auto-reply) or book the whole crew; per-slot fill status.
+- **Photo-verified job history**: the hired pro uploads before/after photos (JPEG/PNG/WebP only, 5 MB max, magic bytes checked, stored in `DATA_DIR/uploads`, served with `nosniff`). Photos stay *Pending* and private to the job until the customer confirms the job is done, then show as *Verified* on the pro's profile.
+- **Milestone escrow (MOCK, test mode)**: the customer splits the job into milestones, "funds" each one, and releases on sign-off; the pro can request sign-off. Status shows per milestone. No card fields, no real money.
+- **Photo-to-quote**: a rules-based estimator (trade base range × size × urgency × regional index × description keywords), always labeled as an estimate and showing its math.
+- **Rapid responder badge**: median first response (messages, leads, crew invites) under 1 hour. Badged pros rank first in emergency searches (`emerg=1`, urgent keywords, or the Emergency links).
+- **Side-by-side bid compare**: with 2+ bids, compare price, timeline, rating, verified jobs, response time and badges, and hire from the compare view.
 
 ## What's here
 | File | Purpose |
 |---|---|
-| `server.js` | Node 24 HTTP server with no npm dependencies. Uses `node:sqlite` (`data/trestle.db`) and `crypto.scrypt` password hashes. |
+| `server.js` | Node 24 HTTP server with no npm dependencies. Uses `node:sqlite` (`data/spanwise.db`) and `crypto.scrypt` password hashes. |
 | `app-logic.js` | The app's own business rules (`A.*` actions), run **server-side** in a `vm` sandbox. The server sets the session user, runs the action, saves to SQLite and returns a user-scoped snapshot. |
 | `public/index.html` | The ultimate UI. Storage is patched so every action goes to `/api/act`. It polls `/api/state` every 4 seconds. |
-| `build-live.js`, `client-pre.js`, `client-post.js` | Regenerate `public/` and `app-logic.js` from `../ultimate/index.html`. Run with `node build-live.js`. |
+| `build-live.js`, `client-pre.js`, `client-post.js` | Regenerate `public/` and `app-logic.js` from `src/app.html` + `src/v2.js` + `src/v2.css`. Run with `node build-live.js`. |
 | `run-server.sh` / `run-tunnel.sh` / `start.sh` | Restart loops for the server and a Cloudflare quick tunnel. |
 | `test/e2e.js` | Playwright test using three browser contexts (customer, pro, PM), run on desktop and mobile. |
 
@@ -22,7 +44,7 @@ tail -f logs/server.log logs/tunnel.log
 - **Server only:** `nohup setsid ./run-server.sh &`. It listens on 127.0.0.1:8787 and restarts itself if it crashes.
 - **Tunnel URL:** **The quick-tunnel URL changes every time cloudflared restarts** (reboot, crash or `start.sh`). Re-read `logs/tunnel-url.txt` after a restart and re-share the link.
 - **Wipe all data and reseed the demo data:** stop the server, `rm -rf data/`, then start it again.
-- **Run the tests:** `cd ../designs/src && cp ../../live/test/e2e.js _live_e2e.js && node _live_e2e.js <BASE_URL> ../../live/shots`
+- **Run the tests:** `cd ../designs/src && cp ../../live/test/e2e.js _live_e2e.js && node _live_e2e.js <BASE_URL> ../../live/shots/v2`
 
 ## Security / safety
 - **Passwords:** scrypt with a per-user salt.
