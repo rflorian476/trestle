@@ -1661,6 +1661,9 @@ kbd{font:600 11px/1 var(--font,inherit);border:1px solid var(--line-strong);bord
 :focus-visible{outline:2px solid var(--p,#E26D3D);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.pal8{animation:none}}
 .mc8{overflow-x:auto;min-width:0;scrollbar-width:none;flex-wrap:nowrap}.mc8>*{flex:0 0 auto}.conv{min-width:0}
+/* a11y: AA contrast for orange text and primary buttons */
+.v4eye,.eyebrow{color:#b84612!important}
+.btn.primary,a.btn.primary{background:#c94a12!important;border-color:#c94a12!important;color:#fff!important}.btn.primary:hover{background:#ad3f0f!important}
 
 </style></head><body><div class="betabar" role="status">Sawyer beta · test mode · don't post sensitive info</div><a class="skip" href="#app">Skip to content</a>
 <header class="top" id="top"></header>
@@ -4076,6 +4079,11 @@ if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener
  if(/^\/[pt]\/[\w-]+$/.test(location.pathname)&&!location.hash){const[,k,id]=location.pathname.split("/");history.replaceState(null,"","/#/"+(k==="p"?"pro":"tcall")+"/"+id);setTimeout(()=>{render();v8Meta()},0)}}
 /* ---- images: lazy by default below the fold ---- */
 if(typeof document!=="undefined"&&window.MutationObserver){const lz=()=>document.querySelectorAll("#app img:not([loading])").forEach((im,i)=>{if(im.getBoundingClientRect().top>innerHeight){im.loading="lazy";im.decoding="async"}});new MutationObserver(lz).observe(document.getElementById("app")||document.body,{childList:true,subtree:true})}
+/* v8: de-duplicate the legacy hero greeting under Next actions; label business accounts correctly */
+{const oa=AFTER.dash;AFTER.dash=(...a)=>{oa&&oa(...a);const m=me();if(!m||!document.querySelector(".na8"))return;
+ const app=document.getElementById("app");const h1=[...app.querySelectorAll("h1")].find(h=>/^Good (morning|afternoon|evening)/.test(h.textContent.trim()));
+ if(h1){h1.textContent=v8IsBiz(m)?(m.biz||m.name):m.role==="contractor"?((m.biz||m.name)):"Your home";}
+ if(v8IsBiz(m))app.querySelectorAll(".kick,.chip,.eyebrow,span").forEach(e=>{if(e.children.length<=1&&/^\s*homeowner\s*$/i.test(e.textContent))e.lastChild.textContent=" Business"})}}
 
 boot();
 /* ---- LIVE: route actions to the server ---- */

@@ -103,3 +103,6 @@ kbd{font:600 11px/1 var(--font,inherit);border:1px solid var(--line-strong);bord
 :focus-visible{outline:2px solid var(--p,#E26D3D);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.pal8{animation:none}}
 .mc8{overflow-x:auto;min-width:0;scrollbar-width:none;flex-wrap:nowrap}.mc8>*{flex:0 0 auto}.conv{min-width:0}
+/* a11y: AA contrast for orange text and primary buttons */
+.v4eye,.eyebrow{color:#b84612!important}
+.btn.primary,a.btn.primary{background:#c94a12!important;border-color:#c94a12!important;color:#fff!important}.btn.primary:hover{background:#ad3f0f!important}

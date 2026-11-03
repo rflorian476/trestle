@@ -143,6 +143,11 @@ const AUTH=require("./lib/auth.js")({db,limited,ip:r=>ip(r),newSession,setCookie
 function formBody(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>16e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>ok(Object.fromEntries(new URLSearchParams(Buffer.concat(c).toString()))))})}
 const server=http.createServer(async(req,res)=>{
  for(const[k,v]of Object.entries(SEC))res.setHeader(k,v);
+ if(/\bgzip\b/.test(req.headers["accept-encoding"]||"")){const zl=require("zlib");const wh=res.writeHead.bind(res),en=res.end.bind(res);let hd=null;
+  res.writeHead=(c,h)=>{hd=[c,h||{}];return res};const wr=res.write.bind(res);res.write=(...a)=>{if(hd){wh(...hd);hd="done"}return wr(...a)};
+  res.end=(b,...r)=>{if(hd==="done")return en(b,...r);if(!hd)hd=[res.statusCode,{}];const[c,h]=hd;const ct=String(h["Content-Type"]||res.getHeader("Content-Type")||"");
+   if(b&&typeof b!=="function"&&/text|json|javascript|xml|svg/.test(ct)&&Buffer.byteLength(b)>1024){const z=zl.gzipSync(b);h["Content-Encoding"]="gzip";h["Vary"]="Accept-Encoding";delete h["Content-Length"];res.removeHeader&&res.removeHeader("Content-Length");wh(c,h);return en(z)}
+   wh(c,h);return en(b,...r)}}
  const url=new URL(req.url,"http://x");const p=url.pathname;
  try{
  if(req.method==="GET"&&(p==="/"||p==="/index.html")){res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});return res.end(withMeta(req,{title:"Sawyer: hire pros you'd trust with your house",desc:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees, and the business tools are included. Reviews only from completed jobs.",path:"/",ld:{"@context":"https://schema.org","@type":"Organization",name:"Sawyer",url:ORIGIN(req),logo:ORIGIN(req)+"/icons/icon-512.png"}}))}

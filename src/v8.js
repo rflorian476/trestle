@@ -212,3 +212,8 @@ if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener
  if(/^\/[pt]\/[\w-]+$/.test(location.pathname)&&!location.hash){const[,k,id]=location.pathname.split("/");history.replaceState(null,"","/#/"+(k==="p"?"pro":"tcall")+"/"+id);setTimeout(()=>{render();v8Meta()},0)}}
 /* ---- images: lazy by default below the fold ---- */
 if(typeof document!=="undefined"&&window.MutationObserver){const lz=()=>document.querySelectorAll("#app img:not([loading])").forEach((im,i)=>{if(im.getBoundingClientRect().top>innerHeight){im.loading="lazy";im.decoding="async"}});new MutationObserver(lz).observe(document.getElementById("app")||document.body,{childList:true,subtree:true})}
+/* v8: de-duplicate the legacy hero greeting under Next actions; label business accounts correctly */
+{const oa=AFTER.dash;AFTER.dash=(...a)=>{oa&&oa(...a);const m=me();if(!m||!document.querySelector(".na8"))return;
+ const app=document.getElementById("app");const h1=[...app.querySelectorAll("h1")].find(h=>/^Good (morning|afternoon|evening)/.test(h.textContent.trim()));
+ if(h1){h1.textContent=v8IsBiz(m)?(m.biz||m.name):m.role==="contractor"?((m.biz||m.name)):"Your home";}
+ if(v8IsBiz(m))app.querySelectorAll(".kick,.chip,.eyebrow,span").forEach(e=>{if(e.children.length<=1&&/^\s*homeowner\s*$/i.test(e.textContent))e.lastChild.textContent=" Business"})}}
