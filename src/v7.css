@@ -288,3 +288,7 @@ select.chip7{padding-right:28px}
  .v7cmp-r{grid-template-columns:1fr 1fr}.v7cmp-r>span:first-child{grid-column:1/-1;padding-bottom:0}.v7cmp-r.hd>span:first-child{display:none}.v7ready{flex-direction:column;align-items:flex-start}.o7-hb>div{grid-template-columns:90px 1fr 64px}
  .o7-bars{gap:6px}.o7-bars i{font-size:10px}.o7-edbar{flex-wrap:wrap}.o7-edbar .btn{flex:1;justify-content:center}}
 @media print{#top,#foot,.betabar,.o7-top,.o7-side,.backlink,.o7-inl,.o7-sh .btn,.mnav,.bnav,#toasts{display:none!important}.o7,.o7c{background:#fff;padding:0}.o7-docg{display:block}.o7-paper{border:0;box-shadow:none}.o7-g2{display:block}.o7-g2>.card:last-child{display:none}}
+.mainnav a{white-space:nowrap}
+@media (max-width:1520px) and (min-width:1000px){.mainnav{gap:0!important}.mainnav a{padding-left:8px!important;padding-right:8px!important;font-size:14px}}
+.o7-tabs{mask-image:linear-gradient(90deg,#000 92%,transparent)}
+.o7-al .btn{white-space:nowrap;flex:none}
