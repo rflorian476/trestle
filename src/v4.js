@@ -1,6 +1,6 @@
 /* v4 redesign: photo hero, one search, clean sections */
 const V4IMG={Plumbing:"t-plumbing",Electrical:"t-electrical",HVAC:"t-hvac",Roofing:"t-roofing",Remodeling:"t-remodel",Painting:"t-painting"};
-const v4img=(n,alt,cls,eager)=>`<img class="${cls||""}" src="/img/${n}.webp" alt="${esc(alt||"")}" ${eager?'fetchpriority="high"':'loading="eager"'} decoding="async">`;
+const v4img=(n,alt,cls,eager)=>`<img class="${cls||""}" src="/img/${n}.webp" ${n==="hero"?'srcset="/img/hero-sm.webp 800w, /img/hero.webp 1600w" sizes="(max-width: 900px) 100vw, 50vw" width="1600" height="1000"':""} alt="${esc(alt||"")}" ${eager?'fetchpriority="high"':'loading="lazy"'} decoding="${eager?"sync":"async"}">`;
 const v4stars=r=>r.n?`<span class="v4rt">${I("star",14)}<b>${r.avg.toFixed(1)}</b><span>(${r.n})</span></span>`:`<span class="v4rt v4new">New</span>`;
 VIEWS.home=()=>{const m=me(),z=(m&&m.zip)||"78704";let top=searchPros({zip:z,miles:120,sort:"rating"}).filter(x=>x.r.n);if(top.length<4)top=searchPros({zip:z,miles:5000,sort:"rating"}).filter(x=>x.r.n);
  const seen=new Set();top=top.filter(x=>x.u.trade!=="Property Management"&&!seen.has(x.u.trade)&&seen.add(x.u.trade)).slice(0,4);

@@ -5,6 +5,7 @@ All photographs are from [Pexels](https://www.pexels.com) under the [Pexels Lice
 | File | Subject | Photographer | Source | License |
 |---|---|---|---|---|
 | public/img/hero.webp | Electrician inspecting a residential fuse box | Kathleen Austin Kuhn | https://www.pexels.com/photo/electrician-inspecting-residential-fuse-box-area-32497160/ | Pexels License |
+| public/img/hero-sm.webp | Same photo, 800px mobile size | Kathleen Austin Kuhn | https://www.pexels.com/photo/electrician-inspecting-residential-fuse-box-area-32497160/ | Pexels License |
 | public/img/t-electrical.webp | Electrician adjusting a breaker panel | ranjeet . | https://www.pexels.com/photo/a-man-is-working-on-an-electrical-panel-27928760/ | Pexels License |
 | public/img/t-plumbing.webp | Plumber installing pipe fittings | Anıl Karakaya | https://www.pexels.com/photo/plumber-installs-pipe-fittings-6419128/ | Pexels License |
 | public/img/t-roofing.webp | Roof installation on a brick house in Fort Worth, TX | Ryan Stephens | https://www.pexels.com/photo/roof-installation-on-brick-house-in-fort-worth-33404080/ | Pexels License |

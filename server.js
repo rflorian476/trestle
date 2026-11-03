@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,uid TEXT NOT NULL,exp
 CREATE TABLE IF NOT EXISTS appdata(k TEXT PRIMARY KEY,v TEXT NOT NULL,updated INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS uploads(name TEXT PRIMARY KEY,uid TEXT NOT NULL,type TEXT NOT NULL,size INTEGER NOT NULL,created INTEGER NOT NULL);`);
 const getKV=db.prepare("SELECT v FROM appdata WHERE k=?"),setKV=db.prepare("INSERT INTO appdata(k,v,updated) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,updated=excluded.updated");
-const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs","estimates","tcalls","bills","bcust","bdocs","ledger","tsheets","lodging","creviews","visits"];
+const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs","estimates","tcalls","bills","bcust","bdocs","ledger","tsheets","lodging","creviews","visits","cases"];
 const BRAND=require("./brand.json");const APP_VERSION=require("./package.json").version+"-"+BRAND.slug;
 const UPLOADS=path.join(DATA,"uploads");fs.mkdirSync(UPLOADS,{recursive:true});
 const MAX_UPLOAD=5*1024*1024;
@@ -63,7 +63,8 @@ function cookies(req){const o={};(req.headers.cookie||"").split(";").forEach(s=>
 function sessionUid(req){const t=cookies(req).swsid;if(!t)return null;const r=db.prepare("SELECT uid,expires FROM sessions WHERE token=?").get(t);if(!r||r.expires<Date.now())return null;return r.uid}
 function setCookie(res,req,t,maxAge){const secure=(req.socket.encrypted||(TRUST_PROXY&&(String(req.headers["x-forwarded-proto"]||"").split(",")[0].trim()==="https"||/https/.test(req.headers["cf-visitor"]||""))))?"; Secure":"";res.setHeader("Set-Cookie",`swsid=${t}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`)}
 const hits=new Map();
-function limited(key,max,winMs){const now=Date.now();const a=(hits.get(key)||[]).filter(t=>now-t<winMs);a.push(now);hits.set(key,a);return a.length>max}
+const RATE_X=Math.max(1,+process.env.RATE_X||1);// RATE_X: loosen limits for local e2e runs only
+function limited(key,max,winMs){max*=RATE_X;const now=Date.now();const a=(hits.get(key)||[]).filter(t=>now-t<winMs);a.push(now);hits.set(key,a);return a.length>max}
 const ip=req=>(TRUST_PROXY&&(req.headers["cf-connecting-ip"]||(req.headers["x-forwarded-for"]||"").split(",")[0].trim()))||req.socket.remoteAddress;
 
 /* ---- validation ---- */
@@ -76,7 +77,7 @@ function clean(v,depth=0){ // strings capped, control chars removed, structure b
  if(Array.isArray(v))return v.slice(0,60).map(x=>clean(x,depth+1));
  if(typeof v==="object"){const o={};for(const k of Object.keys(v).slice(0,60)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;o[k]=clean(v[k],depth+1)}return o}
  return null}
-const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy","flagLead","reportNoShow","disputeReview","sharePhone","cancelPlan","resumePlan","requestCOI","sendCOI","addLocation","addRecurring","updateMe","saveTravel","travAvail","postTravel","applyTravel","withdrawTravel","decideTravel","inviteTraveler","closeTravel","saveCall","setAlert","delAlert","stageTravel","saveCust","addCustNote","addCustPhoto","saveDoc","delDoc","saveBill","sendBill","remindBill","recordPay","payBill","approveEst","convertEst","voidBill","addLedger","delLedger","logTime","approveTime","delTime","postLodging","closeLodging","reviewCo","setCallDetails","setCrew","tripCheck","setAlertPrefs","saveVisit","visitStatus","delVisit","setFocus","custFromJob"]);
+const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy","flagLead","reportNoShow","disputeReview","sharePhone","cancelPlan","resumePlan","requestCOI","sendCOI","addLocation","addRecurring","updateMe","saveTravel","travAvail","postTravel","applyTravel","withdrawTravel","decideTravel","inviteTraveler","closeTravel","saveCall","setAlert","delAlert","stageTravel","saveCust","addCustNote","addCustPhoto","saveDoc","delDoc","saveBill","sendBill","remindBill","recordPay","payBill","approveEst","convertEst","voidBill","addLedger","delLedger","logTime","approveTime","delTime","postLodging","closeLodging","reviewCo","setCallDetails","setCrew","tripCheck","setAlertPrefs","saveVisit","visitStatus","delVisit","setFocus","custFromJob","setRecurring","setAutoRemind","sweep9","openCase","caseReply","caseAccept","caseEscalate","caseWithdraw"]);
 const PRO_LOCKED=["id","role","email","verified","paid","founding","bg","demo","joined","favs"];
 
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
@@ -88,7 +89,7 @@ function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===ui
  const quotes=d.quotes.map(q=>(q.cid===uid||myJobs.has(q.job))?q:Object.assign({},q,{price:null,note:""}));
  const pm=new Map((d.projects||[]).map(p=>[p.id,p]));
  const pmsgs=(d.pmsgs||[]).filter(m=>{const p=pm.get(m.pid);if(!p||!uid)return false;if(m.from===uid||m.to===uid)return true;return m.to==="all"&&(p.pm===uid||crewOf(p).includes(uid))});
- return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews:d.reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:d.projects||[],pmsgs,tcalls:(d.tcalls||[]).map(c=>c.by===uid?c:Object.assign({},c,{napps:(c.apps||[]).filter(a=>a.status!=="withdrawn").length,apps:(c.apps||[]).filter(a=>a.status==="hired"||(uid&&a.uid===uid)).map(a=>a.uid===uid?a:{uid:a.uid,status:a.status,date:a.date}),invites:(c.invites||[]).filter(x=>x===uid)})),bills:uid?(d.bills||[]).filter(b=>b.by===uid||(b.cuid===uid&&b.status!=="draft")):[],bcust:own(d.bcust),bdocs:own(d.bdocs),ledger:own(d.ledger),tsheets:own(d.tsheets),lodging:d.lodging||[],creviews:d.creviews||[],visits:uid?(d.visits||[]).filter(v=>v.by===uid||v.cuid===uid):[],me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
+ return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews:d.reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:d.projects||[],pmsgs,tcalls:(d.tcalls||[]).map(c=>c.by===uid?c:Object.assign({},c,{napps:(c.apps||[]).filter(a=>a.status!=="withdrawn").length,apps:(c.apps||[]).filter(a=>a.status==="hired"||(uid&&a.uid===uid)).map(a=>a.uid===uid?a:{uid:a.uid,status:a.status,date:a.date}),invites:(c.invites||[]).filter(x=>x===uid)})),bills:uid?(d.bills||[]).filter(b=>b.by===uid||(b.cuid===uid&&b.status!=="draft")):[],bcust:own(d.bcust),bdocs:own(d.bdocs),ledger:own(d.ledger),tsheets:own(d.tsheets),lodging:d.lodging||[],creviews:d.creviews||[],visits:uid?(d.visits||[]).filter(v=>v.by===uid||v.cuid===uid):[],cases:uid?(d.cases||[]).filter(c=>c.cu===uid||c.pro===uid):[],me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
 
 function run(uid,name,args){const d=DB();d.me=uid;let r;try{r=api.A[name](...args)}catch(e){r={ok:false,msg:"That didn't work. The item may have changed, refresh and try again."}}finally{DB().me=null}if(dirty)persist();return r}
 
@@ -102,7 +103,11 @@ const ORIGIN=req=>(process.env.PUBLIC_URL||("http"+(req.headers["x-forwarded-pro
 const xe=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 const sj=o=>JSON.stringify(o).replace(/</g,"\\u003c");
 function withMeta(req,m){let h=INDEX().toString();const o=ORIGIN(req);const og=`<meta property="og:type" content="${m.type||"website"}"><meta property="og:site_name" content="Sawyer"><meta property="og:title" content="${xe(m.title)}"><meta property="og:description" content="${xe(m.desc)}"><meta property="og:url" content="${xe(o+(m.path||"/"))}"><meta property="og:image" content="${xe(o+(m.img||"/img/hero.webp"))}"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${xe(o+(m.path||"/"))}">`+(m.ld?`<script type="application/ld+json">${sj(m.ld)}</script>`:"");
- h=h.replace(/<title>[^<]*<\/title>/,`<title>${xe(m.title)}</title>`).replace(/<meta name="description" content="[^"]*">/,`<meta name="description" content="${xe(m.desc)}">`+og);return h}
+ h=h.replace(/<title>[^<]*<\/title>/,`<title>${xe(m.title)}</title>`).replace(/<meta name="description" content="[^"]*">/,`<meta name="description" content="${xe(m.desc)}">`+og);
+ // v9 perf: inline the public snapshot for signed-out visitors so first paint skips the blocking /api/state round trip (never inline private state).
+ if(!sessionUid(req)){const st=sj(snapshot(null));h=h.replace("</head>",`<script>window.__ST=${st}</script></head>`)}
+ if((m.path||"/")==="/")h=h.replace("</head>",`<link rel="preload" as="image" href="/img/hero-sm.webp" imagesrcset="/img/hero-sm.webp 800w, /img/hero.webp 1600w" imagesizes="(max-width: 900px) 100vw, 50vw" fetchpriority="high"></head>`);
+ return h}
 function SEO_PAGE(req,k,id){const d=DB(),o=ORIGIN(req);if(k==="p"){const u=(d.users||[]).find(x=>x.id===id&&x.role==="contractor");if(!u)return null;const town=String(u.zip||"");const name=u.biz||u.name;
   return withMeta(req,{title:`${name}: ${u.trade||"Contractor"} · Sawyer`,desc:`${name}, ${String(u.trade||"").toLowerCase()} pro. ${u.rating?(+u.rating).toFixed(1)+" stars from "+(u.reviews||0)+" verified reviews. ":""}Free quotes, no lead fees.`,path:"/p/"+id,type:"profile",img:u.cover||"/img/pro-1.webp",ld:Object.assign({"@context":"https://schema.org","@type":"HomeAndConstructionBusiness",name,url:o+"/p/"+id,address:{"@type":"PostalAddress",postalCode:town,addressCountry:"US"}},u.rating&&u.reviews?{aggregateRating:{"@type":"AggregateRating",ratingValue:(+u.rating).toFixed(1),reviewCount:u.reviews}}:{})})}
  const c=(d.tcalls||[]).find(x=>x.id===id);if(!c)return null;const org=(d.users||[]).find(x=>x.id===c.by)||{};
@@ -141,12 +146,17 @@ function createUser({role,name,email,phone}){const d=DB();d.me=null;const nm=Str
  db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created,phone) VALUES(?,?,?,?,?,?,?)").run(id,em,"","",u.role,Date.now(),phone||null);persist();return{ok:true,uid:id}}
 const AUTH=require("./lib/auth.js")({db,limited,ip:r=>ip(r),newSession,setCookie,sessionUid,send,createUser,SESS_DAYS,brand:BRAND,html:htmlPage});
 function formBody(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>16e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>ok(Object.fromEntries(new URLSearchParams(Buffer.concat(c).toString()))))})}
+// v9 perf: brotli for big text. Fast level now, max level computed off-thread and cached for repeat bodies (the signed-out home page).
+const BRC=new Map();function brot(zl,b){const buf=Buffer.isBuffer(b)?b:Buffer.from(b);if(buf.length<65536)return zl.brotliCompressSync(buf,{params:{[zl.constants.BROTLI_PARAM_QUALITY]:5}});
+ const k=require("crypto").createHash("sha1").update(buf).digest("base64");const hit=BRC.get(k);if(hit&&hit!=="busy")return hit;
+ if(!hit){BRC.set(k,"busy");zl.brotliCompress(buf,{params:{[zl.constants.BROTLI_PARAM_QUALITY]:11,[zl.constants.BROTLI_PARAM_SIZE_HINT]:buf.length}},(e,z)=>{if(e){BRC.delete(k);return}BRC.set(k,z);if(BRC.size>24)BRC.delete(BRC.keys().next().value)})}
+ return zl.brotliCompressSync(buf,{params:{[zl.constants.BROTLI_PARAM_QUALITY]:5}})}
 const server=http.createServer(async(req,res)=>{
  for(const[k,v]of Object.entries(SEC))res.setHeader(k,v);
- if(/\bgzip\b/.test(req.headers["accept-encoding"]||"")){const zl=require("zlib");const wh=res.writeHead.bind(res),en=res.end.bind(res);let hd=null;
+ const AE=req.headers["accept-encoding"]||"";if(/\b(gzip|br)\b/.test(AE)){const zl=require("zlib"),useBr=/\bbr\b/.test(AE);const wh=res.writeHead.bind(res),en=res.end.bind(res);let hd=null;
   res.writeHead=(c,h)=>{hd=[c,h||{}];return res};const wr=res.write.bind(res);res.write=(...a)=>{if(hd){wh(...hd);hd="done"}return wr(...a)};
   res.end=(b,...r)=>{if(hd==="done")return en(b,...r);if(!hd)hd=[res.statusCode,{}];const[c,h]=hd;const ct=String(h["Content-Type"]||res.getHeader("Content-Type")||"");
-   if(b&&typeof b!=="function"&&/text|json|javascript|xml|svg/.test(ct)&&Buffer.byteLength(b)>1024){const z=zl.gzipSync(b);h["Content-Encoding"]="gzip";h["Vary"]="Accept-Encoding";delete h["Content-Length"];res.removeHeader&&res.removeHeader("Content-Length");wh(c,h);return en(z)}
+   if(b&&typeof b!=="function"&&/text|json|javascript|xml|svg/.test(ct)&&Buffer.byteLength(b)>1024){const z=useBr?brot(zl,b):zl.gzipSync(b);h["Content-Encoding"]=useBr?"br":"gzip";h["Vary"]="Accept-Encoding";delete h["Content-Length"];res.removeHeader&&res.removeHeader("Content-Length");wh(c,h);return en(z)}
    wh(c,h);return en(b,...r)}}
  const url=new URL(req.url,"http://x");const p=url.pathname;
  try{
