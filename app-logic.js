@@ -781,6 +781,7 @@ const USK=new Set(["home","find","pro","dash","msgs","project","projects","jobs"
 {const ot=A.theme;A.theme=function(){return ot.apply(this,arguments)}}
 document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("#themeBtn")){document.documentElement.classList.add("thx");setTimeout(()=>document.documentElement.classList.remove("thx"),450)}},true);
 
+//@@SPLIT@@
 /* =====================================================================
    SAWYER v2 layer: crew builder, photo-verified work, mock milestone
    escrow, photo-to-quote estimator, rapid responder badge, bid compare.
@@ -1333,6 +1334,7 @@ let V4N={},V4Q=0;
 var V4CRED=[["hero", "Electrician inspecting a residential fuse box", "Kathleen Austin Kuhn", "https://www.pexels.com/photo/electrician-inspecting-residential-fuse-box-area-32497160/"], ["t-electrical", "Electrician adjusting a breaker panel", "ranjeet .", "https://www.pexels.com/photo/a-man-is-working-on-an-electrical-panel-27928760/"], ["t-plumbing", "Plumber installing pipe fittings", "Anıl Karakaya", "https://www.pexels.com/photo/plumber-installs-pipe-fittings-6419128/"], ["t-roofing", "Roof installation on a brick house in Fort Worth, TX", "Ryan Stephens", "https://www.pexels.com/photo/roof-installation-on-brick-house-in-fort-worth-33404080/"], ["t-hvac", "Technician inspecting an outdoor HVAC unit", "Kathleen Austin Kuhn", "https://www.pexels.com/photo/technician-inspecting-outdoor-hvac-unit-32497161/"], ["t-remodel", "Bright kitchen with granite countertops", "Peter Vang", "https://www.pexels.com/photo/modern-bright-kitchen-with-granite-countertops-35493910/"], ["t-painting", "Painting a wall with a roller", "Blue Bird", "https://www.pexels.com/photo/woman-painting-the-wall-with-a-roller-brush-7218683/"], ["home-ext", "Craftsman-style house at twilight", "Clay Elliot", "https://www.pexels.com/photo/brown-and-white-house-near-green-grass-field-and-trees-5524164/"], ["pro-1", "Contractor with a spirit level", "Thirdman", "https://www.pexels.com/photo/bearded-man-holding-a-yellow-spirit-level-8482816/"], ["pro-2", "Electrician at work, smiling", "Anastasia Shuraeva", "https://www.pexels.com/photo/a-man-in-white-button-up-shirt-smiling-7647233/"], ["pro-3", "Landscaper trimming with a string trimmer", "Gustavo Fring", "https://www.pexels.com/photo/man-trimming-the-grass-using-a-grass-cutter-4920293/"]];
 VIEWS.credits=()=>`<section class="page narrow prose"><div class="pagehead"><h1>Photo credits</h1></div><p class="lead">Photos from <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a>, used under the <a href="https://www.pexels.com/license/" target="_blank" rel="noopener">Pexels License</a>. Thank you to these photographers.</p><ul class="v4cred">${V4CRED.map(c=>`<li><b>${esc(c[2])}</b>: <a href="${c[3]}" target="_blank" rel="noopener">${esc(c[1])}</a></li>`).join("")}</ul></section>`;
 
+//@@SPLIT@@
 /* ===== v5: Travel work (traveling electricians first, any trade later) + polish ===== */
 const TRADES_T={Electrical:{w:"electrician",ws:"electricians",lic:["Apprentice","Journeyman","Master","Residential wireman","Lineman","Low-voltage / data"],specs:["Data center","Industrial","Solar / BESS","Commercial","Substation","Motor controls","PLC / instrumentation","Conduit bending","Fire alarm","Low voltage","MV terminations","Foreman"]}};
 const T_TYPES=["Data center","Industrial","Solar","Commercial"];
@@ -1718,6 +1720,7 @@ if(typeof USK!=="undefined")["tdash","traveling","newtravel","travme"].forEach(v
 {const oa=AFTER.travel;AFTER.travel=(...a)=>{oa&&oa(...a);const m=document.getElementById("tMap");if(m&&innerWidth>900&&!sessionStorage.tMapX)m.open=true;m&&m.addEventListener("toggle",()=>{if(!m.open)sessionStorage.tMapX=1})}}
 if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("hashchange",()=>{if(!/^#\/travel(\?|$)/.test(location.hash)){T_SHEET=false;document.body.classList.remove("noscroll")}});
 
+//@@SPLIT@@
 /* ===== v7: traveler toolkit (honest call details, pay guarantee, contractor score, lodging board, document wallet, per diem guide, crews, pre-trip checklist) + Office hub (estimates, invoices, pay, records, expenses, mileage, timesheets, compliance, templates, reports) ===== */
 const V7_ACTIONS=["saveCust","addCustNote","addCustPhoto","saveDoc","delDoc","saveBill","sendBill","remindBill","recordPay","payBill","approveEst","convertEst","voidBill","addLedger","delLedger","logTime","approveTime","delTime","postLodging","closeLodging","reviewCo","setCallDetails","setCrew","tripCheck","setAlertPrefs"];
 if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V7_ACTIONS);
@@ -2186,6 +2189,7 @@ if(typeof USK!=="undefined"&&USK.add)["office","lodging","wallet","bills"].forEa
 /* ---- in-page anchors (#reviews, #app) must not change the route: that re-rendered home, then the new view ---- */
 if(typeof document!=="undefined"&&document.addEventListener){document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a[href^='#']");if(!a)return;const h=a.getAttribute("href");if(h.startsWith("#/"))return;e.preventDefault();if(h.length>1){const t=document.getElementById(h.slice(1));if(t){t.scrollIntoView({behavior:"smooth",block:"start"});if(h==="#app"){t.focus&&t.focus()}}}},true)}
 
+//@@SPLIT@@
 /* ===== v8: role-aware home + next actions, Cmd-K search, schedule & dispatch, customer job tracker, quote→invoice→review links, messaging context + photos, PWA, SEO ===== */
 const V8_ACTIONS=["saveVisit","visitStatus","delVisit","setFocus","custFromJob"];
 if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V8_ACTIONS);
@@ -2634,7 +2638,7 @@ function sig10Block(s,label){if(!s)return"";return`<section class="s10-doc" aria
   <div class="s10-padw"><canvas id="s10c" width="800" height="240" aria-label="Signature pad. Draw your signature, or skip it and your typed name is used."></canvas><span class="s10-x" aria-hidden="true">✕</span><span class="s10-hint" id="s10h">Draw your signature (optional)</span><button type="button" class="linkbtn s10-clr" id="s10clr">Clear</button></div>
   <label class="s10-agree"><input type="checkbox" id="s10a" name="agree"><span>I agree to sign electronically and approve this ${what} for <b data-ctot>${v7$(billCalc(b).total)}</b>.</span></label>
   <button class="btn primary lg block" id="s10go">${I("check",16)}Sign and approve</button></form>`;
-  h=h.slice(0,i)+pad+h.slice(j)}
+  h=h.slice(0,i)+pad+h.slice(j).replace(/<p class="muted small">Tick the optional items you want first\. ?/,'<p class="muted small s10-note">Tick any optional items above before you sign. ')}
  else if(b.by===m.id&&b.status==="sent")h=h.replace('<aside class="o7-side">','<aside class="o7-side"><div class="card s10-wait"><b>'+I("pen",16)+'Waiting for e-signature</b><p class="muted small">'+esc(b.cname)+' signs from their phone. You get a notice the moment they do, and the invoice is one tap away.</p></div>');
  return h}}
 {const oa=AFTER.invoice;AFTER.invoice=(id,q)=>{oa&&oa(id,q);const f=document.getElementById("s10F");if(!f)return;const cv=document.getElementById("s10c"),cx=cv.getContext("2d");let strokes=[],cur=null;

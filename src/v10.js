@@ -46,7 +46,7 @@ function sig10Block(s,label){if(!s)return"";return`<section class="s10-doc" aria
   <div class="s10-padw"><canvas id="s10c" width="800" height="240" aria-label="Signature pad. Draw your signature, or skip it and your typed name is used."></canvas><span class="s10-x" aria-hidden="true">✕</span><span class="s10-hint" id="s10h">Draw your signature (optional)</span><button type="button" class="linkbtn s10-clr" id="s10clr">Clear</button></div>
   <label class="s10-agree"><input type="checkbox" id="s10a" name="agree"><span>I agree to sign electronically and approve this ${what} for <b data-ctot>${v7$(billCalc(b).total)}</b>.</span></label>
   <button class="btn primary lg block" id="s10go">${I("check",16)}Sign and approve</button></form>`;
-  h=h.slice(0,i)+pad+h.slice(j)}
+  h=h.slice(0,i)+pad+h.slice(j).replace(/<p class="muted small">Tick the optional items you want first\. ?/,'<p class="muted small s10-note">Tick any optional items above before you sign. ')}
  else if(b.by===m.id&&b.status==="sent")h=h.replace('<aside class="o7-side">','<aside class="o7-side"><div class="card s10-wait"><b>'+I("pen",16)+'Waiting for e-signature</b><p class="muted small">'+esc(b.cname)+' signs from their phone. You get a notice the moment they do, and the invoice is one tap away.</p></div>');
  return h}}
 {const oa=AFTER.invoice;AFTER.invoice=(id,q)=>{oa&&oa(id,q);const f=document.getElementById("s10F");if(!f)return;const cv=document.getElementById("s10c"),cx=cv.getContext("2d");let strokes=[],cur=null;

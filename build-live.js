@@ -8,9 +8,9 @@ const T=s=>s.split("__BRAND_LC__").join(BRAND.name.toLowerCase()).split("__BRAND
 const src=T(fs.readFileSync(SRC,"utf8"));
 const a=src.indexOf("<script>"),b=src.lastIndexOf("</script>");
 let js=src.slice(a+8,b);
-const V2JS=T(fs.readFileSync(path.join(__dirname,"src/v2.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v4.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v5.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v6.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v7.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v8.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v9.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v10.js"),"utf8"));
+const V2JS=T(fs.readFileSync(path.join(__dirname,"src/v2.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v4.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v5.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v6.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v7.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v8.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v9.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v10.js"),"utf8"));
 if(!js.includes("\nboot();"))throw new Error("boot anchor missing");
-js=js.replace("\nboot();","\n"+V2JS+"\nboot();");
+js=js.replace("\nboot();","\n//@@SPLIT@@\n"+V2JS+"\nboot();");
 fs.writeFileSync(path.join(__dirname,"app-logic.js"),js+"\n;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY};\n");
 function rep(s,from,to){if(!s.includes(from))throw new Error("patch anchor missing: "+from.slice(0,60));return s.split(from).join(to)}
 let c=js;
@@ -28,6 +28,8 @@ c=rep(c,'Demo prototype. Every business, person, license and review here is fict
 // v9 perf: split boot into its own script so the parser can yield between compile/eval and first render (shorter long tasks on mobile)
 if(!c.includes("\nboot();"))throw new Error("boot anchor missing (client)");
 c=c.replace("\nboot();","\n</script><script>\"use strict\";\nboot();");
+// v10 perf: one script per feature layer, so the browser compiles/runs them as separate short tasks (lower TBT on phones)
+c=c.split("\n//@@SPLIT@@\n").join('\n</script><script>"use strict";\n');
 let html=src.slice(0,a+8)+c+src.slice(b);
 html=rep(html,'<body><a class="skip" href="#app">Skip to content</a>','<body><div class="betabar" role="status">'+BRAND.name+' beta · test mode · don\'t post sensitive info</div><a class="skip" href="#app">Skip to content</a>');
 html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
@@ -43,7 +45,7 @@ html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
  css=css.replace(/@font-face\{([^}]*)\}/g,(m,b)=>{const fam=(b.match(/font-family:"([^"]+)"/)||[])[1]||"f";if(/Fraunces/.test(fam))return "";
   const wt=((b.match(/font-weight:([^;]+)/)||[])[1]||"400").trim().replace(/\s+/g,"-");const d=b.match(/url\(data:font\/woff2;base64,([^)]+)\)/);if(!d)return m;
   const name=fam.toLowerCase().replace(/[^a-z0-9]+/g,"-")+"-"+wt+".woff2";fs.writeFileSync(path.join(__dirname,"public/fonts",name),Buffer.from(d[1],"base64"));
-  if(/Jakarta/.test(fam)&&(wt==="400"||wt==="800"))pre.push(name);return "@font-face{"+b.replace(d[0],'url(/fonts/'+name+') format("woff2")').replace(/src:url\(\/fonts[^;]*format\("woff2"\)\)/,s=>s)+"}"});
+  if(/Jakarta/.test(fam)&&(wt==="400"||wt==="800"))pre.push(name);return "@font-face{"+b.replace(d[0],'url(/fonts/'+name+')').replace(/src:url\(\/fonts[^;]*format\("woff2"\)\)/,s=>s)+"}"});
  css=css.split('--font-d:"Fraunces S",Georgia,"Times New Roman",serif').join('--font-d:"Jakarta E",ui-sans-serif,system-ui,sans-serif');
  const r=require("./lib/slim-css.js")(css,rest);const before=css.length;css=r.css;
  console.log("css",before,"->",css.length,"rules dropped",r.stats.dropped,"selectors trimmed",r.stats.trimmed);
