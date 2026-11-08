@@ -77,7 +77,7 @@ function clean(v,depth=0){ // strings capped, control chars removed, structure b
  if(Array.isArray(v))return v.slice(0,60).map(x=>clean(x,depth+1));
  if(typeof v==="object"){const o={};for(const k of Object.keys(v).slice(0,60)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;o[k]=clean(v[k],depth+1)}return o}
  return null}
-const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy","flagLead","reportNoShow","disputeReview","sharePhone","cancelPlan","resumePlan","requestCOI","sendCOI","addLocation","addRecurring","updateMe","saveTravel","travAvail","postTravel","applyTravel","withdrawTravel","decideTravel","inviteTraveler","closeTravel","saveCall","setAlert","delAlert","stageTravel","saveCust","addCustNote","addCustPhoto","saveDoc","delDoc","saveBill","sendBill","remindBill","recordPay","payBill","approveEst","convertEst","voidBill","addLedger","delLedger","logTime","approveTime","delTime","postLodging","closeLodging","reviewCo","setCallDetails","setCrew","tripCheck","setAlertPrefs","saveVisit","visitStatus","delVisit","setFocus","custFromJob","setRecurring","setAutoRemind","sweep9","openCase","caseReply","caseAccept","caseEscalate","caseWithdraw"]);
+const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy","flagLead","reportNoShow","disputeReview","sharePhone","cancelPlan","resumePlan","requestCOI","sendCOI","addLocation","addRecurring","updateMe","saveTravel","travAvail","postTravel","applyTravel","withdrawTravel","decideTravel","inviteTraveler","closeTravel","saveCall","setAlert","delAlert","stageTravel","saveCust","addCustNote","addCustPhoto","saveDoc","delDoc","saveBill","sendBill","remindBill","recordPay","payBill","approveEst","convertEst","voidBill","addLedger","delLedger","logTime","approveTime","delTime","postLodging","closeLodging","reviewCo","setCallDetails","setCrew","tripCheck","setAlertPrefs","saveVisit","visitStatus","delVisit","setFocus","custFromJob","setRecurring","setAutoRemind","sweep9","openCase","caseReply","caseAccept","caseEscalate","caseWithdraw","signEst","travStatus"]);
 const PRO_LOCKED=["id","role","email","verified","paid","founding","bg","demo","joined","favs"];
 
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
@@ -225,7 +225,8 @@ const server=http.createServer(async(req,res)=>{
   if(!ACTIONS.has(name))return send(res,400,{error:"Unknown action"});
   if(!uid)return send(res,200,{error:"Sign in first",need:"login",state:snapshot(null)});
   if(limited("act:"+uid,120,60e3))return send(res,429,{error:"Too many actions, slow down."});
-  if(name==="addPhoto"&&!ownsUpload(uid,args[2]))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
+  if(name==="addLedger"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the receipt photo again"},state:snapshot(uid)});
+ if(name==="addPhoto"&&!ownsUpload(uid,args[2]))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
   if(name==="saveEstimate"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
   if(name==="updatePro"&&args[0]&&typeof args[0]==="object")for(const k of PRO_LOCKED)delete args[0][k];
   // demo accounts auto-reply (they're not real people); real users never get fake replies
@@ -236,6 +237,9 @@ const server=http.createServer(async(req,res)=>{
  return send(res,404,{error:"Not found"});
  }catch(e){console.error(e);return send(res,400,{error:"Bad request"})}
 });
+// v10: recurring invoices and overdue reminders run on the server too, so they go out even when the pro doesn't open the app.
+function sweepAll(){try{const d=DB();for(const u of (d.users||[]).slice()){if(u.role!=="contractor")continue;const has=u.autoRem9||(d.bills||[]).some(b=>b.by===u.id&&b.rec9&&b.rec9.on);if(has)run(u.id,"sweep9",[])}}catch(e){console.error("sweep",e.message)}}
+setTimeout(sweepAll,5000).unref();setInterval(sweepAll,+process.env.SWEEP_MS||3600e3).unref();
 setInterval(()=>{db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());const now=Date.now();for(const[k,a]of hits)if(!a.some(t=>now-t<3600e3))hits.delete(k)},3600e3).unref();
 server.listen(PORT,HOST,()=>console.log(`${BRAND.name} live on http://${HOST}:${PORT} (data: ${DATA})`));
 for(const sig of ["SIGTERM","SIGINT"])process.on(sig,()=>{server.close();try{db.close()}catch(e){}process.exit(0)});
