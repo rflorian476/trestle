@@ -36,5 +36,18 @@ html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
 #resetBtn,.demo,[data-login]{display:none!important}
 `+T(fs.readFileSync(path.join(__dirname,"src/v2.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v4.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v5.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v6.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v7.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v8.css"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v9.css"),"utf8"))+`
 </style></head>`);
+// v10 perf: fonts move out of the CSS into cacheable woff2 files (CSS no longer carries ~128KB of base64),
+// the unused serif face is dropped, and legacy CSS rules no markup uses are removed.
+{const s0=html.indexOf("<style>")+7,e0=html.indexOf("</style></head>");let css=html.slice(s0,e0);const rest=html.slice(0,s0-7)+html.slice(e0+8);
+ fs.mkdirSync(path.join(__dirname,"public/fonts"),{recursive:true});const pre=[];
+ css=css.replace(/@font-face\{([^}]*)\}/g,(m,b)=>{const fam=(b.match(/font-family:"([^"]+)"/)||[])[1]||"f";if(/Fraunces/.test(fam))return "";
+  const wt=((b.match(/font-weight:([^;]+)/)||[])[1]||"400").trim().replace(/\s+/g,"-");const d=b.match(/url\(data:font\/woff2;base64,([^)]+)\)/);if(!d)return m;
+  const name=fam.toLowerCase().replace(/[^a-z0-9]+/g,"-")+"-"+wt+".woff2";fs.writeFileSync(path.join(__dirname,"public/fonts",name),Buffer.from(d[1],"base64"));
+  if(/Jakarta/.test(fam)&&(wt==="400"||wt==="800"))pre.push(name);return "@font-face{"+b.replace(d[0],'url(/fonts/'+name+') format("woff2")').replace(/src:url\(\/fonts[^;]*format\("woff2"\)\)/,s=>s)+"}"});
+ css=css.split('--font-d:"Fraunces S",Georgia,"Times New Roman",serif').join('--font-d:"Jakarta E",ui-sans-serif,system-ui,sans-serif');
+ const r=require("./lib/slim-css.js")(css,rest);const before=css.length;css=r.css;
+ console.log("css",before,"->",css.length,"rules dropped",r.stats.dropped,"selectors trimmed",r.stats.trimmed);
+ const links=pre.map(n=>'<link rel="preload" href="/fonts/'+n+'" as="font" type="font/woff2" crossorigin>').join("");
+ html=html.slice(0,s0-7)+links+"<style>"+css+html.slice(e0)}
 fs.writeFileSync(path.join(__dirname,"public/index.html"),html);
 console.log("built",html.length);
