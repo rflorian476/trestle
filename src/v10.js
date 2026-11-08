@@ -87,3 +87,4 @@ async function r10shrink(file){if(!file||!/^image\//.test(file.type)||file.size<
  box.querySelectorAll("input[name=st10]").forEach(r=>r.onchange=()=>{box.querySelectorAll(".t10seg label").forEach(l=>l.classList.toggle("on",l.contains(r)));const v=r.value;if(v==="now"||v==="off")return act(A.travStatus(v,""),keep);D.hidden=false;dl.textContent=v==="onjob"?"This call ends":"Free from";di.focus()});
  document.getElementById("t10save").onclick=()=>{const r=box.querySelector("input[name=st10]:checked");act(A.travStatus(r?r.value:"soon",di.value),keep)}}}
 {const ov=VIEWS.traveler;if(ov)VIEWS.traveler=(id,q)=>{let h=ov(id,q);const u=U(id);if(!u||!u.trav)return h;const ob=t10OpenB(u.trav);if(ob)h=h.replace('<h1>',ob.replace('b10-open','b10-open b10-lg')+'<h1>');return h}}
+{const ov=VIEWS.bills;if(ov)VIEWS.bills=(...a)=>ov(...a).replace('<section class="page o7c">','<section class="page o7c b10-bills">')}

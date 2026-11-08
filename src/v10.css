@@ -26,3 +26,12 @@
 .t10st-d{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.t10st-d[hidden]{display:none}.t10st-d input{min-height:40px}
 .t10-quick{display:flex;gap:8px;align-items:center;font-size:13px;color:#5b6878}
 @media (max-width:640px){.t10seg{grid-template-columns:1fr 1fr}.s10-doc{gap:10px}}
+/* v10 audit fixes */
+.o9-g{grid-template-columns:2fr 1fr}
+@media (max-width:640px){.o9-g{grid-template-columns:1fr}.o9-auto-h{flex-wrap:wrap}.o9-auto-h>div{flex:1;min-width:0}
+ .o7-inl .r10-cap{flex:1 1 100%}
+ .b10-bills .o7t th:nth-last-child(2),.b10-bills .o7t td:nth-last-child(2){display:none}}
+.r10-cap{min-width:220px}
+.o7t th.num{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.o9-kpi small,.o9-kpi em{display:block}
+@media (max-width:640px){.b10-bills .o7t td,.b10-bills .o7t th{padding-left:6px;padding-right:6px}.b10-bills .o7t td:last-child{white-space:nowrap}}
