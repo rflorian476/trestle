@@ -154,7 +154,7 @@ const BRC=new Map();function brot(zl,b){const buf=Buffer.isBuffer(b)?b:Buffer.fr
 const server=http.createServer(async(req,res)=>{
  for(const[k,v]of Object.entries(SEC))res.setHeader(k,v);
  const AE=req.headers["accept-encoding"]||"";if(/\b(gzip|br)\b/.test(AE)){const zl=require("zlib"),useBr=/\bbr\b/.test(AE);const wh=res.writeHead.bind(res),en=res.end.bind(res);let hd=null;
-  res.writeHead=(c,h)=>{hd=[c,h||{}];return res};const wr=res.write.bind(res);res.write=(...a)=>{if(hd){wh(...hd);hd="done"}return wr(...a)};
+  res.writeHead=(c,h)=>{hd=[c,h||{}];return res};const wr=res.write.bind(res);res.write=(...a)=>{if(hd&&hd!=="done"){wh(...hd);hd="done"}else if(!hd){wh(res.statusCode,{});hd="done"}return wr(...a)};// v11 fix: a 2nd chunk used to re-send headers and cut streamed photos off at 64 KB
   res.end=(b,...r)=>{if(hd==="done")return en(b,...r);if(!hd)hd=[res.statusCode,{}];const[c,h]=hd;const ct=String(h["Content-Type"]||res.getHeader("Content-Type")||"");
    if(b&&typeof b!=="function"&&/text|json|javascript|xml|svg/.test(ct)&&Buffer.byteLength(b)>1024){const z=useBr?brot(zl,b):zl.gzipSync(b);h["Content-Encoding"]=useBr?"br":"gzip";h["Vary"]="Accept-Encoding";delete h["Content-Length"];res.removeHeader&&res.removeHeader("Content-Length");wh(c,h);return en(z)}
    wh(c,h);return en(b,...r)}}
@@ -227,6 +227,8 @@ const server=http.createServer(async(req,res)=>{
   if(limited("act:"+uid,120,60e3))return send(res,429,{error:"Too many actions, slow down."});
   if(name==="addLedger"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the receipt photo again"},state:snapshot(uid)});
  if(name==="addPhoto"&&!ownsUpload(uid,args[2]))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
+  if(name==="postJob"&&args[0]&&Array.isArray(args[0].photos))args[0].photos=args[0].photos.filter(u=>ownsUpload(uid,u));
+  if(name==="saveDoc"&&args[0]&&args[0].file&&!ownsUpload(uid,args[0].file)){const prev=(DB().bdocs||[]).find(d=>d.id===args[0].id&&d.by===uid);if(!prev||prev.file!==args[0].file)args[0].file=""}
   if(name==="saveEstimate"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
   if(name==="updatePro"&&args[0]&&typeof args[0]==="object")for(const k of PRO_LOCKED)delete args[0][k];
   // demo accounts auto-reply (they're not real people); real users never get fake replies
