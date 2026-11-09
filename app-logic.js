@@ -630,7 +630,7 @@ VIEWS.pro=(id)=>{const u=U(id);if(!u||u.role!=="contractor")return VIEWS.notfoun
  for(const v of Object.keys(H)){const o=VIEWS[v];if(!o)continue;VIEWS[v]=function(){let h=o.apply(this,arguments);const [k,t,s]=H[v];h=h.replace(/<div class="pagehead">[\s\S]*?<\/div>/,"").replace(/<div class="center head">[\s\S]*?<\/div>/,"");return phx(v,k,t,s)+h}}
 }
 /* ---------- route chrome: view tag, page transition, skeleton fade, tab bar ---------- */
-{const or=render;render=function(){const pv=document.body.dataset.pv;or.apply(this,arguments);document.body.dataset.pv=ROUTE.v;const a=document.getElementById("app");if(pv!==ROUTE.v&&!RM()){a.classList.remove("pgin");void a.offsetWidth;a.classList.add("pgin")}
+{const or=render;render=function(){const pv=document.body.dataset.pv;or.apply(this,arguments);document.body.dataset.pv=ROUTE.v;const a=document.getElementById("app");if(pv&&pv!==ROUTE.v&&!RM()){a.classList.remove("pgin");void a.offsetWidth;a.classList.add("pgin")}
  const sk=document.querySelector(".skel-ov");if(sk)setTimeout(()=>sk.classList.add("gone"),RM()?0:380);natTabs()}}
 function natTabs(){let t=document.getElementById("mtabs");const m=me();const items=[["home","home","Home"],["find","search","Find"],["projects","users","Projects"],[m?"msgs":"signup","chat","Inbox"],[m?"dash":"signup","user",m?"You":"Sign in"]];if(!t){t=document.createElement("nav");t.id="mtabs";t.setAttribute("aria-label","Mobile tabs");document.body.appendChild(t)}
  const unread=m?DB.msgs.filter(x=>x.to===m.id&&!x.read).length:0;t.innerHTML=items.map(([v,ic,l])=>`<a href="${href(v)}" class="${ROUTE.v===v||(v==="projects"&&ROUTE.v==="project")?"on":""}">${I(ic,20)}<span>${l}</span>${l==="Inbox"&&unread?`<i>${unread}</i>`:""}</a>`).join("")}
@@ -2368,7 +2368,7 @@ natTabs=function(){if(typeof document==="undefined")return;let t=document.getEle
 /* ---- PWA ---- */
 function v8Install(){const e=window.__bip;if(!e)return toast("Use your browser's menu: Add to Home Screen");e.prompt();e.userChoice.finally(()=>{window.__bip=null;SHELL()})}
 if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();window.__bip=e;try{SHELL()}catch(x){}});
- if("serviceWorker"in navigator&&location.protocol!=="file:")window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
+ if("serviceWorker"in navigator&&location.protocol!=="file:"){const reg=()=>navigator.serviceWorker.register("/sw.js").catch(()=>{});document.readyState==="complete"?setTimeout(reg,1500):window.addEventListener("load",reg)}
  window.addEventListener("offline",()=>toast("You're offline. Saved pages still open; changes need a connection."));window.addEventListener("online",()=>toast("Back online"))}
 /* ---- messages: job context, photo attachments, quick replies ---- */
 const V8IMG=/^(?:📎 Photo: )?(\/u\/[a-f0-9]{32}\.(?:jpg|png|webp))$/;
@@ -3053,6 +3053,11 @@ if(typeof DB!=="undefined"&&DB&&DB.users&&(!Array.isArray(DB.crew)||!Array.isArr
  const band=`<section class="v4sec p11-home"><div class="v4w"><div class="p11h-g"><div><span class="kick">${I("tag",14)} Price guide</span><h2>Know the price before anyone calls.</h2><p class="muted">Typical ranges near ${esc(townOf(zip))}, from the same open formula on every pro's profile. Then compare up to 3 pros side by side.</p><div class="row wrapr"><a class="btn primary" href="${href("post")}">Start a free request</a><a class="btn" href="${href("prices")}">See all prices</a></div></div>
  <ul class="p11h-l">${ts.map(([t,l,sz])=>{const r=estimateRange({cat:t,size:sz,urg:"soon",zip,desc:l});return`<li><a href="${href("prices",null,{cat:t})}"><span class="w11-ti">${I(TRADE_ICON[t]||"wrench",18)}</span><span><b>${esc(l)}</b><small>${esc(t)}</small></span><em>${money(r.low)}–${money(r.high)}</em></a></li>`}).join("")}</ul></div></div></section>`;
  return h.slice(0,e+10)+band+h.slice(e+10)}}
+
+// v11 perf: keep the server-prerendered hero <img> node through the first app render, so the photo that
+// already painted stays the same element (no repaint, no second LCP candidate).
+{const or=render;render=function(){const pre=document.getElementById("pre11"),old=pre&&pre.querySelector(".v4hero-img img");const r=or.apply(this,arguments);
+ if(old){const nu=document.querySelector("#app .v4hero-img img");if(nu&&nu.getAttribute("src")===old.getAttribute("src")){for(const a of nu.attributes)if(a.name!=="class")old.setAttribute(a.name,a.value);old.className=nu.className;nu.replaceWith(old)}}return r}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY};

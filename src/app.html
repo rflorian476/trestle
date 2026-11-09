@@ -1301,7 +1301,7 @@ VIEWS.pro=(id)=>{const u=U(id);if(!u||u.role!=="contractor")return VIEWS.notfoun
  for(const v of Object.keys(H)){const o=VIEWS[v];if(!o)continue;VIEWS[v]=function(){let h=o.apply(this,arguments);const [k,t,s]=H[v];h=h.replace(/<div class="pagehead">[\s\S]*?<\/div>/,"").replace(/<div class="center head">[\s\S]*?<\/div>/,"");return phx(v,k,t,s)+h}}
 }
 /* ---------- route chrome: view tag, page transition, skeleton fade, tab bar ---------- */
-{const or=render;render=function(){const pv=document.body.dataset.pv;or.apply(this,arguments);document.body.dataset.pv=ROUTE.v;const a=document.getElementById("app");if(pv!==ROUTE.v&&!RM()){a.classList.remove("pgin");void a.offsetWidth;a.classList.add("pgin")}
+{const or=render;render=function(){const pv=document.body.dataset.pv;or.apply(this,arguments);document.body.dataset.pv=ROUTE.v;const a=document.getElementById("app");if(pv&&pv!==ROUTE.v&&!RM()){a.classList.remove("pgin");void a.offsetWidth;a.classList.add("pgin")}
  const sk=document.querySelector(".skel-ov");if(sk)setTimeout(()=>sk.classList.add("gone"),RM()?0:380);natTabs()}}
 function natTabs(){let t=document.getElementById("mtabs");const m=me();const items=[["home","home","Home"],["find","search","Find"],["projects","users","Projects"],[m?"msgs":"signup","chat","Inbox"],[m?"dash":"signup","user",m?"You":"Sign in"]];if(!t){t=document.createElement("nav");t.id="mtabs";t.setAttribute("aria-label","Mobile tabs");document.body.appendChild(t)}
  const unread=m?DB.msgs.filter(x=>x.to===m.id&&!x.read).length:0;t.innerHTML=items.map(([v,ic,l])=>`<a href="${href(v)}" class="${ROUTE.v===v||(v==="projects"&&ROUTE.v==="project")?"on":""}">${I(ic,20)}<span>${l}</span>${l==="Inbox"&&unread?`<i>${unread}</i>`:""}</a>`).join("")}

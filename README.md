@@ -124,3 +124,8 @@ This repo is deploy-ready, and nothing has been pushed anywhere yet.
    - Move to Postgres or proper SQLite tables.
    - Backups.
    - Terms and privacy pages.
+
+### v11 performance notes
+- App JS ships as hashed, immutable `public/js/a*.js` files (built by `build-live.js`), preloaded in `<head>` and run in order by a tiny loader.
+- Signed-out visitors to `/` get the real header + hero prerendered (`public/pre-top.html`, `public/pre-home.html`). On that page the loader waits for the first paint before running the app, so the hero photo is the LCP. After changing the home hero or header, regenerate with `NODE_PATH=/workspace/tools/node_modules node tools/prerender-hero.js http://localhost:8899`.
+- If `esbuild` resolves at build time (`NODE_PATH`), inline CSS/JS get a whitespace+syntax minify (names untouched). `NO_MINIFY=1` skips it. No runtime dependency.

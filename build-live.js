@@ -51,5 +51,24 @@ html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
  console.log("css",before,"->",css.length,"rules dropped",r.stats.dropped,"selectors trimmed",r.stats.trimmed);
  const links=pre.map(n=>'<link rel="preload" href="/fonts/'+n+'" as="font" type="font/woff2" crossorigin>').join("");
  html=html.slice(0,s0-7)+links+"<style>"+css+html.slice(e0)}
+// v11 perf: optional build-time minify (whitespace + syntax only, names untouched so the layers keep sharing globals).
+// Uses esbuild if it can be resolved (NODE_PATH); otherwise the page ships unminified exactly as before. No runtime dependency.
+{let esb=null;try{esb=require("esbuild")}catch(e){}
+ if(esb&&!process.env.NO_MINIFY){const n0=html.length;const o={minifyWhitespace:true,minifySyntax:true,target:"es2022",legalComments:"none"};
+  html=html.replace(/<script>([\s\S]*?)<\/script>/g,(m,code)=>"<script>"+esb.transformSync(code,{...o,loader:"js"}).code.trim()+"</script>");
+  html=html.replace(/<style>([\s\S]*?)<\/style>/,(m,css)=>"<style>"+esb.transformSync(css,{...o,loader:"css"}).code.trim()+"</style>");
+  console.log("minified",n0,"->",html.length)}else console.log("minify skipped (esbuild not found)")}
+// v11 perf: app layers ship as hashed, immutable /js/*.js files loaded with defer (order kept, run before DOMContentLoaded),
+// so the HTML is small, the prerendered hero paints right away, and repeat visits reuse cached JS.
+{const dir=path.join(__dirname,"public/js");fs.rmSync(dir,{recursive:true,force:true});fs.mkdirSync(dir,{recursive:true});let n=0;
+ const bi=html.indexOf("<body");
+ html=html.slice(0,bi)+html.slice(bi).replace(/<script>("use strict";[\s\S]*?)<\/script>/g,(m,code)=>{const h=require("crypto").createHash("sha256").update(code).digest("hex").slice(0,10);const f="a"+(n++)+"."+h+".js";fs.writeFileSync(path.join(dir,f),code);return '<script defer src="/js/'+f+'"></script>'});
+ // Run in order via a tiny loader: on the prerendered home (#pre11) it waits one frame so the hero paints before
+ // the app code evaluates; everywhere else it starts at once. Preloads let the files download in parallel with the HTML.
+ const srcs=[...html.matchAll(/<script defer src="(\/js\/[^"]+)"><\/script>/g)].map(m=>m[1]);
+ html=html.replace(/<script defer src="\/js\/[^"]+"><\/script>/g,"");
+ html=html.replace("</head>",srcs.map(u=>'<link rel="preload" href="'+u+'" as="script">').join("")+"</head>");
+ html=html.replace(/<\/body>/,'<script>(function(){var s='+JSON.stringify(srcs)+',d=0;function g(){if(d)return;d=1;s.forEach(function(u){var e=document.createElement("script");e.src=u;e.async=false;document.body.appendChild(e)})}if(document.getElementById("pre11")){try{new PerformanceObserver(function(){setTimeout(g,0)}).observe({type:"largest-contentful-paint",buffered:true})}catch(x){requestAnimationFrame(function(){setTimeout(g,0)})}setTimeout(g,400)}else g()})()</script></body>');
+ console.log("external scripts",n)}
 fs.writeFileSync(path.join(__dirname,"public/index.html"),html);
 console.log("built",html.length);

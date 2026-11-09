@@ -369,3 +369,8 @@ if(typeof DB!=="undefined"&&DB&&DB.users&&(!Array.isArray(DB.crew)||!Array.isArr
  const band=`<section class="v4sec p11-home"><div class="v4w"><div class="p11h-g"><div><span class="kick">${I("tag",14)} Price guide</span><h2>Know the price before anyone calls.</h2><p class="muted">Typical ranges near ${esc(townOf(zip))}, from the same open formula on every pro's profile. Then compare up to 3 pros side by side.</p><div class="row wrapr"><a class="btn primary" href="${href("post")}">Start a free request</a><a class="btn" href="${href("prices")}">See all prices</a></div></div>
  <ul class="p11h-l">${ts.map(([t,l,sz])=>{const r=estimateRange({cat:t,size:sz,urg:"soon",zip,desc:l});return`<li><a href="${href("prices",null,{cat:t})}"><span class="w11-ti">${I(TRADE_ICON[t]||"wrench",18)}</span><span><b>${esc(l)}</b><small>${esc(t)}</small></span><em>${money(r.low)}–${money(r.high)}</em></a></li>`}).join("")}</ul></div></div></section>`;
  return h.slice(0,e+10)+band+h.slice(e+10)}}
+
+// v11 perf: keep the server-prerendered hero <img> node through the first app render, so the photo that
+// already painted stays the same element (no repaint, no second LCP candidate).
+{const or=render;render=function(){const pre=document.getElementById("pre11"),old=pre&&pre.querySelector(".v4hero-img img");const r=or.apply(this,arguments);
+ if(old){const nu=document.querySelector("#app .v4hero-img img");if(nu&&nu.getAttribute("src")===old.getAttribute("src")){for(const a of nu.attributes)if(a.name!=="class")old.setAttribute(a.name,a.value);old.className=nu.className;nu.replaceWith(old)}}return r}}

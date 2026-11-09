@@ -176,7 +176,7 @@ natTabs=function(){if(typeof document==="undefined")return;let t=document.getEle
 /* ---- PWA ---- */
 function v8Install(){const e=window.__bip;if(!e)return toast("Use your browser's menu: Add to Home Screen");e.prompt();e.userChoice.finally(()=>{window.__bip=null;SHELL()})}
 if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();window.__bip=e;try{SHELL()}catch(x){}});
- if("serviceWorker"in navigator&&location.protocol!=="file:")window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
+ if("serviceWorker"in navigator&&location.protocol!=="file:"){const reg=()=>navigator.serviceWorker.register("/sw.js").catch(()=>{});document.readyState==="complete"?setTimeout(reg,1500):window.addEventListener("load",reg)}
  window.addEventListener("offline",()=>toast("You're offline. Saved pages still open; changes need a connection."));window.addEventListener("online",()=>toast("Back online"))}
 /* ---- messages: job context, photo attachments, quick replies ---- */
 const V8IMG=/^(?:📎 Photo: )?(\/u\/[a-f0-9]{32}\.(?:jpg|png|webp))$/;
