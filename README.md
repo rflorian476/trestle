@@ -15,8 +15,22 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Pro (Bluebonnet Plumbing) | `demo-pro@sawyer.test` | Rapid responder badge, photo-verified portfolio, dashboard reply-time tile. |
 | Pro (Barton Creek Remodeling) | `demo-remodeler@sawyer.test` | Hired on the bath remodel: upload before/after photos, request milestone sign-off. |
 | Project manager (Dana, Copperline Build Group) | `demo-pm@sawyer.test` | **Crew builder** on the Tampa deck & seawall project: dated slots, available-pro suggestions, invite or book the whole crew. |
+| Business (Lakeway Dental Group) | `demo-business@sawyer.test` | Invoices to pay, multi-location requests, COIs. |
+| Traveling electrician (Marcus Delgado) | `demo-traveler@sawyer.test` | References from foremen, "Ask for a reference", status picker, saved calls and alerts with live match counts. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+## v11 features
+- **Guided request** (`/post`): 4 steps (trade → details + photos → timing, location and budget with the typical price range → review). Type the problem to get a trade suggestion. Signed-out visitors can fill it in; the draft survives sign-up and a banner offers "Finish and send".
+- **Instant matched shortlist** on the new job: top 3 pros by verified reviews, distance, reply speed and whether they do that exact job, each with "why matched", typical range, reply time and **Invite to quote** (max 5 invites).
+- **Compare pros side by side** (`/cmp`): from the shortlist, or tap **Compare** on up to 3 search cards (tray at the bottom). Rating, typical range, distance, reply time, license/insurance expiry, background check, reliability, jobs finished, years; the clear leader in a row is marked "Best".
+- **Price guide** (`/prices`): typical ranges for 24 trades with common example jobs, re-priced for any area; also on the home page and search.
+- **Team & clock** (Office): add crew with role, pay rate and access level (Admin / Office / Field crew, with a "who can see what" table), clock people in on a job and out again. Clock-outs land on Timesheets for approval.
+- **Job costing**: invoices (pro side) and hired jobs show invoiced vs. labor (hours × each person's rate), materials, mileage, profit and margin, plus who's on the clock now.
+- **Document vault** (Office → Documents): W-9, contracts, permits, lien waivers and warranties alongside licenses and COIs, with photo/scan upload, a job tag, filters, missing-document nudges and 60/30/7-day expiry reminders.
+- **Traveler references**: travelers ask a contractor or PM for a reference; the contractor answers from their own sign-in (stars, would-hire-again, strengths, text). References show on the traveler profile; travelers can hide but not edit them.
+- **Notification center** (`/inbox`): categories (Jobs & quotes, Money, Messages, Crew & travel, Records), unread filter, day groups, per-category email/text settings with quiet hours, and an **email + text preview** of every notice (test mode: nothing is sent).
+- **Fixed:** uploaded photos over 64 KB were cut off by the compression layer (they showed as broken images). Streamed responses now send headers once.
 
 ## v2 features
 - **Crew builder**: project slots with dates; suggestions match trade + distance and hide pros who are booked in that window (their blocked dates or other crews); invite (slots fill as pros accept; demo pros auto-reply) or book the whole crew; per-slot fill status.
