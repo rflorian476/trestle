@@ -218,3 +218,8 @@ body .uh-k{color:#a9471a!important}.ukpi>small{color:#0b7a4b}[data-theme=dark] b
 [data-theme=dark] .g12-soon{background:transparent}[data-theme=dark] .g12-soon b{color:var(--ink)}
 .pc-img .badge.float{top:auto;bottom:12px;left:12px}
 .pc-foot{align-items:flex-end}.pc-foot .bdg{flex-wrap:wrap;row-gap:4px;overflow:visible;min-width:0}.pc-foot .rate{white-space:nowrap}
+.v13-dtop{padding-top:6px}.v13-dtop>.na8:first-child{margin-top:0}
+.v13-dtop .na8-hd .kick{display:none}
+@media(min-width:900px){.v13-dtop .na8-l{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}}
+.sk8 kbd{white-space:nowrap}
+.v13-dtop #na8k{display:none}

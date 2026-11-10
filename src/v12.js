@@ -331,8 +331,8 @@ function v12DashCards(m){let h="";
  try{if(m.role==="contractor"){const rq=(DB.consults||[]).filter(x=>x.pro===m.id&&x.status==="requested");if(rq.length)add("cal","p",`${rq.length} consult request${rq.length>1?"s":""} to confirm`,`${v7DateNice(rq[0].date)}, ${v12T12(rq[0].time)} · ${nameOf(U(rq[0].cu))}`,href("consults"),"Reply");
    const el=rr12Eligible(m).filter(x=>!x.rq);if(el.length)add("star","gold",`Ask ${el.length} customer${el.length>1?"s":""} for a review`,`"${el[0].j.archived||el[0].j.title==="Past job"?(el[0].j.sub||el[0].j.cat):el[0].j.title}" is done. Fresh jobs get the most reviews.`,href("office","grow"),"Ask")}
   else if(m.role==="customer"){const ts=h12Tasks(m).filter(t=>t.state==="over");if(ts.length)add("house","gold",`${ts[0].t}`,ts.length>1?`Plus ${ts.length-1} more home maintenance task${ts.length>2?"s":""} due`:ts[0].why,href("homelog"),"See")}
-  if(m.role==="pm")add("gantt","blue","Project board","Staffing and dates for every trade, across all your projects.",href("board"),"Open")}catch(e){}
- return extra.concat(out.filter(x=>!(m.role==="pm"&&x.icon==="layers"))).slice(0,5)}}
+  }catch(e){}
+ return extra.concat(out).slice(0,5)}}
 {const os=SHELL;SHELL=function(){os.apply(this,arguments);if(typeof document==="undefined"||!document.getElementById)return;const m=me();const am=document.getElementById("acctMenu");if(!am||!m||am.querySelector("[data-v12]"))return;
  const x=v12Staff(m)?`<a href="${href("mod")}" data-v12>${I("shield",16)}Moderation queue</a>`:m.role==="customer"?`<a href="${href("homelog")}" data-v12>${I("house",16)}Home log</a><a href="${href("consults")}" data-v12>${I("cal",16)}Consults</a>`:m.role==="pm"?`<a href="${href("board")}" data-v12>${I("gantt",16)}Project board</a>`:m.role==="contractor"?`<a href="${href("office","grow")}" data-v12>${I("megaphone",16)}Reviews &amp; marketing</a><a href="${href("consults")}" data-v12>${I("cal",16)}Consults</a>`:"";
  const first=am.querySelector("a");if(first)first.insertAdjacentHTML("afterend",x);else am.insertAdjacentHTML("afterbegin",x)}}
@@ -377,3 +377,7 @@ if(typeof document!=="undefined"&&typeof render==="function"){const or=render;le
 function v13CardImg(u){const g=(u.gal12||[])[0];if(g&&G12OK(g.src))return`<img class="art v4art" src="${esc(g.src)}" alt="${esc(g.cap||"")}" loading="lazy" decoding="async">`;
  const t=(typeof V4IMG!=="undefined"&&V4IMG[u.trade])||"home-ext";return`<img class="art v4art" src="/img/${t}.webp" alt="" loading="lazy" decoding="async">`}
 if(typeof PROCARD==="function"){const oc=PROCARD;PROCARD=function(x){const h=oc(x);try{return h.replace(/(<div class="pc-img">(?:<button[\s\S]*?<\/button>)?)<img class="art v4art"[^>]*>/,(m,a)=>a+v13CardImg(x.u))}catch(e){return h}}}
+/* v13 polish: the dashboard opens with its own header ("Your home", "Your business"...), then what's next, then the rest.
+   Cards that earlier layers put above the header move just below it. */
+{const od=VIEWS.dash;VIEWS.dash=(...a)=>{const h=od(...a);try{const i=h.indexOf('<header class="uh"');if(i<0)return h;const s=h.lastIndexOf("<section",i);if(s<=0)return h;
+ const pre=h.slice(0,s);if(!pre.trim())return h;const e=h.indexOf("</header>",i);if(e<0)return h;const rest=h.slice(s,e+9),tail=h.slice(e+9);return rest+`<div class="v13-dtop">${pre}</div>`+tail}catch(x){return h}}}
