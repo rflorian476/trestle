@@ -2,7 +2,7 @@
 # Runs every e2e suite, each against its own fresh server (empty data dir, so suites don't affect each other).
 # usage: NODE_PATH=/path/to/node_modules(with playwright) bash test/run-all.sh [port]   -> prints PASS/FAIL per suite
 cd "$(dirname "$0")/.."
-PORT=${1:-8961}; B="http://127.0.0.1:$PORT"; export ADMIN_TOKEN="${ADMIN_TOKEN:-$(node -e 'process.stdout.write(require("crypto").randomBytes(18).toString("hex"))')}"
+PORT=${1:-8961}; B="http://localhost:$PORT"; export ADMIN_TOKEN="${ADMIN_TOKEN:-$(node -e 'process.stdout.write(require("crypto").randomBytes(18).toString("hex"))')}"
 LOG=${LOG_DIR:-/tmp/sawyer-tests}; mkdir -p "$LOG"; rc=0
 SUITES=${SUITES:-"e2e v7-e2e v8-e2e v9-e2e v10-e2e v11-e2e v12-e2e v13-e2e hotfix-e2e v14-e2e"}
 for s in $SUITES; do

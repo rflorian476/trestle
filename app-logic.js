@@ -3561,14 +3561,16 @@ const v14Num=s=>+String(s).replace(/[^0-9.]/g,"");
 const v14Band=(j,rg,who)=>`<div class="fp14-band" role="note">${I("dollar",16)}<span><b>Typical for this job near ${esc(townOf(j.zip||"78704"))}: ${money(rg.low)} – ${money(rg.high)}</b><small>${who==="pro"?"Based on what similar jobs cost nearby. Customers see where each quote lands.":"Based on what similar jobs cost nearby. Each quote is marked against it. It's a guide, not a quote."}</small></span></div>`;
 {const oj=VIEWS.job;VIEWS.job=function(id,q){let h=oj.apply(this,arguments);try{const j=(DB.jobs||[]).find(x=>x.id===id),m=me();
   if(!j||!m||j.status!=="posted")return h;const owner=m.id===j.cust,pro=m.role==="contractor";if(!owner&&!pro)return h;const rg=v14Range(j);if(!rg)return h;
+  // one range on the page: the v11 "Typical range for this job" line (stored when posted) gives way to the band below
+  h=h.replace(/<p class="w11-jrange">[\s\S]*?<\/p>/,"");
   h=h.replace(/<b class="qprice">([^<]*)<\/b>/g,(x,p)=>x+v14Chip(v14Fair(v14Num(p),rg)));
   const k=h.search(/<h2 class="h-sub">Quotes \(/);if(k>=0)h=h.slice(0,k)+v14Band(j,rg,owner?"owner":"pro")+h.slice(k);
-  else if(pro&&h.includes('id="doQuote"'))h=h.replace(/(<div class="actions"><button class="btn primary" id="doQuote")/,v14Band(j,rg,"pro")+"$1");
+  else if(pro&&h.includes('id="doQuote"'))h=h.replace(/<div class="actions"><button class="btn primary" id="doQuote"/,x=>v14Band(j,rg,"pro")+x);// function replacer: the band's "$1,400" must not read as a capture reference
  }catch(e){}return h}}
 {const oc=VIEWS.compare;VIEWS.compare=function(jid){let h=oc.apply(this,arguments);try{const j=(DB.jobs||[]).find(x=>x.id===jid),m=me();
   if(!j||!m||m.id!==j.cust||j.status!=="posted")return h;const rg=v14Range(j);if(!rg||!h.includes('class="cmp-price"'))return h;
   h=h.replace(/(<b class="cmp-price">([^<]*)<\/b>)/g,(x,a,p)=>a+v14Chip(v14Fair(v14Num(p),rg)));
-  h=h.replace('<div class="wrap"><div class="cmp"','<div class="wrap">'+v14Band(j,rg,"owner")+'<div class="cmp"');
+  h=h.replace('<div class="wrap"><div class="cmp"',()=>'<div class="wrap">'+v14Band(j,rg,"owner")+'<div class="cmp"');
  }catch(e){}return h}}
 
 // (2) Traveler-first dashboard: a traveling-trade account opens on its work (matching calls, applications, invites,

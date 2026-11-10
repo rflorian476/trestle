@@ -65,19 +65,28 @@ for(const w of [390,320,1440]){const p=await mk(w);await p.goto(B+"/does-not-exi
  const job=r.j.state.jobs.find(j=>j.id===jid);ok(job&&job.est11&&job.est11.low>=1000,"stored typical range uses the job-specific cost (water heater ≥ $1,000)",JSON.stringify(job&&job.est11));
  const pros=[];for(const [k,price] of [["a",1650],["b",9800],["c",300]]){const P=await signup("pro",{name:"Fair Pro "+k,biz:"Fair Plumbing "+k.toUpperCase()+" "+run,email:"v14-pro-"+k+"-"+run+"@example.com",trade:"Plumbing",zip:"78704"});
   const q=await act(P.cookie,"quote",[jid,price,"Price includes haul-away "+k]);ok(q.j&&q.j.res&&q.j.res.ok,"pro "+k+" quotes $"+price,JSON.stringify(q.j&&q.j.res));pros.push(P)}
+ // a pro with no quote yet sees the range once and can still quote through the normal form
+ {const D=await signup("pro",{name:"Fair Pro d",biz:"Fair Plumbing D "+run,email:"v14-pro-d-"+run+"@example.com",trade:"Plumbing",zip:"78704"});
+  for(const w of [1300,390]){const dp=await mk(w);await dp.goto(B+"/");await dp.context().addCookies([{name:"swsid",value:D.cookie.split("=")[1],url:B}]);await nav(dp,"/job/"+jid);
+   ok((await dp.$$("[id=doQuote]")).length===1&&(await dp.$$(".fp14-band")).length===1,"pro before quoting: one band, one Send a quote button ("+w+"px)",(await dp.$$("[id=doQuote]")).length+"/"+(await dp.$$(".fp14-band")).length);
+   ok(!/\$1,?\d{3}<|id="doQuote"[^>]*>[^<]*<\/div>\s*<div class="fp14-band"/.test(await dp.innerHTML("#app")),"band text keeps its dollar amounts");
+   ok(await dp.$(".w11-jrange")===null,"only one typical-range line on the page");
+   if(w===1300){await dp.click("#doQuote");await dp.fill("#qp","1500");await dp.fill("#qd","2");await dp.fill("#qn","50-gal tank, haul-away, permit");await dp.click("#qf button.primary");await dp.waitForTimeout(800);
+    const st=(await req(B,"/api/state",{cookie:D.cookie})).j.state;const q=st.quotes.find(x=>x.job===jid&&x.cid===st.me);ok(q&&q.price===1500&&/haul-away/.test(q.note||""),"pro quotes $1,500 through the form",JSON.stringify(q))}
+   await dp.context().close()}}
  const p=await mk();await p.goto(B+"/");await p.context().addCookies([{name:"swsid",value:C.cookie.split("=")[1],url:B}]);await nav(p,"/job/"+jid);
  const band=await p.textContent(".fp14-band").catch(()=>"");ok(/Typical for this job near Austin, TX: \$[\d,]+ – \$[\d,]+/.test(band),"owner sees the typical range above the quotes",band);
  const chips=await p.$$eval(".quote .fp14",cs=>cs.map(c=>c.className.replace("fp14 ","")+":"+c.textContent.trim()));
- ok(chips.length===3,"every quote gets a price check chip ("+chips.length+")",JSON.stringify(chips));
+ ok(chips.length===4,"every quote gets a price check chip ("+chips.length+")",JSON.stringify(chips));
  ok(chips.some(c=>/fp14-ok:In typical range/.test(c)),"$1,650 reads 'In typical range'",JSON.stringify(chips));
  ok(chips.some(c=>/fp14-hi2:Well above typical/.test(c)),"$9,800 reads 'Well above typical'",JSON.stringify(chips));
  ok(chips.some(c=>/fp14-lo:Well below typical/.test(c)),"$300 reads 'Well below typical'",JSON.stringify(chips));
  ok(await p.$eval(".quote .fp14-hi2",e=>!!e.getAttribute("title")),"chips explain themselves on hover (title)");
  await shot(p,"fair-price-job",true);
- await nav(p,"/compare/"+jid);const cc=await p.$$eval(".cmp .fp14",cs=>cs.length);ok(cc===3&&await p.$(".fp14-band")!==null,"compare bids shows the range and a chip per bid ("+cc+")");
+ await nav(p,"/compare/"+jid);const cc=await p.$$eval(".cmp .fp14",cs=>cs.length);ok(cc===4&&(await p.$$(".fp14-band")).length===1,"compare bids shows the range once and a chip per bid ("+cc+")");
  await shot(p,"fair-price-compare",true);
  const m=await mk(390);await m.goto(B+"/");await m.context().addCookies([{name:"swsid",value:C.cookie.split("=")[1],url:B}]);await nav(m,"/job/"+jid);
- ok(await noX(m)&&(await m.$$(".quote .fp14")).length===3,"price chips fit at 390px");await shot(m,"fair-price-job-390",true);await m.context().close();
+ ok(await noX(m)&&(await m.$$(".quote .fp14")).length===4,"price chips fit at 390px");await shot(m,"fair-price-job-390",true);await m.context().close();
  // a pro sees the range before quoting, never the other bids' checks
  const pp=await mk();await pp.goto(B+"/");await pp.context().addCookies([{name:"swsid",value:pros[0].cookie.split("=")[1],url:B}]);await nav(pp,"/job/"+jid);
  ok(await pp.$(".fp14-band")!==null,"the quoting pro sees the typical range");ok((await pp.$$(".quote .fp14")).length<=1,"a pro only sees a check on their own quote");await pp.context().close();
