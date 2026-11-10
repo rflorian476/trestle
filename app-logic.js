@@ -3531,7 +3531,7 @@ if(typeof document!=="undefined"){
  {const or2=render;render=function(){const r=or2.apply(this,arguments);try{if(sessionStorage.getItem("pw13")==="1"&&me()&&ROUTE.v!=="account")location.hash="#/account"}catch(e){}return r}}
 }
 
-/* v14: (1) fair-price check on quotes and bid comparison. */
+/* v14: (1) fair-price check on quotes and bid comparison, (2) a traveler-first dashboard for traveling-trade accounts. */
 // (1) Fair-price check: each quote is read against Sawyer's typical range for that job (the range the request wizard
 // stored, or the same rules-based estimate the price guide uses). Owners see where every bid lands; pros see the range
 // before they quote. Shown only while the job is open, so a finished job is never relabeled after the fact.
@@ -3571,6 +3571,35 @@ const v14Band=(j,rg,who)=>`<div class="fp14-band" role="note">${I("dollar",16)}<
   h=h.replace('<div class="wrap"><div class="cmp"','<div class="wrap">'+v14Band(j,rg,"owner")+'<div class="cmp"');
  }catch(e){}return h}}
 
+// (2) Traveler-first dashboard: a traveling-trade account opens on its work (matching calls, applications, invites,
+// references) instead of the homeowner shell. Home tools stay below, under "Your home".
+function v14TravStats(m){const t=m.trav||{},calls=(DB.tcalls||[]).filter(c=>c.status==="open"||!c.status);
+ const st=new Set(t.states||[]),any=st.has("ANY");
+ const mine=c=>(c.apps||[]).find(a=>a.uid===m.id&&a.status!=="withdrawn");
+ const match=calls.filter(c=>c.trade===t.trade&&(any||!st.size||st.has(c.state))&&!mine(c)&&c.by!==m.id);
+ const apps=(DB.tcalls||[]).map(c=>({c,a:mine(c)})).filter(x=>x.a);
+ const inv=calls.filter(c=>(c.invites||[]).includes(m.id)&&!mine(c));
+ const refs=(DB.refs||[]).filter(r=>r&&r.trav===m.id&&r.status==="given");
+ const wk=c=>{try{return tWeekly(c)}catch(e){return 0}};
+ match.sort((a,b)=>(inv.includes(b)-inv.includes(a))||(wk(b)-wk(a)));
+ return{t,match,apps,inv,refs,active:apps.filter(x=>x.a.status==="pending"||x.a.status==="short").length,hired:apps.filter(x=>x.a.status==="hired").length,wk}}
+function v14TravBlock(m){const s=v14TravStats(m),t=s.t;
+ const tile=(n,l,ic,to)=>`<a class="tv14-t" href="${to}"><span class="tv14-ti">${I(ic,16)}</span><b>${n}</b><small>${l}</small></a>`;
+ const row=c=>`<li><a href="${href("tcall",c.id)}"><span class="tv14-c"><b>${esc(c.title)}</b><small>${esc(c.loc||"")}${c.state?", "+esc(c.state):""} · ${esc(c.lic||"")}${c.weeks?" · "+c.weeks+" wks":""}</small></span><span class="tv14-p"><b>${tMoney(+c.rate||0)}/hr</b><small>${c.perDiem?"+$"+esc(c.perDiem)+"/day per diem":"No per diem"}</small></span>${s.inv.includes(c)?`<em class="tv14-inv">Invited</em>`:""}</a></li>`;
+ const list=s.match.slice(0,3);
+ return`<section class="tv14 wrap" aria-labelledby="tv14h"><div class="tv14-hd"><h2 id="tv14h">Your travel work</h2><a href="${href("tdash",null,{view:"me"})}">Traveler dashboard ${I("chev",14)}</a></div>
+ <div class="tv14-tiles">${tile(s.match.length,s.match.length===1?"open call fits your trade and states":"open calls fit your trade and states","zap",href("travel"))}${tile(s.active,"active applications","send",href("tdash",null,{view:"me"}))}${tile(s.inv.length,s.inv.length===1?"invite from a contractor":"invites from contractors","bell",href("tdash",null,{view:"me"}))}${tile(s.refs.length,s.refs.length===1?"reference from a foreman":"references from foremen","award",href("traveler",m.id))}</div>
+ <div class="tv14-grid"><div class="tv14-m card"><h3>Best matches for you</h3>${list.length?`<ul class="tv14-l">${list.map(row).join("")}</ul>`:`<p class="muted small">No open ${esc((t.trade||"").toLowerCase())} calls in your states right now. Add more states to your profile or set an alert.</p>`}<a class="btn primary" href="${href("travel")}">${I("search",16)}See all calls</a></div>
+ <div class="tv14-q card"><h3>Your status</h3><p class="tv14-av">${t.availNow?`<span class="badge b-now"><i class="pulse"></i>Available now</span>`:t.availDate?`<span class="badge">${I("clock",12)}Available from ${esc(fmtD(t.availDate))}</span>`:`<span class="badge">Availability not set</span>`}</p><p class="small muted">${esc(t.trade||"")}${t.yrs?" · "+t.yrs+" yrs":""}${(t.lic||[]).length?" · "+esc(t.lic.map(l=>l.type+(l.state?" "+l.state:"")).join(", ")):""}</p>
+ <nav class="tv14-links" aria-label="Travel tools"><a href="${href("traveler",m.id)}">${I("user",15)}My traveler profile</a><a href="${href("lodging")}">${I("home",15)}Lodging board</a><a href="${href("perdiem")}">${I("calc",15)}Per diem guide</a></nav></div></div></section>`}
+const v14IsTrav=m=>!!(m&&m.trav&&m.role!=="contractor"&&m.role!=="pm");
+{const od=VIEWS.dash;VIEWS.dash=function(){let h=od.apply(this,arguments);try{const m=me();if(!v14IsTrav(m))return h;
+  const t=m.trav||{};
+  h=h.replace(/(<span class="uh-k">[\s\S]*?<\/svg>) Homeowner<\/span><h1>[^<]*<\/h1><p class="uh-s">[^<]*<\/p>/,(x,a)=>`${a.replace(/<svg[\s\S]*<\/svg>/,I("truck",14))} Traveler</span><h1>Your travel work</h1><p class="uh-s">${esc(t.headline||t.trade||"Traveling trades")}${t.home?" · home base "+esc(t.home):""}</p>`);
+  h=h.replace(/(<div class="uh-r">)<a class="btn primary lg" href="[^"]*">[\s\S]*?<\/a><a class="btn glass" href="[^"]*">[\s\S]*?<\/a>/,(x,a)=>`${a}<a class="btn primary lg" href="${href("travel")}">${I("search",16)}Find calls</a><a class="btn glass" href="${href("post")}">${I("plus",16)}Post a home job</a>`);
+  const k=h.indexOf("</header>");if(k<0)return h;
+  return h.slice(0,k+9)+v14TravBlock(m)+`<div class="wrap tv14-home"><h2>Your home</h2></div>`+h.slice(k+9);
+ }catch(e){}return h}}
 
 /* ===== hotfix-sec layer (QA sweep 1) ===== */
 /* SW-003: no inline event handlers (the Content-Security-Policy blocks them). Buttons carry data-csp + data-arg instead. */

@@ -1,5 +1,5 @@
 // v14 end-to-end: QA retest-1 fixes (SW-039 review author ids stay with the parties, SW-040 HTML 404 fits a phone)
-// plus v14 features: fair-price check on quotes and bid comparison.
+// plus v14 features: fair-price check on quotes and bid comparison, traveler-first dashboard.
 // usage: node test/v14-e2e.js http://localhost:8899 [shotdir]   (NODE_PATH must include playwright)
 const {chromium}=require("playwright");const fs=require("fs"),path=require("path"),os=require("os"),cp=require("child_process");
 const B=(process.argv[2]||"http://localhost:8899").replace(/\/$/,"");const OUT=process.argv[3]||"";let fail=0;const errs=[];
@@ -87,6 +87,23 @@ for(const w of [390,320,1440]){const p=await mk(w);await p.goto(B+"/does-not-exi
  // price guide now agrees with the job-specific range
  const g=await mk();await nav(g,"/prices");const wh=await g.$$eval(".p11-ex li",ls=>(ls.find(l=>/water heater/i.test(l.textContent))||{}).textContent||"");
  const lo=+((wh.match(/\$([\d,]+)/)||[])[1]||"0").replace(/,/g,"");ok(lo>=1000,"price guide: 'Replace a water heater' starts at $1,000+",wh);await g.context().close()}
+
+// ---- Traveler-first dashboard ----
+{const t=await as("demo-traveler@sawyer.test");await nav(t,"/dash");
+ ok(/Your travel work/.test(await t.textContent("h1").catch(()=>"")),"traveler dashboard H1 is 'Your travel work'");
+ ok((await t.$$("h1")).length===1,"traveler dashboard has exactly one H1");
+ ok((await t.$$(".tv14-t")).length===4,"four travel tiles (matches, applications, invites, references)");
+ const best=await t.$$eval(".tv14-l a",as=>as.map(a=>a.getAttribute("href")));ok(best.length>=1&&best.every(h=>/#\/tcall\//.test(h)),"best matches link to traveler calls ("+best.length+")",JSON.stringify(best));
+ const rates=await t.$$eval(".tv14-p b",bs=>bs.map(b=>b.textContent));ok(rates.length&&rates.every(x=>/^\$\d+(\.\d+)?\/hr$/.test(x)),"match rates read like $45/hr",JSON.stringify(rates));
+ ok(/Traveler/.test(await t.textContent(".uh-k").catch(()=>"")),"header kicker says Traveler");
+ ok(await t.$(".tv14-home h2")!==null&&await t.$(".na8")!==null,"home tools stay below under 'Your home'");
+ ok(await t.$('.uh-r a[href="#/travel"]')!==null,"primary header action is Find calls");
+ await shot(t,"traveler-dash",true);
+ await t.click(".tv14-l a");await t.waitForTimeout(700);ok(/#\/tcall\//.test(t.url()),"tapping a match opens the call");
+ await t.context().close();
+ const tm=await as("demo-traveler@sawyer.test",390);await nav(tm,"/dash");ok(await noX(tm)&&(await tm.$$(".tv14-t")).length===4,"traveler dashboard fits at 390px");await shot(tm,"traveler-dash-390",true);await tm.context().close();
+ const h=await as("demo-homeowner@sawyer.test");await nav(h,"/dash");ok(await h.$(".tv14")===null&&/Your home/.test(await h.textContent("h1").catch(()=>"")),"homeowners keep the 'Your home' dashboard");await h.context().close();
+ const pr=await as("demo-pro@sawyer.test");await nav(pr,"/dash");ok(await pr.$(".tv14")===null,"pros don't get the traveler block");await pr.context().close()}
 
 ok(errs.length===0,"zero console/page errors"+(errs.length?" :: "+errs.slice(0,3).join(" | "):""));
 await br.close();console.log(fail?fail+" FAILED":"ALL PASS");process.exit(fail?1:0)})().catch(e=>{console.error("FAIL crashed:",e);process.exit(1)});
