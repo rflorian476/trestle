@@ -476,3 +476,8 @@ function seedV12(){if(!DB||!DB.users)return;const now=Date.now(),D=864e5;
  v7Col("rmrev12")}
 if(typeof DB!=="undefined"&&DB&&DB.users&&!Array.isArray(DB.consults)){try{seedV12();save()}catch(e){console.warn("seedV12",e)}}
 {const os=seed;seed=function(){const r=os.apply(this,arguments);try{seedV12();save()}catch(e){}return r}}
+/* signed-out consult booking: keep the pick through sign-in / sign-up */
+function cs12Pending(){try{const x=JSON.parse(sessionStorage.getItem("sw12cs"));const u=x&&U(x.pid);return u&&u.role==="contractor"&&x.date&&x.time?Object.assign({u},x):null}catch(e){return null}}
+const cs12PendHTML=(x,signedIn)=>`<div class="wrap cs12-pend" role="status"><span>${I("cal",18)}</span><p><b>${signedIn?"Finish booking":"Sign in to finish booking"}</b> your free consult with ${esc(v12Nm(x.u))}: ${esc(v7DateNice(x.date))}, ${v12T12(x.time)}.${signedIn?"":" We'll bring you right back to it."}</p>${signedIn?`<a class="btn sm primary" href="${href("pro",x.pid,{book:"1"})}">Finish booking</a>`:""}</div>`;
+{const os=VIEWS.signup;VIEWS.signup=(p,q)=>{const h=os(p,q);const x=q&&/\?book=1$/.test(q.next||"")?cs12Pending():null;return x&&!me()?cs12PendHTML(x,false)+h:h}}
+if(VIEWS.account){const oa=VIEWS.account;VIEWS.account=(...a)=>{const h=oa(...a);const x=me()&&cs12Pending();return x?cs12PendHTML(x,true)+h:h}}

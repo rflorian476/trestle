@@ -198,3 +198,7 @@
 
 .cm12-imp{display:flex;align-items:center;gap:6px;margin:6px 0 10px;color:var(--muted,#5b6475)}.cm12-imp .linkbtn{font-weight:700}
 .rr12-t th,.rr12-t td{position:relative}
+.cs12-pend{display:flex;align-items:center;gap:12px;margin-top:16px;margin-bottom:-4px;padding:12px 16px;background:#FFF5EC;border:1px solid #F3C9A4;border-radius:12px;color:#0F2A44}
+.cs12-pend>span{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#fff;color:#B4531A;flex:none}
+.cs12-pend p{margin:0;flex:1;font-size:.92rem}.cs12-pend .btn{flex:none}
+@media(max-width:640px){.cs12-pend{margin-left:12px;margin-right:12px;flex-wrap:wrap}}
