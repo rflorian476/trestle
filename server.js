@@ -65,6 +65,10 @@ function setCookie(res,req,t,maxAge){const secure=(req.socket.encrypted||(TRUST_
 const hits=new Map();
 const RATE_X=Math.max(1,+process.env.RATE_X||1);// RATE_X: loosen limits for local e2e runs only
 function limited(key,max,winMs){max*=RATE_X;const now=Date.now();const a=(hits.get(key)||[]).filter(t=>now-t<winMs);a.push(now);hits.set(key,a);return a.length>max}
+// SW-009: login throttling counts FAILED attempts only, per IP+account (tight) and per IP (looser, for spraying). Successful logins never count.
+// (Not loosened by RATE_X: test runs log in successfully as often as they like, so they never need it.)
+function overLimit(key,max,winMs){const now=Date.now();const a=(hits.get(key)||[]).filter(t=>now-t<winMs);hits.set(key,a);return a.length>=max}
+function addHit(key){const a=hits.get(key)||[];a.push(Date.now());hits.set(key,a)}
 const ip=req=>(TRUST_PROXY&&(req.headers["cf-connecting-ip"]||(req.headers["x-forwarded-for"]||"").split(",")[0].trim()))||req.socket.remoteAddress;
 
 /* ---- validation ---- */
@@ -201,10 +205,12 @@ const server=http.createServer(async(req,res)=>{
  if(req.method!=="POST")return send(res,405,{error:"Method not allowed"});
  const b=clean(await body(req));
  if(p==="/api/login"){
-  if(limited("login:"+ip(req),+process.env.LOGIN_RATE_MAX||10,15*60e3))return send(res,429,{error:"Too many login attempts. Try again in 15 minutes."});
-  const email=String(b.email||"").trim().toLowerCase(),pw=String(b.password||"");
+  const email=String(b.email||"").trim().toLowerCase().slice(0,254),pw=String(b.password||"");
+  const kA="loginfail:"+ip(req)+"|"+email,kI="loginfail:"+ip(req),W=15*60e3;
+  if(overLimit(kA,+process.env.LOGIN_RATE_MAX||10,W)||overLimit(kI,+process.env.LOGIN_IP_MAX||50,W))return send(res,429,{error:"Too many wrong passwords. Try again in 15 minutes."},{"Retry-After":"900"});
   const a=db.prepare("SELECT * FROM accounts WHERE email=?").get(email);
-  if(!a||!a.hash||!checkPw(pw,a.salt,a.hash))return send(res,401,{error:"Wrong email or password."});
+  if(!a||!a.hash||!checkPw(pw,a.salt,a.hash)){addHit(kA);addHit(kI);return send(res,401,{error:"Wrong email or password."})}
+  hits.delete(kA);
   const t=newSession(a.uid);setCookie(res,req,t,SESS_DAYS*86400);return send(res,200,{ok:true,state:snapshot(a.uid)})}
  // staff-only trust action: mark a pro's license + insurance as checked. Off unless ADMIN_TOKEN is set on the server.
  if(p==="/api/staff/verify"){const tok=process.env.ADMIN_TOKEN||"",got=String(req.headers["x-admin-token"]||"");if(!tok||got.length!==tok.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(tok)))return send(res,404,{error:"Not found"});
