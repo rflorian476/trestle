@@ -89,11 +89,23 @@ function pickPro(o){const r={};if(!o||typeof o!=="object"||Array.isArray(o))retu
 // strip privilege keys from any top-level object argument of any action (defence in depth for every action, not just updatePro)
 function stripPriv(args){for(const a of args)if(a&&typeof a==="object"&&!Array.isArray(a))for(const k of ["staff","admin","verified","founding","bg","planStatus","planEnds","credits"])delete a[k];return args}
 
+const PRO_PRIVATE=["email","sharedWith","credits","coiReqs","cois","flags","favs","plan","planStatus","planEnds","paidThru","tsaved","talerts","trip","aprefs","focus8","crew8","nprefs11","locations","recurring","saved","autoRem9","needsSetup","verifyPending","emailHidden","staff","admin"];
+const PUBLIC_USER=["id","role","acct","name","biz","zip","bio","demo","joined","created","trav","avatar","photo"];
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
 function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===uid):[];const crewOf=p=>(p.roles||[]).flatMap(r=>r.filled||[]);
  const rc=ctx.__v2&&ctx.__v2.respCalc;
- const users=d.users.map(u=>{const c=Object.assign({},u);if(u.id!==uid){delete c.email;if(u.role!=="contractor"&&!(u.sharedWith||[]).includes(uid))delete c.phone;delete c.sharedWith;delete c.credits;delete c.coiReqs;delete c.flags;delete c.favs;delete c.plan;delete c.tsaved;delete c.talerts;delete c.trip;delete c.aprefs;delete c.focus8;delete c.crew8;delete c.nprefs11}if(u.role==="contractor"&&rc){try{c.rs=rc(u.id)}catch(e){}}return c});
- const jobs=d.jobs.map(j=>{const party=uid&&(j.cust===uid||j.hired===uid);if(party)return j;const c=Object.assign({},j);delete c.escrow;const done=j.status==="completed"&&j.custConfirmed;if(!done)delete c.photos;return c});
+ // SW-006: other people's records are reduced to what public pages need. Customers/PMs/travelers: an allowlist.
+ // Pros: business profile minus private/billing fields. Phone numbers only for signed-in viewers (pros' business line)
+ // or when the person shared it with the viewer. Business locations (street addresses) never leave the owner.
+ const viewer=uid&&d.users.find(u=>u.id===uid),isPro=!!(viewer&&viewer.role==="contractor");
+ const users=d.users.map(u=>{if(u.id===uid){const c=Object.assign({},u);if(u.role==="contractor"&&rc){try{c.rs=rc(u.id)}catch(e){}}return c}
+  let c;if(u.role==="contractor"){c=Object.assign({},u);for(const k of PRO_PRIVATE)delete c[k];if(!uid)delete c.phone;if(Array.isArray(c.busy))c.busy=c.busy.map(x=>({start:x&&x.start,end:x&&x.end}));if(rc){try{c.rs=rc(u.id)}catch(e){}}}
+  else{c={};for(const k of PUBLIC_USER)if(u[k]!==undefined)c[k]=u[k];if(uid&&(u.sharedWith||[]).includes(uid)&&u.phone)c.phone=u.phone}
+  return c});
+ // Jobs: parties see everything. Signed-in pros see open requests to quote (no escrow, no customer contact).
+ // Everyone else (signed out, other customers) gets a redacted card: no description, no customer id, no exact budget.
+ const jobs=d.jobs.map(j=>{const party=uid&&(j.cust===uid||j.hired===uid);if(party)return j;const c=Object.assign({},j);delete c.escrow;delete c.cases;const done=j.status==="completed"&&j.custConfirmed;if(!done){delete c.photos;delete c.rphotos}
+  if(!isPro){c.cust=null;c.desc="";delete c.interested;delete c.invited;delete c.rphotos;delete c.est11;delete c.noShow;delete c.flags}return c});
  const myJobs=new Set(d.jobs.filter(j=>j.cust===uid).map(j=>j.id));
  const quotes=d.quotes.map(q=>(q.cid===uid||myJobs.has(q.job))?q:Object.assign({},q,{price:null,note:""}));
  const pm=new Map((d.projects||[]).map(p=>[p.id,p]));
