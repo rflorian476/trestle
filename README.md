@@ -21,6 +21,17 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+## v14: QA retest-1 fixes + fair prices, traveler dashboard
+- **QA retest 1:**
+  - **SW-039:** a review's author id is shared only with the parties to it: the author, the reviewed pro and staff. Signed-out visitors and everyone else get a per-review token (`rv-<id>`) and a short name such as "Pat H.". The token can't be linked across reviews or to `users[]`.
+  - **SW-040:** HTML error and auth pages fit a 390 px phone with no sideways scroll. They now show the house mark in Plus Jakarta Sans on linen.
+  - Sweep 1 and sweep 2 bugs were rechecked against v13. All were already fixed: Find has no empty well, H1s, titles, contrast and axe are clean, HSTS is on over HTTPS, and pretty URLs work.
+- **Fair-price check:** owners see "Typical for this job near (town): $X – $Y" above their quotes and on Compare bids. Each bid is marked **In typical range**, **Above typical**, **Well above typical** or **Well below typical**. The bands are wide on purpose, so honest pros aren't flagged for scope the estimate can't see. Pros see the range before they quote. The checks disappear once a job is hired.
+- **Realistic ranges for common jobs:** water heaters, panel upgrades, EV chargers, mini-splits, full system and roof replacements, kitchen and bath remodels, dock in/out and fences now use job-specific costs. These feed the request wizard, the price guide examples and the quote check, so all three show the same numbers. Before, a water heater showed as $260–$950.
+- **Traveler-first dashboard:** traveling-trade accounts open on "Your travel work". It shows matching open calls, applications, invites and references, the 3 best matches with rate and per diem, availability, and links to the traveler profile, lodging and per diem. Home tools follow below.
+- **First-contact cap:** a sender can start at most 20 new conversations in 24 hours (`NEW_THREAD_MAX`). The next one gets HTTP 429. Replies in existing threads are never limited.
+- Tests: `NODE_PATH=… bash test/run-all.sh [port]` runs every e2e suite, each against its own fresh server, and marks a suite failed on any `FAIL` line. The v14 checks alone: `node test/v14-e2e.js http://localhost:8899 shots/v14`.
+
 ## v13: speed + design pass
 - Faster pages: the home log, project board, moderation and marketing code (`src/v12-lazy.js`, built to `/js/lz12.<hash>.js`) loads only when one of those pages opens, with a skeleton while it loads. Signed-in users prefetch it when the browser is idle.
 - Signed-out pro profiles (`/p/:id`) come back from the server with the cover already rendered and the cover photo preloaded, so it paints before the app scripts run.
