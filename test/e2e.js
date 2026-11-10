@@ -1,4 +1,5 @@
 // Multi-user end-to-end test against a running Sawyer live server (v2 features included).
+// hotfix-sec: real 4xx status codes are expected from the negative tests (browser logs them as "Failed to load resource"); stock photos no longer count as verified work, so c1 shows .v2pro without .vwork.
 // usage (from designs/src for playwright): node /workspace/contractor-app/live/test/e2e.js <BASE_URL> <shotdir>
 const {chromium}=require("playwright");
 const [BASE,OUT]=process.argv.slice(2);
@@ -6,7 +7,7 @@ const [BASE,OUT]=process.argv.slice(2);
 for(const [vw,vh,name] of [[1440,900,"desktop"],[390,844,"mobile"]]){
  const run=Date.now().toString(36)+name[0];
  const mk=async who=>{const ctx=await b.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:name==="mobile"?2:1,hasTouch:name==="mobile",isMobile:name==="mobile"});const p=await ctx.newPage();p.setDefaultTimeout(8000);
-  p.on("console",m=>{if(m.type()==="error")errs.push(`${name}/${who} console: ${m.text()}`)});p.on("pageerror",e=>errs.push(`${name}/${who} pageerror: ${e.message}`));return p};
+  p.on("console",m=>{if(m.type()==="error"&&!/Failed to load resource: the server responded with a status of 4\d\d/.test(m.text()))errs.push(`${name}/${who} console: ${m.text()}`)});p.on("pageerror",e=>errs.push(`${name}/${who} pageerror: ${e.message}`));return p};
  const cu=await mk("customer"),pr=await mk("pro"),pm=await mk("pm");
  const shot=async(p,n)=>{await p.evaluate(()=>{document.querySelectorAll("#toasts>*").forEach(t=>t.remove());document.querySelectorAll(".rv").forEach(e=>e.classList.add("in"));window.scrollTo(0,0)});await p.waitForTimeout(500);await p.screenshot({path:`${OUT}/${name}-${n}.png`})};
  const step=async(label,fn)=>{try{await fn();results.push(`PASS ${name}: ${label}`)}catch(e){for(const [w,pp] of [["cu",cu],["pr",pr],["pm",pm]])await pp.screenshot({path:`${OUT}/FAIL-${name}-${label.split(" ")[0]}-${w}.png`}).catch(()=>{});results.push(`FAIL ${name}: ${label} :: ${e.message.split("\n").slice(0,3).join(" | ")}`)}};
@@ -89,7 +90,7 @@ for(const [vw,vh,name] of [[1440,900,"desktop"],[390,844,"mobile"]]){
   if(await cu.$(".n11-i.unread"))throw Error("unread after mark all");if(await cu.$("#bellBtn .dot"))throw Error("bell still shows count");
   const un=await cu.evaluate(()=>unreadCount());if(un)throw Error("server still has unread "+un)});
  await step("15 rich pro profile (services, response, sticky CTA) + new-pro setup checklist",async()=>{
-  await go(cu,"/pro/c1");for(const sel of[".svc",".pxresp, .st12",".vwork, .g12",".v2stats, .st12","#pxQuote"])await cu.waitForSelector(sel);if(!(await cu.getAttribute("#pxQuote","href")).includes("invite=c1"))throw Error("cta href");if(await cu.$("#onboard"))throw Error("checklist shown to customer");
+  await go(cu,"/pro/c1");for(const sel of[".svc",".pxresp, .st12",".vwork, .g12, .v2pro",".v2stats, .st12","#pxQuote"])await cu.waitForSelector(sel);if(!(await cu.getAttribute("#pxQuote","href")).includes("invite=c1"))throw Error("cta href");if(await cu.$("#onboard"))throw Error("checklist shown to customer");
   await shot(cu,"15-pro-profile-rich");await cu.evaluate(()=>document.querySelector(".pxsvc").scrollIntoView());await cu.waitForTimeout(300);await cu.screenshot({path:`${OUT}/${name}-15-pro-services.png`});
   await go(pr,"/pro/"+proId);await pr.waitForSelector("#onboard");const t=(await pr.textContent("#onboard .pct")).trim();if(!/^\d+\/(7|10)$/.test(t))throw Error("pct "+t);const d=await pr.$$eval("#onboard li",x=>x.filter(e=>e.dataset.done==="true").length);if(d!==+t.split("/")[0])throw Error("count mismatch");
   await go(pr,"/dash");await pr.waitForSelector("#onboard");await pr.evaluate(()=>document.getElementById("onboard").scrollIntoView());await pr.waitForTimeout(300);await pr.screenshot({path:`${OUT}/${name}-15-pro-setup.png`})});

@@ -14,6 +14,10 @@ const shot=async(p,n,full)=>{if(OUT)await p.screenshot({path:OUT+"/"+n+".png",fu
 const noX=p=>p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1);
 const txt=(p,s)=>p.textContent(s).catch(()=>"");
 const labelsClear=p=>p.$$eval(".usmap .m-town text",ts=>{const b=ts.map(t=>t.getBoundingClientRect());let bad=0;for(let i=0;i<b.length;i++)for(let j=i+1;j<b.length;j++){const a=b[i],c=b[j];if(a.left<c.right-1&&a.right>c.left+1&&a.top<c.bottom-1&&a.bottom>c.top+1)bad++}return{n:b.length,bad}});
+// fixture: demo pro c1 gets a portfolio of its OWN uploads (SW-008: stock photos are never shown as a pro's work)
+{const sp=await as("demo-pro@sawyer.test");const F=[["g-water-heater","Water heater in a utility closet, new venting","finished"],["g-pipe-wrench","Replacing a corroded supply line","in-progress"],["g-shower","Curbless shower valve and drain","finished"],["g-radiator","Hydronic heat loop, new fittings","in-progress"],["g-wall-pipes","Old galvanized lines before a repipe","before"],["g-copper","Sweated copper on a 3/4 inch main","finished"],["g-drain","Sink drain after a full snake and clean","after"]].map(([f,cap,tag])=>[fs.readFileSync(__dirname+"/../public/img/"+f+".webp").toString("base64"),cap,tag]);
+ const r=await sp.evaluate(async F=>{const out=[];for(const [b,cap,tag] of F){const bin=Uint8Array.from(atob(b),c=>c.charCodeAt(0));const x=await (await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"image/webp"},body:bin})).json();if(x.url)out.push({src:x.url,cap,tag})}return A.setGal12(out)},F);
+ if(!r||!r.ok)throw Error("portfolio fixture failed "+JSON.stringify(r));await sp.context().close()}
 // ---- 1. signed-out profile is pre-rendered, cover first ----
 const pub=await mk();
 const raw=await (await pub.request.get(B+"/p/c1")).text();
@@ -41,7 +45,7 @@ ok(!/undefined|NaN/.test(await txt(pub,"main")),"c3 profile text is clean");
 await shot(pub,"desktop-photos-coming-soon");
 // search cards: own photo with its caption, or a plain trade image with no caption
 await nav(pub,"/find");const cards=await pub.$$eval(".pc-img",x=>x.map(d=>{const i=d.querySelector("img");return{img:!!i,s:i?i.getAttribute("src")||"":"",a:i?i.alt:"",tile:!!d.querySelector(".pc13-tile")}}));
-ok(cards.length>=4&&cards.every(c=>c.img?(/\/img\/g-|\/u\//.test(c.s)&&c.a.length>0):c.tile),"search cards: own photos with captions, otherwise a 'photos coming soon' tile ("+cards.length+")");
+ok(cards.length>=4&&cards.every(c=>c.img?/^\/u\//.test(c.s):c.tile),"search cards: the pro's own uploaded photos (decorative alt), otherwise a 'photos coming soon' tile ("+cards.length+")");
 ok(cards.some(c=>c.tile)&&cards.some(c=>c.img),"search mixes real portfolios and honest placeholders, no repeated stock photos");
 await shot(pub,"desktop-search");
 // ---- 3. mobile ----

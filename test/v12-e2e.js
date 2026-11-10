@@ -13,9 +13,13 @@ const nav=async(p,r)=>{await p.goto(B+"/#"+r);await p.reload();await p.waitForTi
 const shot=async(p,n,full)=>{if(OUT)await p.screenshot({path:OUT+"/"+n+".png",fullPage:!!full})};
 const noX=p=>p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1);
 const txt=(p,s)=>p.textContent(s).catch(()=>"");
+// fixture: demo pro c1 gets a portfolio of its OWN uploads (SW-008: stock photos are never shown as a pro's work)
+{const sp=await as("demo-pro@sawyer.test");const F=[["g-water-heater","Water heater in a utility closet, new venting","finished"],["g-pipe-wrench","Replacing a corroded supply line","in-progress"],["g-shower","Curbless shower valve and drain","finished"],["g-radiator","Hydronic heat loop, new fittings","in-progress"],["g-wall-pipes","Old galvanized lines before a repipe","before"],["g-copper","Sweated copper on a 3/4 inch main","finished"],["g-drain","Sink drain after a full snake and clean","after"]].map(([f,cap,tag])=>[fs.readFileSync(__dirname+"/../public/img/"+f+".webp").toString("base64"),cap,tag]);
+ const r=await sp.evaluate(async F=>{const out=[];for(const [b,cap,tag] of F){const bin=Uint8Array.from(atob(b),c=>c.charCodeAt(0));const x=await (await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"image/webp"},body:bin})).json();if(x.url)out.push({src:x.url,cap,tag})}return A.setGal12(out)},F);
+ if(!r||!r.ok)throw Error("portfolio fixture failed "+JSON.stringify(r));await sp.context().close()}
 // ---- public: profile ----
 let pub=await mk();await pub.goto(B+"/p/c1",{waitUntil:"networkidle"});await pub.waitForTimeout(500);
-ok(/\/img\/g-/.test(await pub.getAttribute(".px-cover img","src")||""),"profile cover uses the pro's own portfolio photos");
+ok(/^\/u\//.test(await pub.getAttribute(".px-cover img","src")||""),"profile cover uses the pro's own portfolio photos");
 const menu=await pub.$$eval("#prices .m12-r",x=>x.map(e=>e.textContent));ok(menu.length>=5&&menu.filter(t=>/From \$\d/.test(t)).length>=5,"services & starting prices list ("+menu.length+")");
 ok(await pub.$('a[href="#prices"]')!==null,"profile nav has a Prices link");
 const tiles=await pub.$$(".g12 [data-g12]");ok(tiles.length===5,"portfolio grid shows 5 tiles ("+tiles.length+")");ok(/\+\d+ more/.test(await txt(pub,".g12")),"portfolio shows '+N more'");
@@ -75,7 +79,7 @@ const pro=await as("demo-pro@sawyer.test");await nav(pro,"/dash");
 ok((await pro.$$('[data-cs12][data-do=confirm]')).length>=1,"pro dashboard shows consult requests");await pro.click('[data-cs12][data-do=confirm]');await pro.waitForTimeout(400);
 ok(await pro.evaluate(()=>DB.consults.find(c=>c.id==="cs1").status==="confirmed"),"pro confirms a consult");
 ok(await pro.evaluate(b=>DB.consults.some(c=>c.id===b.id&&c.note),booked),"pro sees the customer's consult note");
-await nav(pro,"/pro/c1");ok(await pro.$("#cm12")!==null,"owner sees the completeness meter");ok(await pro.$("#cs12Set")!==null,"owner can set consult hours");
+await nav(pro,"/pro/c1");ok(await pro.$("#cm12, #onboard")!==null,"owner sees the completeness meter, or the setup checklist while steps are left (stock photos no longer count as verified work, SW-008)");ok(await pro.$("#cs12Set")!==null,"owner can set consult hours");
 await pro.click("#m12Edit");await pro.waitForTimeout(250);await pro.fill('#m12F .m12-er:first-child input[name=from]',"159");await pro.click("#m12F button.primary");await pro.waitForTimeout(400);
 ok(await pro.evaluate(()=>me().menu12[0].from===159),"pro edits a starting price");ok(/From \$159/.test(await txt(pro,"#prices")),"new price shows on the profile");
 await pro.click("#g12Edit");await pro.waitForTimeout(250);ok((await pro.$$("#modal .g12m-r, #modal [data-gi]")).length>=1||/Portfolio|photos/i.test(await txt(pro,"#modal")),"portfolio manager opens");await shot(pro,"desktop-portfolio-manager");await pro.keyboard.press("Escape");await pro.waitForTimeout(200);

@@ -35,7 +35,7 @@
 .v3acct .card{margin-bottom:16px}.v3acct .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media(max-width:760px){.v3why{padding:40px 16px 16px}.v3r{grid-template-columns:1fr;gap:4px;padding:12px 14px}.v3hd{display:none}.v3r .no:before{content:"Typical: ";font-weight:600}.v3promise{grid-template-columns:1fr}.pp-g{grid-template-columns:1fr 1fr}.v3oauth{grid-template-columns:1fr}.pp-cal{grid-template-columns:repeat(7,1fr)}}
 /* Linen & Navy palette: surface separation, readable borders, one copper highlight */
-:root:not([data-theme=dark]){--surface:#FFFFFF;--line:#DCD8CF;--line-strong:#C7C2B6;--muted:#4A5260;--ink:#0E1B2B;--shadow:0 1px 2px rgba(14,27,43,.06),0 4px 14px rgba(14,27,43,.06);--star:#B5532F;--gold:#9A4426;--gold-bg:#F6E7DF}
+:root:root{--surface:#FFFFFF;--line:#DCD8CF;--line-strong:#C7C2B6;--muted:#4A5260;--ink:#0E1B2B;--shadow:0 1px 2px rgba(14,27,43,.06),0 4px 14px rgba(14,27,43,.06);--star:#B5532F;--gold:#9A4426;--gold-bg:#F6E7DF}
 [data-theme=dark]{--line:#26374E;--line-strong:#33465F;--muted:#A3AEBD;--star:#E08A5F;--gold:#E08A5F;--gold-bg:#2E1E17;--shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25)}
 .card,.v2card,.pcard,.v3card{border-color:var(--line)}
 /* programmatic focus targets (headings / tabindex=-1) get no visible box; real controls keep focus rings */

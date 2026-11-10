@@ -57,7 +57,7 @@ function m12Modal(){const m=me();const mn=v12Menu(m);const row=(x,i)=>`<div clas
  document.getElementById("m12F").onsubmit=e=>{e.preventDefault();const list=[...L.querySelectorAll(".m12-er")].map(r=>({s:r.querySelector('[name="s"]').value,from:r.querySelector('[name="from"]').value,unit:r.querySelector('[name="unit"]').value,note:r.querySelector('[name="note"]').value}));act(A.setMenu12(list),()=>{closeModal();v12Rerender()})}}
 
 /* portfolio: real photos (pro uploads), lightbox */
-const G12OK=s=>/^\/img\/g-[a-z0-9-]+\.webp$/.test(String(s||""))||UPLOAD_RE.test(String(s||""));
+const G12OK=s=>UPLOAD_RE.test(String(s||""));/* SW-008: only the pro's own uploads */
 const g12Thumb=s=>/^\/img\/g-/.test(s)?s.replace(/\.webp$/,"-sm.webp"):s;
 A.setGal12=function(list){const m=me();if(!m||m.role!=="contractor")return{ok:false,msg:"Pro accounts only"};const rows=(Array.isArray(list)?list:[]).slice(0,12).filter(x=>x&&G12OK(x.src)).map(x=>({src:String(x.src),cap:v7S(x.cap,90),tag:["before","after","finished","in-progress"].includes(x.tag)?x.tag:"finished",date:+x.date||Date.now()}));
  if(Array.isArray(list)&&list.length&&!rows.length)return{ok:false,msg:"Those photos couldn't be added. Upload them again from your device."};/* v13 SW-037: only an explicit [] clears */
@@ -164,7 +164,7 @@ function v12Meter(u){const s=proSetup(u),d=s.filter(x=>x[2]).length,pct=Math.rou
  const hasGal=!!(u.gal12||[]).length||g12All(u).some(x=>/^\/u\//.test(x.src||""));
  /* v13: no stock photos dressed up as a pro's work. Without their own photos: decorative cover, honest empty state, no stock before/after */
  if(!hasGal){h=h.replace(/<div class="px-cover[^"]*">[\s\S]*?<div class="px-shade">/,x=>x.replace(/ alt="[^"]*"/g,' alt=""'));
-  if(!own)h=h.replace(/<div class="gallery g\d">[\s\S]*?<\/div>/,()=>`<div class="g12-soon"><span class="g12-si">${I("camera",22)}</span><div><b>Job photos coming soon</b><small>${esc(v12Nm(u))} hasn't added photos of their work yet. Ask for pictures of similar jobs when you request a quote.</small></div><a class="btn sm ghost" href="${href("post",null,{invite:u.id})}">Request a quote</a></div>`);
+  if(!own)h=h.replace(/<div class="gallery g\d">[\s\S]*?<\/div>/,()=>`<div class="g12-soon sec-soon"><span class="g12-si">${I("camera",22)}</span><div><b>Job photos coming soon</b><small>${esc(v12Nm(u))} hasn't added photos of their work yet. Ask for pictures of similar jobs when you request a quote.</small></div><a class="btn sm ghost" href="${href("post",null,{invite:u.id})}">Request a quote</a></div>`);
   {const a=h.indexOf('<section class="wrap v2pro">');const b=a<0?-1:h.indexOf("</section>",a);if(b>0&&!/src="\/u\//.test(h.slice(a,b)))h=h.slice(0,a)+h.slice(b+10)}}
  if(hasGal||own)h=h.replace(/<div class="gallery g\d">[\s\S]*?<\/div>/,()=>g12Grid(u,own));
  if(setupDone)h=h.replace('<div class="pmain">',()=>'<div class="pmain">'+v12Meter(u));
@@ -344,9 +344,10 @@ function v12DashCards(m){let h="";
 
 /* ---- seed ---- */
 function seedV12(){if(!DB||!DB.users)return;const now=Date.now(),D=864e5;
+ for(const u of DB.users||[])if(Array.isArray(u.gal12)&&u.gal12.some(x=>!UPLOAD_RE.test(String(x&&x.src||""))))u.gal12=u.gal12.filter(x=>UPLOAD_RE.test(String(x&&x.src||"")));
  if(!U("a1"))DB.users.push({id:"a1",role:"customer",name:"Sawyer Trust Team",zip:"78704",favs:[],staff:true,demo:true,joined:now-400*D});
  const c1=U("c1");if(c1){if(!c1.menu12)c1.menu12=[{s:"Water heaters",from:1450,unit:"job",note:"40–50 gal tank swap, haul-away and permit"},{s:"Tankless conversion",from:3900,unit:"job",note:"Gas line sizing and venting included"},{s:"Drain cleaning",from:189,unit:"job",note:"Main line, one cleanout"},{s:"Sewer line repair",from:2800,unit:"job",note:"Camera inspection first, $0 if we do the repair"},{s:"Sump pumps",from:650,unit:"job",note:"1/3 hp pump with check valve"},{s:"Frozen pipe thaw",from:225,unit:"visit",note:"Nights and weekends, same price"},{s:"Service call",from:95,unit:"hr",note:"Waived if you book the repair"}];
-  if(!c1.gal12)c1.gal12=[["g-water-heater","Water heater in a utility closet, new venting","finished"],["g-pipe-wrench","Replacing a corroded supply line","in-progress"],["g-shower","Curbless shower valve and drain, Travis Heights","finished"],["g-radiator","Hydronic heat loop, new fittings","in-progress"],["g-wall-pipes","Old galvanized lines before a repipe","before"],["g-copper","Sweated copper on a 3/4\" main","finished"],["g-drain","Sink drain after a full snake and clean","after"]].map(([f,cap,tag],i)=>({src:"/img/"+f+".webp",cap,tag,date:now-(i*9+3)*D}));
+  /* SW-008 (hotfix-sec): stock photos are never a pro's portfolio. No seeded stock gallery; stock entries saved earlier are dropped. */
   if(!c1.consult12)c1.consult12={on:true,modes:["onsite","video","phone"],times:["08:00","10:00","13:00","15:30"],days:[1,2,3,4,5,6],len:30}}
  const cs=v7Col("consults");if(!cs.length&&c1){const day=n=>{let d=new Date(now+n*D);while(d.getDay()===0)d=new Date(d.getTime()+D);return d.toISOString().slice(0,10)};
   cs.push({id:"cs1",pro:"c1",cu:"u2",date:day(2),time:"10:00",mode:"video",len:30,note:"Want to talk through a whole-house repipe before we buy.",zip:"78704",status:"requested",created:now-3*36e5,log:[{s:"requested",t:now-3*36e5}],demo:true},
