@@ -1,5 +1,5 @@
 // v14 end-to-end: QA retest-1 fixes (SW-039 review author ids stay with the parties, SW-040 HTML 404 fits a phone)
-// 
+// plus v14 features: fair-price check on quotes and bid comparison.
 // usage: node test/v14-e2e.js http://localhost:8899 [shotdir]   (NODE_PATH must include playwright)
 const {chromium}=require("playwright");const fs=require("fs"),path=require("path"),os=require("os"),cp=require("child_process");
 const B=(process.argv[2]||"http://localhost:8899").replace(/\/$/,"");const OUT=process.argv[3]||"";let fail=0;const errs=[];
@@ -57,6 +57,36 @@ for(const w of [390,320,1440]){const p=await mk(w);await p.goto(B+"/does-not-exi
  const ff=await p.evaluate(()=>getComputedStyle(document.body).fontFamily);ok(/Plus Jakarta Sans/.test(ff),"404 page uses Plus Jakarta Sans",ff);
  const bg=await p.evaluate(()=>getComputedStyle(document.body).backgroundColor);ok(bg==="rgb(247, 246, 243)","404 page background is linen",bg);
  if(w===390)await shot(p,"sw040-404-390");await p.context().close()}
+
+// ---- Fair-price check ----
+{const C=await signup("customer",{name:"Fair Price "+run,email:"v14-cust-"+run+"@example.com",zip:"78704"});ok(C.code===200&&C.cookie,"throwaway customer signs up",C.code);
+ const r=await act(C.cookie,"postJob",[{title:"Replace 50-gallon water heater "+run.slice(-4),cat:"Plumbing",desc:"Old tank is rusting at the base, want a new one installed with permit.",zip:"78704"}]);
+ const jid=r.j&&r.j.res&&r.j.res.id;ok(!!jid,"customer posts a water-heater job",JSON.stringify(r.j&&r.j.res));
+ const job=r.j.state.jobs.find(j=>j.id===jid);ok(job&&job.est11&&job.est11.low>=1000,"stored typical range uses the job-specific cost (water heater ≥ $1,000)",JSON.stringify(job&&job.est11));
+ const pros=[];for(const [k,price] of [["a",1650],["b",9800],["c",300]]){const P=await signup("pro",{name:"Fair Pro "+k,biz:"Fair Plumbing "+k.toUpperCase()+" "+run,email:"v14-pro-"+k+"-"+run+"@example.com",trade:"Plumbing",zip:"78704"});
+  const q=await act(P.cookie,"quote",[jid,price,"Price includes haul-away "+k]);ok(q.j&&q.j.res&&q.j.res.ok,"pro "+k+" quotes $"+price,JSON.stringify(q.j&&q.j.res));pros.push(P)}
+ const p=await mk();await p.goto(B+"/");await p.context().addCookies([{name:"swsid",value:C.cookie.split("=")[1],url:B}]);await nav(p,"/job/"+jid);
+ const band=await p.textContent(".fp14-band").catch(()=>"");ok(/Typical for this job near Austin, TX: \$[\d,]+ – \$[\d,]+/.test(band),"owner sees the typical range above the quotes",band);
+ const chips=await p.$$eval(".quote .fp14",cs=>cs.map(c=>c.className.replace("fp14 ","")+":"+c.textContent.trim()));
+ ok(chips.length===3,"every quote gets a price check chip ("+chips.length+")",JSON.stringify(chips));
+ ok(chips.some(c=>/fp14-ok:In typical range/.test(c)),"$1,650 reads 'In typical range'",JSON.stringify(chips));
+ ok(chips.some(c=>/fp14-hi2:Well above typical/.test(c)),"$9,800 reads 'Well above typical'",JSON.stringify(chips));
+ ok(chips.some(c=>/fp14-lo:Well below typical/.test(c)),"$300 reads 'Well below typical'",JSON.stringify(chips));
+ ok(await p.$eval(".quote .fp14-hi2",e=>!!e.getAttribute("title")),"chips explain themselves on hover (title)");
+ await shot(p,"fair-price-job",true);
+ await nav(p,"/compare/"+jid);const cc=await p.$$eval(".cmp .fp14",cs=>cs.length);ok(cc===3&&await p.$(".fp14-band")!==null,"compare bids shows the range and a chip per bid ("+cc+")");
+ await shot(p,"fair-price-compare",true);
+ const m=await mk(390);await m.goto(B+"/");await m.context().addCookies([{name:"swsid",value:C.cookie.split("=")[1],url:B}]);await nav(m,"/job/"+jid);
+ ok(await noX(m)&&(await m.$$(".quote .fp14")).length===3,"price chips fit at 390px");await shot(m,"fair-price-job-390",true);await m.context().close();
+ // a pro sees the range before quoting, never the other bids' checks
+ const pp=await mk();await pp.goto(B+"/");await pp.context().addCookies([{name:"swsid",value:pros[0].cookie.split("=")[1],url:B}]);await nav(pp,"/job/"+jid);
+ ok(await pp.$(".fp14-band")!==null,"the quoting pro sees the typical range");ok((await pp.$$(".quote .fp14")).length<=1,"a pro only sees a check on their own quote");await pp.context().close();
+ // after hire the labels go away (never relabel a hired job)
+ const hire=await act(C.cookie,"hire",[jid,pros[0].j.state.me]);ok(hire.j.res&&hire.j.res.ok,"customer hires pro A",JSON.stringify(hire.j.res));
+ await nav(p,"/job/"+jid);ok(await p.$(".fp14")===null&&await p.$(".fp14-band")===null,"hired job no longer shows price checks");await p.context().close();
+ // price guide now agrees with the job-specific range
+ const g=await mk();await nav(g,"/prices");const wh=await g.$$eval(".p11-ex li",ls=>(ls.find(l=>/water heater/i.test(l.textContent))||{}).textContent||"");
+ const lo=+((wh.match(/\$([\d,]+)/)||[])[1]||"0").replace(/,/g,"");ok(lo>=1000,"price guide: 'Replace a water heater' starts at $1,000+",wh);await g.context().close()}
 
 ok(errs.length===0,"zero console/page errors"+(errs.length?" :: "+errs.slice(0,3).join(" | "):""));
 await br.close();console.log(fail?fail+" FAILED":"ALL PASS");process.exit(fail?1:0)})().catch(e=>{console.error("FAIL crashed:",e);process.exit(1)});

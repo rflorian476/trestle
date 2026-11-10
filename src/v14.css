@@ -1,0 +1,13 @@
+/* v14: fair-price chips + band (Linen & Navy tokens, AA contrast) */
+.fp14{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:600;line-height:1.3;white-space:nowrap;border:1px solid transparent}
+.fp14 .i{flex:none}
+.fp14-ok{background:#E7F2EB;color:#1C5E3C;border-color:#C6E0CF}
+.fp14-hi{background:#FBF0DC;color:#7A4300;border-color:#EBD3A6}
+.fp14-hi2{background:#F9E4DF;color:#8F2C1A;border-color:#EDC3B9}
+.fp14-lo{background:#FBF0DC;color:#7A4300;border-color:#EBD3A6}
+.qside .fp14{display:flex;width:max-content;margin:6px 0 4px auto}
+.cmp [data-k="Price"] .fp14{display:flex;width:max-content}
+.fp14-band{display:flex;gap:10px;align-items:flex-start;margin:14px 0 12px;padding:12px 14px;border-radius:12px;background:#F2EEE5;border:1px solid #E4DED0;color:#0E1B2B}
+.fp14-band>.i{flex:none;margin-top:2px;color:#1B3A5B}
+.fp14-band b{display:block;font-size:14.5px}
+.fp14-band small{display:block;color:#4A5565;font-size:13px;margin-top:2px}
