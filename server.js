@@ -66,6 +66,7 @@ function sessionUid(req){const t=cookies(req).swsid;if(!t)return null;const r=db
 const isHttps=req=>!!(req.socket.encrypted||(TRUST_PROXY&&(String(req.headers["x-forwarded-proto"]||"").split(",")[0].trim()==="https"||/https/.test(req.headers["cf-visitor"]||""))));
 function setCookie(res,req,t,maxAge){const secure=isHttps(req)?"; Secure":"";res.setHeader("Set-Cookie",`swsid=${t}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`)}
 const hits=new Map();
+const NEW_THREAD_MAX=Math.max(1,+process.env.NEW_THREAD_MAX||20);// v14: new conversations a sender may start per 24 h
 const RATE_X=Math.max(1,+process.env.RATE_X||1);// RATE_X: loosen limits for local e2e runs only
 function limited(key,max,winMs){max*=RATE_X;const now=Date.now();const a=(hits.get(key)||[]).filter(t=>now-t<winMs);a.push(now);hits.set(key,a);return a.length>max}
 // SW-009: login throttling counts FAILED attempts only, per IP+account (tight) and per IP (looser, for spraying). Successful logins never count.
@@ -350,7 +351,12 @@ const server=http.createServer(async(req,res)=>{
   // demo accounts auto-reply (they're not real people); real users never get fake replies
   const isDemo=id=>!!(DB().users.find(u=>u.id===id)||{}).demo;
   allowAuto=(name==="send"&&isDemo(args[0]))||name==="inviteCrew"||(name==="crewSend"&&(()=>{const pr=(DB().projects||[]).find(x=>x.id===args[0]);return pr&&pr.demo})());
+  // v14: first contact is capped (anyone may message a pro's public profile, so cold outreach is the spam path).
+  // Up to NEW_THREAD_MAX new conversations per sender per 24 h; replies in existing threads are never limited.
+  let newThread=false;if(name==="send"){const to=String(args[0]||"");newThread=!!to&&to!==uid&&!DB().msgs.some(x=>(x.a===uid&&x.b===to)||(x.a===to&&x.b===uid));
+   if(newThread){const now=Date.now(),k="newthread:"+uid,a=(hits.get(k)||[]).filter(t=>now-t<864e5);hits.set(k,a);if(a.length>=NEW_THREAD_MAX*RATE_X)return send(res,429,{error:"You've started a lot of new conversations today. Reply in your existing threads, or try again tomorrow.",res:{ok:false,msg:"You've started a lot of new conversations today. Reply in your existing threads, or try again tomorrow."},state:snapshot(uid)})}}
   const r=run(uid,name,args);allowAuto=false;
+  if(newThread&&r&&r.ok!==false&&DB().msgs.some(x=>x.from===uid&&(x.a===String(args[0])||x.b===String(args[0]))))hits.get("newthread:"+uid).push(Date.now());
   return send(res,200,{res:r===undefined?{ok:true}:r,state:snapshot(uid)})}
  return send(res,404,{error:"Not found"});
  }catch(e){console.error(e);return send(res,400,{error:"Bad request"})}
@@ -358,7 +364,7 @@ const server=http.createServer(async(req,res)=>{
 // v10: recurring invoices and overdue reminders run on the server too, so they go out even when the pro doesn't open the app.
 function sweepAll(){try{const d=DB();for(const u of (d.users||[]).slice()){if(u.role!=="contractor")continue;const has=u.autoRem9||(d.bills||[]).some(b=>b.by===u.id&&b.rec9&&b.rec9.on);if(has)run(u.id,"sweep9",[])}}catch(e){console.error("sweep",e.message)}}
 setTimeout(sweepAll,5000).unref();setInterval(sweepAll,+process.env.SWEEP_MS||3600e3).unref();
-setInterval(()=>{db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());const now=Date.now();for(const[k,a]of hits)if(!a.some(t=>now-t<3600e3))hits.delete(k)},3600e3).unref();
+setInterval(()=>{db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());const now=Date.now();for(const[k,a]of hits)if(!a.some(t=>now-t<(k.startsWith("newthread:")?864e5:3600e3)))hits.delete(k)},3600e3).unref();
 server.listen(PORT,HOST,()=>{console.log(`${BRAND.name} live on http://${HOST}:${PORT} (data: ${DATA})`);
  // v10 perf: warm the max-compression cache for the signed-out home page so the first visitor after a deploy gets the small copy
  const warm=()=>{try{require("http").get({host:HOST==="0.0.0.0"?"127.0.0.1":HOST,port:PORT,path:"/",headers:{"Accept-Encoding":"br"}},r=>r.resume()).on("error",()=>{})}catch(e){}};setTimeout(warm,300).unref();setTimeout(warm,4000).unref()});
