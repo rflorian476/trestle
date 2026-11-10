@@ -21,6 +21,20 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+## v13: speed + design pass
+- Faster pages: the home log, project board, moderation and marketing code (`src/v12-lazy.js`, built to `/js/lz12.<hash>.js`) loads only when one of those pages opens, with a skeleton while it loads. Signed-in users prefetch it when the browser is idle.
+- Signed-out pro profiles (`/p/:id`) come back from the server with the cover already rendered and the cover photo preloaded, so it paints before the app scripts run.
+- Profile map town names no longer overlap. Each label tries 8 spots; if none fits, the town shows just its dot.
+- Pros without their own photos show "Job photos coming soon" with a Request a quote link, instead of stock "Recent work" photos with captions that don't match. Search cards use the pro's own first photo, or a plain trade photo with no caption.
+- Design pass, comparing against Airbnb, Thumbtack, Stripe and Linear:
+  - **Home:** new hero ("Pros you'd trust with your house keys.") with floating trust cards showing a real top-rated pro and how milestone escrow works. A strip of what you get replaces the small counts. The page now has a single "How it works" section, and Sawyer vs Angi can be compared for homeowners and for pros. Sections use the same spacing throughout, and cards react to hover and taps.
+  - **Dashboards:** dashboards open with their header. The clip-art is gone, and "what's next" is a tidy 2-column list. Nothing is duplicated (no second invoices card or project board card), and towns show instead of bare ZIP codes.
+  - **Profile:** highlights sit in a 2-column grid. The sidebar sticks as one block, so it no longer overlaps the guarantee card. The guarantee copy now matches milestone escrow.
+  - **Search:** the helper lines are smaller and quieter.
+  - **Mobile:** the request flow and Office are denser.
+  - **Traveler board:** job calls come first, and the map stays folded until opened.
+- Tests: `node test/v13-e2e.js http://localhost:8899 shots/v13/final`. Before/after screenshots are in `shots/v13/before-after/`.
+
 ## v12 features
 - **Pro profile**: **Services & starting prices** (pros set "From $X" per service, others show Sawyer's typical price), a real-photo **portfolio** with a full-screen lightbox (arrow keys, captions, before/after tags) that also becomes the cover, a **Track record** block (median reply, customer-confirmed jobs, quotes in 90 days, hire rate, repeat customers, member since), **Towns covered** with a "Do they come to you?" ZIP check, and **Book a free consult** (on-site, video or phone; 14-day day/time picker, taken slots blocked, 2 live bookings per customer per pro, .ics download). Visitors can pick a time before signing in; the pick survives sign-in/sign-up.
 - **Completeness + import (demo)**: the setup checklist gains prices, 3+ photos and consults; once complete it becomes a 100% ring. **Import from Google or Facebook** fills description, phone, hours, services, years and website after you check each field (test mode: sample data). Reviews never import.
