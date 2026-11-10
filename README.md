@@ -12,7 +12,7 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Role | Email | What to try |
 |---|---|---|
 | Homeowner (Pat, Austin TX) | `demo-homeowner@sawyer.test` | **Compare bids** on "Water heater leaking" (3 bids). **Escrow sign-off** on "Primary bath remodel" (one milestone waiting). Saved **photo-to-quote** estimate. |
-| Pro (Bluebonnet Plumbing) | `demo-pro@sawyer.test` | Rapid responder badge, photo-verified portfolio, dashboard reply-time tile. |
+| Pro (Bluebonnet Plumbing) | `demo-pro@sawyer.test` | Rapid responder badge, dashboard reply-time tile (demo stock photos are not shown as its work). |
 | Pro (Barton Creek Remodeling) | `demo-remodeler@sawyer.test` | Hired on the bath remodel: upload before/after photos, request milestone sign-off. |
 | Project manager (Dana, Copperline Build Group) | `demo-pm@sawyer.test` | **Crew builder** on the Tampa deck & seawall project: dated slots, available-pro suggestions, invite or book the whole crew. |
 | Business (Lakeway Dental Group) | `demo-business@sawyer.test` | Invoices to pay, multi-location requests, COIs. |
@@ -63,6 +63,18 @@ tail -f logs/server.log logs/tunnel.log
 - **Run the tests:** `cd ../designs/src && cp ../../live/test/e2e.js _live_e2e.js && node _live_e2e.js <BASE_URL> ../../live/shots/v2`
 
 ## Security / safety
+### Hotfix (QA sweeps 1–2)
+- **Profile edits are an allowlist** (`bio, rate, phone, license, insurance, availNow`, pros only). `staff`, `verified`, `bg`, `plan`, `role`, etc. are never taken from the client. Typing a license no longer earns the Verified badge; changing it clears the badge. Staff mark a pro verified with `POST /api/staff/verify` `{uid, verified}` and header `x-admin-token: $ADMIN_TOKEN` (endpoint is off, 404, when `ADMIN_TOKEN` isn't set).
+- **Real HTTP status codes** (400/401/403/404/405/413/415/429); JSON bodies still carry `status`.
+- **Public snapshot is minimized:** signed out, no phone numbers, emails, business addresses or job descriptions/customer ids. Signed-in pros see open job details and business phones.
+- **Headers:** hash-based Content-Security-Policy on every app page (no inline event handlers; use `data-csp`), HSTS over HTTPS, `X-Frame-Options: DENY`, nosniff, `Referrer-Policy`.
+- **Pretty URLs** (`/prices`, `/find?cat=Roofing`, `/job/j1`) serve the app; unknown pages are an HTML 404.
+- **Login throttling counts failed attempts only** (10 per account+IP, 50 per IP, 15 min, HTTP 429 + Retry-After).
+- **Job lifecycle:** hire only open jobs and real pros, no switching after hire, complete only hired jobs, reviews only for a hired pro.
+- **Messaging** needs a real account and a connection (pro profile, job, quote, project, traveler call, invoice, etc.).
+- **Password change** needs the current password and signs out other sessions.
+- Light Linen & Navy theme only; stock photos are never shown as a pro's own work.
+- Tests: `node test/hotfix-e2e.js http://localhost:8910` (set `ADMIN_TOKEN` to the server's to cover the staff action).
 - **Passwords:** scrypt with a per-user salt.
 - **Sessions:** a random 256-bit token in an `HttpOnly; SameSite=Lax` cookie, plus `Secure` when served over https. Sessions last 30 days and are stored in SQLite.
 - **Rate limits:**
