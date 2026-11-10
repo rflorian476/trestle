@@ -6,3 +6,5 @@ if(typeof document!=="undefined"&&document.addEventListener&&typeof window!=="un
  document.addEventListener("submit",e=>{const f=e.target;if(!f||!f.matches||!f.matches("form[data-reply]"))return;e.preventDefault();act(A.reply(f.dataset.reply,(f.t&&f.t.value)||""))})}
 /* SW-007: typed or shared pretty URLs (/prices, /find?cat=Roofing, /job/j12) open the same view as the #/ route */
 if(typeof location!=="undefined"&&typeof history!=="undefined"&&typeof window!=="undefined"&&window.addEventListener){try{const pn=location.pathname;if(pn&&pn!=="/"&&pn!=="/index.html"&&!/^\/[pt]\/[\w-]+$/.test(pn)&&(!location.hash||location.hash.length<3)&&/^\/[a-z0-9]+(\/[\w.-]+)?\/?$/.test(pn))history.replaceState(null,"","/#"+pn.replace(/\/$/,"")+location.search)}catch(x){}}
+/* SW-005: one light Linen & Navy theme. Anything saved from the old dark toggle is ignored. */
+if(typeof document!=="undefined"&&document.documentElement){try{document.documentElement.dataset.theme="light";if(typeof DB==="object"&&DB)DB.theme="light"}catch(x){}}
