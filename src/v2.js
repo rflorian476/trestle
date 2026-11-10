@@ -27,7 +27,7 @@ let V2EMERG=false;
 /* ---------- verified work + job confirmation ---------- */
 const confirmedJob=j=>j&&j.status==="completed"&&!!j.custConfirmed;
 const verifiedJobs=cid=>DB.jobs.filter(j=>j.hired===cid&&confirmedJob(j)).length;
-const verifiedPhotos=cid=>DB.jobs.filter(j=>j.hired===cid&&confirmedJob(j)&&(j.photos||[]).length).flatMap(j=>(j.photos||[]).map(p=>Object.assign({job:j},p)));
+const verifiedPhotos=cid=>DB.jobs.filter(j=>j.hired===cid&&confirmedJob(j)&&(j.photos||[]).length).flatMap(j=>(j.photos||[]).filter(p=>!/^art:/.test(String(p.src||""))).map(p=>Object.assign({job:j},p)));// SW-008: stock (art:) photos never count as a pro's verified work
 const photoSrc=(p,cls)=>{const s=String(p.src||"");if(s.startsWith("art:")){const[a,b,c]=s.slice(4).split("|");return art(a,b,c)}if(UPLOAD_RE.test(s))return`<img src="${esc(s)}" alt="${esc((p.kind==="before"?"Before":"After")+": "+(p.cap||"job photo"))}" loading="lazy" class="${cls||""}">`;return""};
 
 /* ---------- photo-to-quote estimator (transparent rules) ---------- */
