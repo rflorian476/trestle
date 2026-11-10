@@ -55,7 +55,12 @@ Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, M
   - Quotes are accepted only on open jobs, in dollars, up to $10M.
   - Job titles are capped at 90 characters and descriptions at 2,000.
   - The message photo check matches the 5 MB server limit and shows the server's error.
-- Tests: `node test/v13-e2e.js http://localhost:8899 shots/v13/final`. Before/after screenshots are in `shots/v13/before-after/`.
+- **Security hotfix merged (main 6eb9c79):**
+  - Pro profile edits go through an allowlist, and staff and verified are set server-side only. Verified changes only through `POST /api/staff/verify`, which needs `x-admin-token`.
+  - CSP with no inline handlers (`data-csp` instead), real HTTP codes, a redacted public snapshot, pretty URLs, the failure-based login limiter, a light theme only, and fixes to the job lifecycle and messaging rules.
+  - Stock photos are never a pro's portfolio. The demo pro (Bluebonnet) no longer has a seeded stock gallery, `setGal12` only takes the pro's own uploads, and profiles without uploads show "Job photos coming soon".
+  - Forgot password works with the hotfix rule that a password change needs the current password: a session started by a one-time code in the last 15 minutes may set a new password once without the old one.
+- Tests: `node test/v13-e2e.js http://localhost:8899 shots/v13/final` and `ADMIN_TOKEN=… node test/hotfix-e2e.js http://localhost:8899` (the server needs the same `ADMIN_TOKEN`). Before/after screenshots are in `shots/v13/before-after/`.
 
 ## v12 features
 - **Pro profile**: **Services & starting prices** (pros set "From $X" per service, others show Sawyer's typical price), a real-photo **portfolio** with a full-screen lightbox (arrow keys, captions, before/after tags) that also becomes the cover, a **Track record** block (median reply, customer-confirmed jobs, quotes in 90 days, hire rate, repeat customers, member since), **Towns covered** with a "Do they come to you?" ZIP check, and **Book a free consult** (on-site, video or phone; 14-day day/time picker, taken slots blocked, 2 live bookings per customer per pro, .ics download). Visitors can pick a time before signing in; the pick survives sign-in/sign-up.
