@@ -100,7 +100,8 @@ function run(uid,name,args){const d=DB();d.me=uid;let r;try{r=api.A[name](...arg
 
 /* ---- http ---- */
 const INDEX=()=>fs.readFileSync(path.join(__dirname,"public/index.html"));
-function send(res,code,obj,extra){if(code>=400&&code<500&&code!==404&&code!==405&&code!==415){obj.status=code;code=200}res.writeHead(code,Object.assign({"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"},extra||{}));res.end(JSON.stringify(obj))}
+// SW-002: real HTTP status codes. Errors also keep "status" in the JSON body for older clients.
+function send(res,code,obj,extra){if(code>=400&&obj&&typeof obj==="object")obj.status=code;res.writeHead(code,Object.assign({"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; frame-ancestors 'none'"},extra||{}));res.end(JSON.stringify(obj))}
 function body(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>256e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>{try{ok(c.length?JSON.parse(Buffer.concat(c).toString()):{})}catch(e){no(e)}})})}
 
 // v8: SEO + PWA helpers
@@ -133,7 +134,7 @@ const SEC={"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer
 /* ---- photo uploads: images only, 5 MB max, magic bytes checked, stored under DATA_DIR/uploads ---- */
 const IMG={"image/jpeg":{ext:"jpg",ok:b=>b[0]===0xff&&b[1]===0xd8&&b[2]===0xff},"image/png":{ext:"png",ok:b=>b.slice(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))},"image/webp":{ext:"webp",ok:b=>b.slice(0,4).toString("latin1")==="RIFF"&&b.slice(8,12).toString("latin1")==="WEBP"}};
 function upload(req,res){
- const send=(res,code,o)=>{if(code!==200)o.status=code;res.writeHead(200,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"});res.end(JSON.stringify(o))};
+ const send=(res,code,o)=>{if(code!==200)o.status=code;res.writeHead(code,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"});res.end(JSON.stringify(o))};
  const o=req.headers.origin;if(o&&req.headers.host&&new URL(o).host!==req.headers.host)return send(res,403,{error:"Bad origin"});
  const uid=sessionUid(req);if(!uid){req.resume();return send(res,401,{error:"Sign in to upload photos"})}
  const type=String(req.headers["content-type"]||"").split(";")[0].trim().toLowerCase(),t=IMG[type];
@@ -238,7 +239,7 @@ const server=http.createServer(async(req,res)=>{
  if(p==="/api/act"){
   const name=String(b.name||""),args=Array.isArray(b.args)?b.args.slice(0,6):[];
   if(!ACTIONS.has(name))return send(res,400,{error:"Unknown action"});
-  if(!uid)return send(res,200,{error:"Sign in first",need:"login",state:snapshot(null)});
+  if(!uid)return send(res,401,{error:"Sign in first",need:"login",state:snapshot(null)});
   if(limited("act:"+uid,120,60e3))return send(res,429,{error:"Too many actions, slow down."});
   if(name==="addLedger"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the receipt photo again"},state:snapshot(uid)});
  if(name==="addPhoto"&&!ownsUpload(uid,args[2]))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
