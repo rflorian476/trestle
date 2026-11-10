@@ -16,3 +16,17 @@ if(typeof VIEWS!=="undefined"&&VIEWS.pro){const ov=VIEWS.pro;VIEWS.pro=function(
  if(!secOwnPhotos(u))h=h.replace(/<div class="gallery g\d">[\s\S]*?<\/div>/,()=>`<div class="sec-soon"><span class="sec-si">${I("camera",22)}</span><div><b>${own?"Add photos of your work":"Job photos coming soon"}</b><small>${own?"Photos you add to a job you were hired for show here once the customer confirms it's done.":esc(u.biz||"This pro")+" hasn't added photos of their own jobs yet. Ask for pictures of similar work when you request a quote."}</small></div></div>`);
  }catch(e){}return h}}
 if(typeof PROCARD==="function"){const oc=PROCARD;PROCARD=function(x){const h=oc.apply(this,arguments);try{return h.replace(/(<div class="pc-img">(?:<button[\s\S]*?<\/button>)?)(<img class="art v4art"[^>]*?) alt="[^"]*"/,'$1$2 alt=""')}catch(e){return h}}}
+/* SW-030: messages need a real account and a real connection. Anyone may contact a business (public pro profile);
+   everyone else only through a job, quote, project crew, traveler call, invoice, visit, case, reference, lodging listing
+   or an existing conversation. Missing ids are refused, so no orphan threads (SW-031). */
+if(typeof A!=="undefined")A.canMessage=function(to){const m=me(),u=U(to);if(!m||!u||u.id===m.id)return false;const a=m.id,b=u.id;
+ if(u.role==="contractor")return true;
+ if((DB.msgs||[]).some(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a)))return true;
+ if((u.sharedWith||[]).includes(a)||(m.sharedWith||[]).includes(b))return true;
+ const job=(c,p)=>(DB.jobs||[]).some(j=>j.cust===c&&(j.hired===p||(j.interested||[]).includes(p)||(j.invited||[]).includes(p)||(DB.quotes||[]).some(q=>q.job===j.id&&q.cid===p)));if(job(a,b)||job(b,a))return true;
+ if((DB.projects||[]).some(p=>{if(p.pm!==a&&p.pm!==b)return false;const o=p.pm===a?b:a;return(p.roles||[]).some(r=>(r.filled||[]).includes(o)||(r.done||[]).includes(o)||(r.apps||[]).some(x=>x.cid===o)||(r.invites||[]).some(x=>x.cid===o))}))return true;
+ const tc=(by,o)=>(DB.tcalls||[]).some(c=>c.by===by&&((c.apps||[]).some(x=>x.uid===o)||(c.invites||[]).includes(o)));if(tc(a,b)||tc(b,a))return true;
+ if(u.trav&&(m.role==="contractor"||m.role==="pm"))return true;
+ if((DB.lodging||[]).some(l=>l.by===b))return true;
+ const pair=(x,k1,k2)=>(x||[]).some(r=>(r[k1]===a&&r[k2]===b)||(r[k1]===b&&r[k2]===a));
+ return pair(DB.bills,"by","cuid")||pair(DB.bcust,"by","uid")||pair(DB.visits,"by","cuid")||pair(DB.cases,"cu","pro")||pair(DB.refs,"trav","by")};
