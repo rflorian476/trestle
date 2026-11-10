@@ -33,6 +33,28 @@ Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, M
   - **Search:** the helper lines are smaller and quieter.
   - **Mobile:** the request flow and Office are denser.
   - **Traveler board:** job calls come first, and the map stays folded until opened.
+- Pro cards and the home "top pros" row no longer reuse stock house photos. A pro without their own photos gets a trade tile with initials and "Job photos coming soon".
+- **QA sweep 1 (Medium/Low, SW-010 to SW-025):**
+  - Text contrast passes WCAG AA on linen.
+  - Every page has one H1, and unknown links open a real "Page not found" page.
+  - ARIA fixes: toggles, tabs, map and grid buttons, and scrolling tables.
+  - Only pros can edit pro profiles.
+  - Seed names read as real people, with a "Hill Country Mutual (demo)" insurer.
+  - The footer says plainly that all data is fictional sample data.
+  - The font files are named Plus Jakarta Sans.
+  - Uploads return real HTTP error codes, and public profile data is cached for 3 seconds.
+  - The unused dark icon was removed.
+- **QA sweep 2 (SW-033 to SW-038):**
+  - "Forgot password?" on the password sign-in emails a one-time code, then opens Set a password.
+  - **Account → Delete account** asks you to type DELETE. It then:
+    - signs you out everywhere;
+    - removes the login, passkeys, linked sign-ins and uploads;
+    - anonymizes the profile, with reviews kept as "Former Sawyer member".
+  - Deletion is blocked while a job is active and on shared demo accounts.
+  - A portfolio save where every photo is rejected is refused instead of silently clearing the gallery. Only an empty list clears it.
+  - Quotes are accepted only on open jobs, in dollars, up to $10M.
+  - Job titles are capped at 90 characters and descriptions at 2,000.
+  - The message photo check matches the 5 MB server limit and shows the server's error.
 - Tests: `node test/v13-e2e.js http://localhost:8899 shots/v13/final`. Before/after screenshots are in `shots/v13/before-after/`.
 
 ## v12 features
