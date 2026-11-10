@@ -249,7 +249,13 @@ const server=http.createServer(async(req,res)=>{
   if(p==="/api/passkey/register/options")return AUTH.pkRegOptions(req,res,uid,{email:(db.prepare("SELECT email FROM accounts WHERE uid=?").get(uid)||{}).email,name:u.name});
   if(p==="/api/passkey/register/verify")return AUTH.pkRegVerify(req,res,uid,b);
   if(p==="/api/passkey/delete")return send(res,200,{ok:AUTH.pkDelete(uid,b.id)});
-  if(p==="/api/account/password"){const pw=String(b.password||"");if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});const h=hashPw(pw);db.prepare("UPDATE accounts SET salt=?,hash=? WHERE uid=?").run(h.salt,h.hash,uid);return send(res,200,{ok:true})}
+  // SW-032: changing an existing password needs the current one (a session cookie alone isn't enough), and signs out other sessions.
+  if(p==="/api/account/password"){const pw=String(b.password||"");if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});
+   const acc=db.prepare("SELECT salt,hash FROM accounts WHERE uid=?").get(uid)||{};const kP="pwfail:"+uid;
+   if(acc.hash){if(overLimit(kP,5,15*60e3))return send(res,429,{error:"Too many wrong passwords. Try again in 15 minutes."},{"Retry-After":"900"});
+    if(!checkPw(String(b.current||""),acc.salt,acc.hash)){addHit(kP);return send(res,403,{error:"Your current password isn't right."})}hits.delete(kP)}
+   const h=hashPw(pw);db.prepare("UPDATE accounts SET salt=?,hash=? WHERE uid=?").run(h.salt,h.hash,uid);
+   if(acc.hash)db.prepare("DELETE FROM sessions WHERE uid=? AND token<>?").run(uid,cookies(req).swsid||"");return send(res,200,{ok:true})}
   return send(res,404,{error:"Not found"})}
  if(p==="/api/logout"){const t=cookies(req).swsid;if(t)db.prepare("DELETE FROM sessions WHERE token=?").run(t);setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}
  if(p==="/api/signup"){
