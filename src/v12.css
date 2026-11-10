@@ -207,3 +207,7 @@
 .o9-trf a{text-decoration:underline;text-underline-offset:2px}
 .h12-t.later{opacity:1}.h12-t.later .h12-tt b{color:#3d4a5c}.uh-k{color:#b4531a}.s-hired{color:#a3410f}.badge.b-urg,.b-urg{color:#b01c2b}small a:not(.btn),.small a:not(.btn){text-decoration:underline;text-underline-offset:2px}
 body .uh-k{color:#a9471a!important}.ukpi>small{color:#0b7a4b}[data-theme=dark] body .uh-k{color:var(--acc)!important}[data-theme=dark] .ukpi>small{color:#4fd197}
+.lz12{display:grid;gap:14px;padding:28px 0}.lz12 i{display:block;height:20px;border-radius:12px;background:linear-gradient(90deg,#eef2f6 25%,#f7f9fb 50%,#eef2f6 75%);background-size:200% 100%;animation:lz12 1.2s linear infinite}
+.lz12-r{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.lz12-r i{height:72px}
+@keyframes lz12{to{background-position:-200% 0}}@media(prefers-reduced-motion:reduce){.lz12 i{animation:none}}
+[data-theme=dark] .lz12 i{background:#1d2a38}

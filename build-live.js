@@ -14,6 +14,11 @@ js=js.replace("\nboot();","\n//@@SPLIT@@\n"+V2JS+"\nboot();");
 fs.writeFileSync(path.join(__dirname,"app-logic.js"),js+"\n;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY};\n");
 function rep(s,from,to){if(!s.includes(from))throw new Error("patch anchor missing: "+from.slice(0,60));return s.split(from).join(to)}
 let c=js;
+// v13 perf: on-demand layer (home log, board, moderation, marketing, import). Not in app-logic.js (UI only) and not preloaded.
+let LZ12=T(fs.readFileSync(path.join(__dirname,"src/v12-lazy.js"),"utf8"));
+{let esb=null;try{esb=require("esbuild")}catch(e){}if(esb&&!process.env.NO_MINIFY)LZ12=esb.transformSync('"use strict";\n'+LZ12,{minifyWhitespace:true,minifySyntax:true,target:"es2022",legalComments:"none",loader:"js"}).code.trim();else LZ12='"use strict";\n'+LZ12}
+const LZ12_FILE="lz12."+require("crypto").createHash("sha256").update(LZ12).digest("hex").slice(0,10)+".js";
+c=rep(c,"__LZ12_SRC__","/js/"+LZ12_FILE);
 c=rep(c,"try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){DB=null}\nif(!DB||!DB.users||DB.v!==1)seed();","DB=__liveLoad();");
 c=rep(c,"function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}}",fs.readFileSync(path.join(__dirname,"client-pre.js"),"utf8"));
 c=rep(c,'<p class="muted small">Demo only: no card is charged. In production this step opens a secure Stripe checkout.</p>','<div class="testmode" role="note"><b>Test mode, no real charge.</b> This beta never asks for or stores a card number. Picking a plan here is simulated.</div>');
@@ -51,7 +56,7 @@ html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
   const name=fam.toLowerCase().replace(/[^a-z0-9]+/g,"-")+"-"+wt+".woff2";fs.writeFileSync(path.join(__dirname,"public/fonts",name),Buffer.from(d[1],"base64"));
   if(/Jakarta/.test(fam)&&(wt==="400"||wt==="800"))pre.push(name);return "@font-face{"+b.replace(d[0],'url(/fonts/'+name+')').replace(/src:url\(\/fonts[^;]*format\("woff2"\)\)/,s=>s)+"}"});
  css=css.split('--font-d:"Fraunces S",Georgia,"Times New Roman",serif').join('--font-d:"Jakarta E",ui-sans-serif,system-ui,sans-serif');
- const r=require("./lib/slim-css.js")(css,rest);const before=css.length;css=r.css;
+ const r=require("./lib/slim-css.js")(css,rest+"\n<script>"+LZ12+"</script>");const before=css.length;css=r.css;
  console.log("css",before,"->",css.length,"rules dropped",r.stats.dropped,"selectors trimmed",r.stats.trimmed);
  const links=pre.map(n=>'<link rel="preload" href="/fonts/'+n+'" as="font" type="font/woff2" crossorigin>').join("");
  html=html.slice(0,s0-7)+links+"<style>"+css+html.slice(e0)}
@@ -73,6 +78,7 @@ html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
  html=html.replace(/<script defer src="\/js\/[^"]+"><\/script>/g,"");
  html=html.replace("</head>",srcs.map(u=>'<link rel="preload" href="'+u+'" as="script">').join("")+"</head>");
  html=html.replace(/<\/body>/,'<script>(function(){var s='+JSON.stringify(srcs)+',d=0;function g(){if(d)return;d=1;s.forEach(function(u){var e=document.createElement("script");e.src=u;e.async=false;document.body.appendChild(e)})}if(document.getElementById("pre11")){try{new PerformanceObserver(function(){setTimeout(g,0)}).observe({type:"largest-contentful-paint",buffered:true})}catch(x){requestAnimationFrame(function(){setTimeout(g,0)})}setTimeout(g,400)}else g()})()</script></body>');
- console.log("external scripts",n)}
+ fs.writeFileSync(path.join(dir,LZ12_FILE),LZ12);
+ console.log("external scripts",n,"+ on-demand",LZ12_FILE,LZ12.length)}
 fs.writeFileSync(path.join(__dirname,"public/index.html"),html);
 console.log("built",html.length);
