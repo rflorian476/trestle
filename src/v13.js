@@ -53,3 +53,24 @@ if(typeof document!=="undefined"&&typeof render==="function"){const or=render;re
  app.querySelectorAll('[role=columnheader]').forEach(e=>{if(!e.textContent.trim())e.innerHTML='<span class="sr">Feature</span>'});
  const res=app.querySelector(".fx-res");if(res&&!res.querySelector("h2")&&res.querySelector("h3"))res.insertAdjacentHTML("afterbegin",'<h2 class="sr">Results</h2>');
  }catch(e){}return r}}
+/* QA SW-034: account deletion. The server endpoint (/api/account/delete) calls this after its own checks, then removes
+   the login, sessions, passkeys and uploads. Not in ACTIONS, so /api/act can't call it directly. */
+A.__delete13=function(){const m=me();if(!m)return{ok:false,msg:"Sign in first"};if(m.demo)return{ok:false,msg:"Demo accounts can't be deleted."};
+ const live=(DB.jobs||[]).filter(j=>(j.cust===m.id||j.hired===m.id)&&j.hired&&j.status!=="completed"&&j.status!=="posted");
+ if(live.length)return{ok:false,msg:`Finish or cancel your ${live.length===1?"active job":live.length+" active jobs"} first, so nobody is left with money held in escrow.`};
+ const gone=new Set((DB.jobs||[]).filter(j=>j.cust===m.id&&j.status==="posted"&&!j.hired).map(j=>j.id));
+ DB.jobs=(DB.jobs||[]).filter(j=>!gone.has(j.id));DB.quotes=(DB.quotes||[]).filter(q=>!gone.has(q.job)&&!(q.cid===m.id&&q.status==="sent"));
+ const keep={id:m.id,created:m.created};for(const k of Object.keys(m))delete m[k];
+ Object.assign(m,keep,{name:"Former Sawyer member",role:"deleted",zip:"",deleted13:Date.now()});
+ if(typeof save==="function")save();return{ok:true,msg:"Account deleted"}};
+if(typeof document!=="undefined"){
+ {const ov=VIEWS.account;if(ov)VIEWS.account=function(){const h=ov.apply(this,arguments);const m=me();if(!m||!/id="signinMethods"/.test(h))return h;
+  const card=`<div class="card del13" id="delAcct"><h2 class="h-sub">${I("x",16)} Delete account</h2><p class="muted small">This signs you out everywhere, removes your sign-in methods, photos and contact details, and takes your profile out of search. Reviews you wrote stay, credited to “Former Sawyer member”. This can't be undone.</p><button class="btn ghost danger13" id="delGo" type="button">Delete my account</button></div>`;
+  const k=h.lastIndexOf("</section>");return k<0?h+card:h.slice(0,k)+card+h.slice(k)}}
+ {const oa=AFTER.account;AFTER.account=function(){if(oa)oa.apply(this,arguments);const $=s=>document.getElementById(s);
+  if(sessionStorage.getItem("pw13")==="1"&&$("setPw")){clearTimeout(window.__pw13t);window.__pw13t=setTimeout(()=>{const b=document.getElementById("setPw");if(!b||document.getElementById("npw")||sessionStorage.getItem("pw13")!=="1")return;sessionStorage.removeItem("pw13");b.click();toast("You're signed in. Set a new password below.")},700)}
+  const g=$("delGo");if(!g)return;g.onclick=()=>{const m=me()||{};openModal(`<h2>Delete your account?</h2><p class="muted">${m.demo?"Demo accounts are shared, so they can't be deleted. Create your own account to try this.":"Everything tied to your login is removed and you'll be signed out on every device. Type <b>DELETE</b> to confirm."}</p>${m.demo?"":`<div class="fld"><label for="delTxt">Type DELETE</label><input id="delTxt" autocomplete="off" autocapitalize="characters"></div><button class="btn primary block danger13" id="delYes" type="button" disabled>Delete my account</button>`}`,()=>{const t=$("delTxt"),y=$("delYes");if(!t)return;t.oninput=()=>{y.disabled=t.value.trim()!=="DELETE"};
+   y.onclick=async()=>{y.disabled=true;const r=await jpost("/api/account/delete",{confirm:t.value.trim()});if(r.error){y.disabled=false;toast(r.error,"err");return}closeModal();if(r.state&&typeof __applyState==="function")__applyState(r.state);toast("Your account was deleted. Sorry to see you go.");location.hash="#/home";setTimeout(()=>location.reload(),600)}})}}}
+ /* QA SW-033: "Forgot password?" sends a one-time sign-in code to the account email, then opens Set a password. */
+ {const or2=render;render=function(){const r=or2.apply(this,arguments);try{if(sessionStorage.getItem("pw13")==="1"&&me()&&ROUTE.v!=="account")location.hash="#/account"}catch(e){}return r}}
+}

@@ -120,3 +120,4 @@
 .progrid>.rv,.projgrid>.rv{opacity:1;transform:none;transition:none}
 .nf13 h1{color:var(--ink)}
 #app :is(h1,h2,h3,b){overflow-wrap:break-word}
+.li13{align-items:center;gap:14px}.del13{border-color:#EBD5CC}.danger13{color:#9F2D12;border-color:#E3BFB2}.btn.primary.danger13{background:#9F2D12;color:#fff;border-color:#9F2D12}.btn.primary.danger13:disabled{opacity:.5}

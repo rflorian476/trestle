@@ -247,6 +247,17 @@ const server=http.createServer(async(req,res)=>{
   if(p==="/api/account/password"){const pw=String(b.password||"");if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});const h=hashPw(pw);db.prepare("UPDATE accounts SET salt=?,hash=? WHERE uid=?").run(h.salt,h.hash,uid);return send(res,200,{ok:true})}
   return send(res,404,{error:"Not found"})}
  if(p==="/api/logout"){const t=cookies(req).swsid;if(t)db.prepare("DELETE FROM sessions WHERE token=?").run(t);setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}
+ // v13 (QA SW-034): delete my account. Ends every session, removes sign-in methods and uploads, anonymizes the profile
+ // (reviews stay, credited to "Former Sawyer member"). Shared demo accounts can't be deleted.
+ if(p==="/api/account/delete"){if(!uid)return send(res,401,{error:"Sign in first"});if(String(b.confirm||"")!=="DELETE")return send(res,400,{error:'Type DELETE to confirm.'});
+  const u=DB().users.find(x=>x.id===uid);if(!u)return send(res,404,{error:"Account not found"});if(u.demo)return send(res,400,{error:"Demo accounts are shared, so they can't be deleted. Create your own account to try this."});
+  const r=run(uid,"__delete13",[]);if(!r||!r.ok)return send(res,400,{error:(r&&r.msg)||"Couldn't delete the account."});
+  const a=db.prepare("SELECT email,phone FROM accounts WHERE uid=?").get(uid)||{};
+  for(const up of db.prepare("SELECT name FROM uploads WHERE uid=?").all(uid)){try{fs.unlinkSync(path.join(UPLOADS,up.name))}catch(e){}}
+  db.prepare("DELETE FROM uploads WHERE uid=?").run(uid);db.prepare("DELETE FROM sessions WHERE uid=?").run(uid);db.prepare("DELETE FROM accounts WHERE uid=?").run(uid);
+  for(const t of ["passkeys","identities"])try{db.prepare("DELETE FROM "+t+" WHERE uid=?").run(uid)}catch(e){}
+  for(const t of [a.email,a.phone].filter(Boolean))try{db.prepare("DELETE FROM codes WHERE target=?").run(String(t).toLowerCase())}catch(e){}
+  setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}
  if(p==="/api/signup"){
   if(limited("signup:"+ip(req),20,60*60e3))return send(res,429,{error:"Too many sign-ups from this network. Try later."});
   const kind=b.kind,d=b.data&&typeof b.data==="object"?b.data:{},pw=String(b.password||"");

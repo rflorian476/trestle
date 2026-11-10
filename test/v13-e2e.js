@@ -91,6 +91,26 @@ ok(!(await cu.evaluate(()=>A.updatePro({bio:"hacked"}))).ok,"homeowners can't us
  await pp.context().close()}
 {const r=await cu.evaluate(()=>A.postJob({title:"A".repeat(200),cat:"plumbing",zip:"78704",desc:"Leaky tap"}));ok(!r.ok&&/90/.test(r.msg),"job titles are capped at 90 characters (SW-036)")}
 ok(require("fs").readFileSync(__dirname+"/../app-logic.js","utf8").includes('file.size>5*1024*1024')&&require("fs").readFileSync(__dirname+"/../app-logic.js","utf8").includes('(e&&e.message)||"Upload failed'),"message photo pre-check matches the 5 MB server limit and shows the real error (SW-038)");
+// ---- 8. QA sweep-2 accounts: forgot password (SW-033) and delete account (SW-034) ----
+{const em="forgot13-"+Date.now()+"@example.com",post=(p,u,b)=>p.evaluate(async([u,b])=>{const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});return r.json()},[u,b]);
+ const code=async p=>{await p.click("#au-send");await p.waitForSelector("#tcVal");const c=(await p.textContent("#tcVal")).trim();await p.fill("#au-code",c);await p.click("#au-verify")};
+ const p=await mk();await p.goto(B+"/#/signup");await p.waitForSelector("#authBox");await p.check("input[name=au-role][value=homeowner]",{force:true});await p.fill("#au-to",em);await code(p);
+ await p.waitForFunction(()=>!!DB.me,null,{timeout:8000});ok((await post(p,"/api/account/password",{password:"first-pass-123"})).ok,"new account sets a password");
+ await post(p,"/api/logout",{});await p.goto(B+"/#/signup");await p.reload();await p.waitForSelector("#authBox");
+ await p.evaluate(()=>{const d=document.getElementById("pwSection");if(d)d.open=true});ok(await p.isVisible("#liForgot"),"password sign-in has a 'Forgot password?' link (SW-033)");
+ await p.fill("#li-e",em);await p.click("#liForgot");ok((await p.inputValue("#au-to"))===em,"forgot password pre-fills the one-time code form");await code(p);
+ await p.waitForSelector("#npw",{timeout:8000});await p.waitForTimeout(900);await p.waitForSelector("#npw");ok(/#\/account/.test(await p.evaluate(()=>location.hash)),"after the code, the account page opens Set a password");
+ await p.fill("#npw","second-pass-456");await p.click("#npwGo");await p.waitForTimeout(500);await post(p,"/api/logout",{});
+ ok((await post(p,"/api/login",{email:em,password:"second-pass-456"})).ok&&!(await post(p,"/api/login",{email:em,password:"first-pass-123"})).ok,"the new password works and the old one doesn't");
+ await p.goto(B+"/#/account");await p.reload();await p.waitForSelector("#delGo",{timeout:8000});const uid=await p.evaluate(()=>DB.me);
+ await p.click("#delGo");await p.waitForSelector("#delTxt");ok(await p.isDisabled("#delYes"),"delete stays disabled until you type DELETE (SW-034)");
+ await p.fill("#delTxt","DELETE");await p.click("#delYes");await p.waitForTimeout(1500);
+ const after=await p.evaluate(async id=>{const s=(await (await fetch("/api/state")).json()).state;const u=(s.users||[]).find(x=>x.id===id)||{};return{me:s.me||null,name:u.name,role:u.role,email:u.email||null}},uid);
+ ok(!after.me&&after.name==="Former Sawyer member"&&after.role==="deleted"&&!after.email,"deleting signs you out and anonymizes the profile "+JSON.stringify(after));
+ ok(!(await post(p,"/api/login",{email:em,password:"second-pass-456"})).ok,"a deleted account can't sign in");
+ const dp=await as("demo-homeowner@sawyer.test");ok(/can't be deleted/.test((await post(dp,"/api/account/delete",{confirm:"DELETE"})).error||""),"shared demo accounts can't be deleted");
+ ok(await dp.evaluate(()=>typeof A.__delete13==="function")&&/Unknown action/.test(JSON.stringify(await post(dp,"/api/act",{name:"__delete13",args:[]}))),"the delete action isn't reachable through /api/act");
+ await dp.context().close();await p.context().close()}
 // signed-in profile is the live app, not the pre-render
 const sraw=await (await cu.request.get(B+"/p/c1")).text();ok(!/id="pre11"/.test(sraw),"signed-in visitors get the live profile, not the pre-rendered one");
 ok(errs.length===0,"no page errors ("+errs.length+")"+(errs.length?": "+errs.slice(0,3).join(" | "):""));
