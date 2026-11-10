@@ -21,7 +21,7 @@ const UPLOADS=path.join(DATA,"uploads");fs.mkdirSync(UPLOADS,{recursive:true});
 const MAX_UPLOAD=5*1024*1024;
 
 /* ---- shared business rules: the same A.* actions the UI was built on, run server-side ---- */
-let VER=Date.now(),allowAuto=false,dirty=false;
+let VER=Date.now(),allowAuto=false,dirty=false,PUB_ST={t:0,s:"",v:0};
 function anyStub(){const f=function(){return p};const p=new Proxy(f,{get:(t,k)=>k===Symbol.toPrimitive?()=>"":k==="length"?0:p,set:()=>true,apply:()=>p,construct:()=>p});return p}
 const store={};
 const ctx={console,Date,Math,JSON,Object,Array,String,Number,Boolean,RegExp,Error,Set,Map,Promise,Intl,parseInt,parseFloat,isNaN,encodeURIComponent,decodeURIComponent,
@@ -37,7 +37,7 @@ try{vm.runInContext(fs.readFileSync(path.join(__dirname,"app-logic.js"),"utf8"),
 const api=ctx.__api;if(!api)throw new Error("app logic failed to load");
 ctx.onData=null;
 function DB(){return api.DB}
-function persist(){const d=DB();for(const c of COLS)setKV.run(c,JSON.stringify(d[c]||[]),Date.now());setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:!!getKV.get("meta")}),Date.now());VER++;dirty=false}
+function persist(){const d=DB();for(const c of COLS)setKV.run(c,JSON.stringify(d[c]||[]),Date.now());setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:!!getKV.get("meta")}),Date.now());VER++;dirty=false;PUB_ST={t:0,s:"",v:0}}
 function hashPw0(pw){const salt=crypto.randomBytes(16).toString("hex");return{salt,hash:crypto.scryptSync(pw,salt,64,{N:16384,r:8,p:1}).toString("hex")}}
 // first boot: seed demo data, clearly labeled
 {const d=DB();if(!getKV.get("meta")||!JSON.parse(getKV.get("meta").v).labeled){
@@ -154,7 +154,7 @@ function prePro(req,h,id){if(sessionUid(req))return h;const c=proCover(id);if(!c
  h=h.replace(/<link rel="preload" href="\/js\/[^"]+" as="script">/g,"");
  return h.replace(re,()=>'<div id="pre11"><section class="px">'+c.html+'</section></div>')}
 // v13 (QA SW-018): the public snapshot is the same for every signed-out visitor, so build it at most every 3 s instead of per request
-let PUB_ST={t:0,s:""};function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s)PUB_ST={t:n,s:sj(snapshot(null))};return PUB_ST.s}
+function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
 function withMeta(req,m){let h=INDEX().toString();const o=ORIGIN(req);const og=`<meta property="og:type" content="${m.type||"website"}"><meta property="og:site_name" content="Sawyer"><meta property="og:title" content="${xe(m.title)}"><meta property="og:description" content="${xe(m.desc)}"><meta property="og:url" content="${xe(o+(m.path||"/"))}"><meta property="og:image" content="${xe(o+(m.img||"/img/hero.webp"))}"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${xe(o+(m.path||"/"))}">`+(m.ld?`<script type="application/ld+json">${sj(m.ld)}</script>`:"");
  h=h.replace(/<title>[^<]*<\/title>/,`<title>${xe(m.title)}</title>`).replace(/<meta name="description" content="[^"]*">/,`<meta name="description" content="${xe(m.desc)}">`+og);
  // v9 perf: inline the public snapshot for signed-out visitors so first paint skips the blocking /api/state round trip (never inline private state).
