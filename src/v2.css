@@ -8,7 +8,7 @@ h1,h2,.uh h1,.ehead h2,.ehero h1,.en-copy h2,.ef-cta h2,.eprice h2{font-family:v
 .ehero h1{font-size:clamp(44px,6.4vw,86px);line-height:.98}
 .grad{background:none!important;-webkit-text-fill-color:currentColor!important;color:var(--acc)!important;font-style:italic;font-weight:500}
 .brand span{font-family:var(--font-d);font-weight:650;font-size:23px;letter-spacing:-.03em}
-.betabar{background:var(--navy)!important;color:#E8B9A3!important;font:600 12.5px/1.3 "Jakarta E",system-ui,sans-serif!important;letter-spacing:.04em;text-transform:uppercase}
+.betabar{background:var(--navy)!important;color:#E8B9A3!important;font:600 12.5px/1.3 "Plus Jakarta Sans",system-ui,sans-serif!important;letter-spacing:.04em;text-transform:uppercase}
 .testmode,.mocktag{border:1.5px dashed var(--brass)!important;background:var(--brass-bg)!important;color:var(--ink)!important}
 /* buttons */
 .btn{border-radius:12px}.btn.primary{background:var(--p);border-color:var(--p);color:var(--p-ink);box-shadow:0 8px 20px -10px rgba((27,58,91),.6)}.btn.primary:hover{background:var(--p-h)}

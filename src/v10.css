@@ -8,7 +8,7 @@
 .s10-agree{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.45}.s10-agree input{margin-top:3px;width:18px;height:18px;flex:none;accent-color:#0F2A44}
 .s10-doc{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:22px;padding-top:16px;border-top:1px solid #e3e8ef}
 .s10-ink{width:220px;max-width:100%;border-bottom:1.5px solid #0F2A44;padding-bottom:4px}.s10-ink svg{display:block;width:100%;height:auto}.s10-ink path{fill:none;stroke:#0F2A44;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
-.s10-typed{font:italic 600 26px/1.2 "Jakarta E",ui-sans-serif,sans-serif;color:#0F2A44}
+.s10-typed{font:italic 600 26px/1.2 "Plus Jakarta Sans",ui-sans-serif,sans-serif;color:#0F2A44}
 .s10-meta{display:grid;gap:2px;font-size:14px;min-width:200px;flex:1}.s10-meta b{display:flex;gap:6px;align-items:center;color:#17663a}.s10-from .s10-meta b{color:#0F2A44}
 .s10-wait b{display:flex;gap:8px;align-items:center}
 .r10-cap .r10-l{font-size:13px;font-weight:600;color:#33445a}

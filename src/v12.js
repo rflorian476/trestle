@@ -375,7 +375,9 @@ if(typeof document!=="undefined"&&typeof render==="function"){const or=render;le
 /* v13: search cards show the pro's own first portfolio photo; without one, the plain trade photo as decoration (no caption
    pretending it is their job). */
 function v13CardImg(u){const g=(u.gal12||[])[0];if(g&&G12OK(g.src))return`<img class="art v4art" src="${esc(g.src)}" alt="${esc(g.cap||"")}" loading="lazy" decoding="async">`;
- const t=(typeof V4IMG!=="undefined"&&V4IMG[u.trade])||"home-ext";return`<img class="art v4art" src="/img/${t}.webp" alt="" loading="lazy" decoding="async">`}
+ /* v13: no stock photo standing in for a pro's work (repeated houses looked fake): a branded tile with the trade icon and initials */
+ const nm=String(u.biz||nameOf(u)||"").replace(/\(demo\)/i,"").trim(),ini=nm.split(/\s+/).filter(w=>/^[A-Za-z]/.test(w)).slice(0,2).map(w=>w[0].toUpperCase()).join("");
+ return`<div class="pc13-tile" aria-hidden="true"><span class="pc13-i">${I((typeof TRADE_ICON!=="undefined"&&TRADE_ICON[u.trade])||"wrench",26)}</span><b>${esc(ini)}</b><small>Job photos coming soon</small></div>`}
 if(typeof PROCARD==="function"){const oc=PROCARD;PROCARD=function(x){const h=oc(x);try{return h.replace(/(<div class="pc-img">(?:<button[\s\S]*?<\/button>)?)<img class="art v4art"[^>]*>/,(m,a)=>a+v13CardImg(x.u))}catch(e){return h}}}
 /* v13 polish: the dashboard opens with its own header ("Your home", "Your business"...), then what's next, then the rest.
    Cards that earlier layers put above the header move just below it. */

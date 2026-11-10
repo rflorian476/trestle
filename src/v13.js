@@ -27,6 +27,8 @@ if(typeof ZIPS!=="undefined"&&!ZIPS["78734"])ZIPS["78734"]=["Lakeway, TX",30.363
  if(proof){const f=h.indexOf('<section class="v4sec v4alt v4feat"');const fe=f<0?-1:h.indexOf("</section>",h.indexOf('<div class="v4pro-g">',f));if(fe>0)h=h.slice(0,fe+10)+proof+h.slice(fe+10);else h+=proof}
  const trav=cut(/<section class="v4sec v4w t5home" id="travelHome">[\s\S]*?<\/section>/);
  if(trav){const s=h.indexOf('<section class="v4w v4split"');h=s<0?h+trav:h.slice(0,s)+trav+h.slice(s)}
+ // top-rated pros: the pro's own first photo, or the honest tile (never a stock photo posing as their work)
+ h=h.replace(/(<a class="v4pro" href="#\/pro\/([^"]+)"><div class="v4pro-img">)<img [^>]*>/g,(m,a,id)=>{const u=U(id);return u&&typeof v13CardImg==="function"?a+v13CardImg(u):m});
  }catch(e){}return h}}
 {const oa=AFTER.home;AFTER.home=(...a)=>{oa&&oa(...a);const tabs=[...document.querySelectorAll("[data-vs13]")];tabs.forEach(b=>b.onclick=()=>tabs.forEach(x=>{const on=x===b;x.classList.toggle("on",on);x.setAttribute("aria-selected",on);const t=document.getElementById("vs"+x.dataset.vs13);if(t)t.hidden=!on}))}}
 /* traveler board: calls first; the state map stays folded until someone opens it (remembered for the session) */
@@ -37,3 +39,17 @@ if(typeof ZIPS!=="undefined"&&!ZIPS["78734"])ZIPS["78734"]=["Lakeway, TX",30.363
  if(m.biz&&m.role==="customer")h=h.replace("<b>Your home log</b>","<b>Your property log</b>");
  if(/<div class="v13-dtop">[\s\S]*?href="#\/pay\//.test(h)&&!/estimates? waiting for your approval/.test(h))h=h.replace(/<div class="o7-wrap"><a class="card v7billcard"[\s\S]*?<\/a><\/div>/,"");
  }catch(e){}return h}}
+/* QA sweep-1 SW-011/SW-022: every view has exactly one H1 (visually hidden when the design has none), Find cards sit
+   under an H2, and unknown routes get a real "Page not found" H1 + document title */
+VIEWS.notfound=()=>`<section class="page narrow"><div class="empty nf13">${I("map",28)}<h1>Page not found</h1><p class="muted">That link doesn't go anywhere. It may have moved, or the address has a typo.</p><div class="row wrapr"><a class="btn primary" href="#/home">Go home</a><a class="btn ghost" href="${href("find")}">Find a pro</a></div></div></section>`;
+if(typeof document!=="undefined"&&typeof render==="function"){const or=render;render=function(){const r=or.apply(this,arguments);try{const app=document.getElementById("app");if(!app)return r;
+ if(!VIEWS[ROUTE.v]){document.title="Page not found · Sawyer"}
+ if(!app.querySelector("h1")){const t=(document.title||"Sawyer").split(" · ")[0].split(": ")[0];app.insertAdjacentHTML("afterbegin",`<h1 class="sr" data-h13>${esc(t)}</h1>`)}
+ /* QA SW-012 + axe: aria-pressed only on button roles, tabs inside tablists, named icon buttons, focusable scrollers */
+ app.querySelectorAll("a[aria-pressed]:not([role])").forEach(a=>a.setAttribute("role","button"));
+ app.querySelectorAll('[role=tablist]>a:not([role])').forEach(a=>{a.setAttribute("role","tab");if(!a.hasAttribute("aria-selected"))a.setAttribute("aria-selected",a.classList.contains("on")||a.getAttribute("aria-current")==="page"?"true":"false")});
+ app.querySelectorAll("button[data-view]:not([aria-label])").forEach(b=>b.setAttribute("aria-label",b.dataset.view==="map"?"Map view":"Grid view"));
+ app.querySelectorAll(".tablewrap,.j9steps,ol").forEach(e=>{if(e.scrollWidth>e.clientWidth+2&&!e.querySelector("a,button,input,select,textarea,[tabindex]"))e.tabIndex=0});
+ app.querySelectorAll('[role=columnheader]').forEach(e=>{if(!e.textContent.trim())e.innerHTML='<span class="sr">Feature</span>'});
+ const res=app.querySelector(".fx-res");if(res&&!res.querySelector("h2")&&res.querySelector("h3"))res.insertAdjacentHTML("afterbegin",'<h2 class="sr">Results</h2>');
+ }catch(e){}return r}}

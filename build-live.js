@@ -26,11 +26,11 @@ c=rep(c,'${F("phone","Phone",OB.phone,"tel","(231) 555-0100","tel")}</div>','${F
 c=rep(c,'<div class="fld"><label for="cu-z">','<div class="fld"><label for="cu-p">Password (8+ characters)</label><input id="cu-p" name="password" type="password" autocomplete="new-password" minlength="8" required></div><div class="fld"><label for="cu-z">');
 c=rep(c,'<div class="fld"><label for="pms-z"','<div class="fld"><label for="pms-p">Password (8+ characters)</label><input id="pms-p" name="password" type="password" autocomplete="new-password" minlength="8"></div><div class="fld"><label for="pms-z"');
 c=rep(c,'<button class="linkbtn" id="resetBtn">Reset demo data</button>','');
-c=rep(c,'Demo prototype. Every business, person, license and review here is fictional.','Beta test. Listings marked (demo) are fictional sample data; everything else was posted by real beta users.');
+c=rep(c,'Demo prototype. Every business, person, license and review here is fictional.','Beta test. Every pro, customer, job and review in this beta is fictional sample data. Payments are in test mode.');
 c=rep(c,'id="acctBtn" aria-haspopup="true"','id="acctBtn" aria-label="${esc(nameOf(m).split(" ")[0])}, account menu" aria-haspopup="true"');
 c=c.split('class="mapsvg" role="img"').join('class="mapsvg" role="group"').split('class="mapsvg usmap" role="img"').join('class="mapsvg usmap" role="group"');
 c=rep(c,'class="stars" aria-label=','class="stars" role="img" aria-label=');
-c=rep(c,'Demo prototype. Every business, person, city listing, license and review here is fictional sample data.','Beta test. Listings marked (demo) are fictional sample data; everything else was posted by real beta users.');
+c=rep(c,'Demo prototype. Every business, person, city listing, license and review here is fictional sample data.','Beta test. Every pro, customer, job and review in this beta is fictional sample data. Payments are in test mode.');
 // v9 perf: run the live-mode patches before boot so the page renders once instead of twice
 {const post=fs.readFileSync(path.join(__dirname,"client-post.js"),"utf8");const tail="try{render()}catch(e){}\n})();";if(!post.trimEnd().endsWith(tail.trim()))throw new Error("client-post tail changed");
  const pre=post.trimEnd().slice(0,-tail.trim().length)+"})();";if(!c.includes("\nboot();"))throw new Error("boot anchor missing (client)");c=c.replace("\nboot();","\n"+pre+"\nboot();")}
@@ -55,7 +55,7 @@ html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
   const wt=((b.match(/font-weight:([^;]+)/)||[])[1]||"400").trim().replace(/\s+/g,"-");const d=b.match(/url\(data:font\/woff2;base64,([^)]+)\)/);if(!d)return m;
   const name=fam.toLowerCase().replace(/[^a-z0-9]+/g,"-")+"-"+wt+".woff2";fs.writeFileSync(path.join(__dirname,"public/fonts",name),Buffer.from(d[1],"base64"));
   if(/Jakarta/.test(fam)&&(wt==="400"||wt==="800"))pre.push(name);return "@font-face{"+b.replace(d[0],'url(/fonts/'+name+')').replace(/src:url\(\/fonts[^;]*format\("woff2"\)\)/,s=>s)+"}"});
- css=css.split('--font-d:"Fraunces S",Georgia,"Times New Roman",serif').join('--font-d:"Jakarta E",ui-sans-serif,system-ui,sans-serif');
+ css=css.split('--font-d:"Fraunces S",Georgia,"Times New Roman",serif').join('--font-d:"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif');
  const r=require("./lib/slim-css.js")(css,rest+"\n<script>"+LZ12+"</script>");const before=css.length;css=r.css;
  console.log("css",before,"->",css.length,"rules dropped",r.stats.dropped,"selectors trimmed",r.stats.trimmed);
  const links=pre.map(n=>'<link rel="preload" href="/fonts/'+n+'" as="font" type="font/woff2" crossorigin>').join("");

@@ -40,8 +40,9 @@ const fr=await pub.evaluate(()=>({f:(document.body.innerText.match(/Fast respond
 ok(!/undefined|NaN/.test(await txt(pub,"main")),"c3 profile text is clean");
 await shot(pub,"desktop-photos-coming-soon");
 // search cards: own photo with its caption, or a plain trade image with no caption
-await nav(pub,"/find");const cards=await pub.$$eval(".pc-img img",x=>x.map(i=>({s:i.getAttribute("src")||"",a:i.alt})));
-ok(cards.length>=4&&cards.every(c=>/\/img\/g-|\/u\//.test(c.s)?c.a.length>0:c.a===""),"search cards: own photos captioned, stock images uncaptioned ("+cards.length+")");
+await nav(pub,"/find");const cards=await pub.$$eval(".pc-img",x=>x.map(d=>{const i=d.querySelector("img");return{img:!!i,s:i?i.getAttribute("src")||"":"",a:i?i.alt:"",tile:!!d.querySelector(".pc13-tile")}}));
+ok(cards.length>=4&&cards.every(c=>c.img?(/\/img\/g-|\/u\//.test(c.s)&&c.a.length>0):c.tile),"search cards: own photos with captions, otherwise a 'photos coming soon' tile ("+cards.length+")");
+ok(cards.some(c=>c.tile)&&cards.some(c=>c.img),"search mixes real portfolios and honest placeholders, no repeated stock photos");
 await shot(pub,"desktop-search");
 // ---- 3. mobile ----
 const mob=await mk(390);await mob.goto(B+"/p/c2",{waitUntil:"networkidle"});await mob.waitForTimeout(800);
@@ -66,6 +67,18 @@ for(const [e,n] of [["demo-homeowner","homeowner"],["demo-pro","pro"],["demo-pm"
   const o=await p.evaluate(()=>{const h=document.querySelector("main header.uh, main .uh");if(!h)return{h:0};const d=document.querySelector(".v13-dtop");const firstNa=document.querySelector("main .na8");return{h:1,ok:!firstNa||!!(h.compareDocumentPosition(firstNa)&Node.DOCUMENT_POSITION_FOLLOWING),dup:document.querySelectorAll("main .uh").length,boards:[...document.querySelectorAll("main .na8 a, main .na8 button")].filter(x=>/Project board/.test(x.textContent)).length}});
   ok(o.h&&o.ok&&o.dup===1,n+" dashboard ("+w+"px) starts with its own header, next steps below");if(n==="pm")ok(o.boards<=1,"pm dashboard lists the project board once");
   if(w<500)ok(await noX(p),n+" dashboard fits a phone");if(w===1300&&(n==="pm"||n==="homeowner"))await shot(p,"desktop-dash-"+n);if(w<500&&n==="pro")await shot(p,"mobile-dash-pro",true);await p.context().close()}}
+// ---- 6. QA sweep-1 Medium/Low fixes ----
+const q=await mk();await q.goto(B+"/#/no-such-page");await q.waitForTimeout(900);
+ok((await q.$$eval("h1",x=>x.map(e=>e.textContent))).join("|")==="Page not found"&&/^Page not found · Sawyer/.test(await q.title()),"unknown routes: one H1 'Page not found' and a matching title (SW-011/022)");
+await q.goto(B+"/#/find");await q.waitForTimeout(900);ok((await q.$$("h1")).length===1&&await q.$(".fx-res h2")!==null&&(await q.$$("main main, #app main")).length===0,"Find: one H1, results under an H2, no nested main (SW-011)");
+ok(await q.$('#fRapid[role="button"][aria-pressed]')!==null,"Rapid responder toggle is a button role (SW-012)");
+const foot=await txt(q,"#foot");ok(!/real beta users|Demo prototype/.test(foot)&&/fictional sample data/.test(foot),"footer copy is accurate about the fictional seed (SW-014/020)");
+ok(await q.evaluate(()=>getComputedStyle(document.body).fontFamily.startsWith('"Plus Jakarta Sans"')),"font family is named Plus Jakarta Sans (SW-023)");
+ok(await q.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue("--bg").trim().toUpperCase()==="#F8F6F1"),"light theme background is linen (SW-013)");
+ok(!(await q.evaluate(()=>JSON.stringify(DB.users.map(u=>u.name)))).match(/Fakeson|Placeholder|Testwell|Mockler|Faux|Dummy|Testcase|Sampleton|Mocksen|Notreal|Pretend|Imagin|Fictional|Synthetic|Pseudo|Notaname|Madeup|Sparkfake|Placebo|Fakowski/),"seed names read as real people (SW-024)");
+const up=await q.evaluate(async()=>{const r=await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"image/png"},body:"x"});return [r.status,(await r.json()).status]});ok(up[0]===401&&up[1]===401,"signed-out upload returns HTTP 401 (SW-019) "+up);
+ok((await q.request.get(B+"/icons/icon-dark-512.png")).status()===404,"unused dark icon no longer shipped (SW-025)");
+ok(!(await cu.evaluate(()=>A.updatePro({bio:"hacked"}))).ok,"homeowners can't use the pro-profile editor (SW-017)");
 // signed-in profile is the live app, not the pre-render
 const sraw=await (await cu.request.get(B+"/p/c1")).text();ok(!/id="pre11"/.test(sraw),"signed-in visitors get the live profile, not the pre-rendered one");
 ok(errs.length===0,"no page errors ("+errs.length+")"+(errs.length?": "+errs.slice(0,3).join(" | "):""));

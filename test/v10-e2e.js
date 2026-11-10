@@ -8,8 +8,8 @@ async function as(email,w=1300){const p=await br.newPage({viewport:{width:w,heig
 const nav=async(p,r)=>{await p.goto(B+"/#"+r);await p.reload();await p.waitForTimeout(900)};
 const shot=async(p,n)=>{if(OUT){fs.mkdirSync(OUT,{recursive:true});await p.screenshot({path:path.join(OUT,n+".png")})}};
 // --- fonts are external files now (CSS stays small)
-{const r=await (await fetch(B+"/")).text();ok(!/base64,d09GMg/.test(r),"no inline base64 fonts in the page");ok(/rel="preload" href="\/fonts\/jakarta-e-400\.woff2"/.test(r),"body font preloaded");
- const f=await fetch(B+"/fonts/jakarta-e-800.woff2");ok(f.status===200&&/woff2/.test(f.headers.get("content-type"))&&/immutable/.test(f.headers.get("cache-control")),"font served with long cache");ok(!/Fraunces/.test(r),"unused serif face removed");ok(!/format\("woff2"\) format/.test(r),"font-face src is valid")}
+{const r=await (await fetch(B+"/")).text();ok(!/base64,d09GMg/.test(r),"no inline base64 fonts in the page");ok(/rel="preload" href="\/fonts\/plus-jakarta-sans-400\.woff2"/.test(r),"body font preloaded");
+ const f=await fetch(B+"/fonts/plus-jakarta-sans-800.woff2");ok(f.status===200&&/woff2/.test(f.headers.get("content-type"))&&/immutable/.test(f.headers.get("cache-control")),"font served with long cache");ok(!/Fraunces/.test(r),"unused serif face removed");ok(!/format\("woff2"\) format/.test(r),"font-face src is valid")}
 {const p=await as(null);await p.waitForTimeout(1500);ok(await p.evaluate(()=>[...document.fonts].filter(f=>f.family.includes("Jakarta")&&f.status==="loaded").length>=2),"Plus Jakarta Sans actually loads");await p.close()}
 // --- pro makes a fresh estimate for the homeowner and sends it
 let pro=await as("demo-pro@sawyer.test");await nav(pro,"/office/estimates");
