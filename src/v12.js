@@ -159,7 +159,13 @@ function v12Meter(u){const s=proSetup(u),d=s.filter(x=>x[2]).length,pct=Math.rou
  try{
  const setupDone=own&&proSetup(u).every(x=>x[2]);
  if((u.gal12||[]).length>=3)h=h.replace(/<div class="px-cover c\d">[\s\S]*?<div class="px-shade">/,()=>`<div class="px-cover c3">${u.gal12.slice(0,3).map((x,i)=>`<div><img class="art v4art" src="${esc(x.src)}" alt="${esc(x.cap||u.trade)}" ${i?'loading="lazy" decoding="async"':'fetchpriority="high"'}></div>`).join("")}<div class="px-shade">`);
- if((u.gal12||[]).length||own)h=h.replace(/<div class="gallery g\d">[\s\S]*?<\/div>/,()=>g12Grid(u,own));
+ if(h.includes("<b>Rapid responder</b>"))h=h.replace(/<div class="bb"><svg(?:(?!<\/svg>)[\s\S])*<\/svg><div><b>Fast responder<\/b><small>[^<]*<\/small><\/div><\/div>/,"");
+ const hasGal=!!(u.gal12||[]).length||g12All(u).some(x=>/^\/u\//.test(x.src||""));
+ /* v13: no stock photos dressed up as a pro's work. Without their own photos: decorative cover, honest empty state, no stock before/after */
+ if(!hasGal){h=h.replace(/<div class="px-cover[^"]*">[\s\S]*?<div class="px-shade">/,x=>x.replace(/ alt="[^"]*"/g,' alt=""'));
+  if(!own)h=h.replace(/<div class="gallery g\d">[\s\S]*?<\/div>/,()=>`<div class="g12-soon"><span class="g12-si">${I("camera",22)}</span><div><b>Job photos coming soon</b><small>${esc(v12Nm(u))} hasn't added photos of their work yet. Ask for pictures of similar jobs when you request a quote.</small></div><a class="btn sm ghost" href="${href("post",null,{invite:u.id})}">Request a quote</a></div>`);
+  {const a=h.indexOf('<section class="wrap v2pro">');const b=a<0?-1:h.indexOf("</section>",a);if(b>0&&!/src="\/u\//.test(h.slice(a,b)))h=h.slice(0,a)+h.slice(b+10)}}
+ if(hasGal||own)h=h.replace(/<div class="gallery g\d">[\s\S]*?<\/div>/,()=>g12Grid(u,own));
  if(setupDone)h=h.replace('<div class="pmain">',()=>'<div class="pmain">'+v12Meter(u));
  h=h.replace(/<section class="wrap pxsvc">/,'<section class="wrap pxsvc" id="prices">').replace(/(<section class="wrap pxsvc"[^>]*><div class="ehead"><span class="kick">[\s\S]*?<\/span><h2>)What [^<]* takes on(<\/h2>)/,"$1Services &amp; starting prices$2");
  h=h.replace(/<div class="svc-g">[\s\S]*?<\/div>/,()=>v12MenuHTML(u,own));
@@ -366,3 +372,8 @@ if(VIEWS.account){const oa=VIEWS.account;VIEWS.account=(...a)=>{const h=oa(...a)
    When the app mounts, keep those painted images instead of swapping in identical new ones. */
 if(typeof document!=="undefined"&&typeof render==="function"){const or=render;let keep=null,until=0;render=function(){const pre=document.getElementById("pre11");const pc=pre&&pre.querySelector(".px-cover");if(pc){keep=pc;until=Date.now()+5000}const r=or.apply(this,arguments);
  if(keep){if(Date.now()>until)keep=null;else try{const nu=document.querySelector("#app .px-cover");const k=e=>[...e.querySelectorAll("img")].map(i=>i.getAttribute("src")).join("|");if(nu&&nu!==keep&&k(nu)===k(keep)&&nu.className===keep.className){const bl=nu.querySelector(".backlink"),ob=keep.querySelector(".backlink");if(bl&&ob)ob.replaceWith(bl);nu.replaceWith(keep)}}catch(e){}}return r}}
+/* v13: search cards show the pro's own first portfolio photo; without one, the plain trade photo as decoration (no caption
+   pretending it is their job). */
+function v13CardImg(u){const g=(u.gal12||[])[0];if(g&&G12OK(g.src))return`<img class="art v4art" src="${esc(g.src)}" alt="${esc(g.cap||"")}" loading="lazy" decoding="async">`;
+ const t=(typeof V4IMG!=="undefined"&&V4IMG[u.trade])||"home-ext";return`<img class="art v4art" src="/img/${t}.webp" alt="" loading="lazy" decoding="async">`}
+if(typeof PROCARD==="function"){const oc=PROCARD;PROCARD=function(x){const h=oc(x);try{return h.replace(/(<div class="pc-img">(?:<button[\s\S]*?<\/button>)?)<img class="art v4art"[^>]*>/,(m,a)=>a+v13CardImg(x.u))}catch(e){return h}}}
