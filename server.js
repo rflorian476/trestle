@@ -61,7 +61,8 @@ const SESS_DAYS=30;
 function newSession(uid){const t=crypto.randomBytes(32).toString("base64url");db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(t,uid,Date.now()+SESS_DAYS*864e5);return t}
 function cookies(req){const o={};(req.headers.cookie||"").split(";").forEach(s=>{const i=s.indexOf("=");if(i>0)o[s.slice(0,i).trim()]=decodeURIComponent(s.slice(i+1).trim())});return o}
 function sessionUid(req){const t=cookies(req).swsid;if(!t)return null;const r=db.prepare("SELECT uid,expires FROM sessions WHERE token=?").get(t);if(!r||r.expires<Date.now())return null;return r.uid}
-function setCookie(res,req,t,maxAge){const secure=(req.socket.encrypted||(TRUST_PROXY&&(String(req.headers["x-forwarded-proto"]||"").split(",")[0].trim()==="https"||/https/.test(req.headers["cf-visitor"]||""))))?"; Secure":"";res.setHeader("Set-Cookie",`swsid=${t}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`)}
+const isHttps=req=>!!(req.socket.encrypted||(TRUST_PROXY&&(String(req.headers["x-forwarded-proto"]||"").split(",")[0].trim()==="https"||/https/.test(req.headers["cf-visitor"]||""))));
+function setCookie(res,req,t,maxAge){const secure=isHttps(req)?"; Secure":"";res.setHeader("Set-Cookie",`swsid=${t}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`)}
 const hits=new Map();
 const RATE_X=Math.max(1,+process.env.RATE_X||1);// RATE_X: loosen limits for local e2e runs only
 function limited(key,max,winMs){max*=RATE_X;const now=Date.now();const a=(hits.get(key)||[]).filter(t=>now-t<winMs);a.push(now);hits.set(key,a);return a.length>max}
@@ -147,6 +148,11 @@ self.addEventListener("fetch",e=>{const r=e.request;if(r.method!=="GET")return;c
  if(r.mode==="navigate"){e.respondWith(fetch(r).then(x=>{const y=x.clone();caches.open(C).then(c=>c.put("/",y));return x}).catch(()=>caches.match("/")));return}
  if(/^\\/(img|icons|u|fonts|js)\\//.test(u.pathname))e.respondWith(caches.match(r).then(h=>h||fetch(r).then(x=>{if(x.ok){const y=x.clone();caches.open(C).then(c=>c.put(r,y))}return x})))});`;
 const SEC={"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"same-origin","Permissions-Policy":"geolocation=(), camera=(), microphone=()"};
+// SW-003: app pages get a strict CSP. Inline boot scripts are allowed by their exact sha256 hash (computed per response),
+// app code only from this origin, no inline event handlers, no plugins, no framing, no foreign form posts.
+function cspFor(html,req){const hs=new Set();for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g))hs.add("'sha256-"+crypto.createHash("sha256").update(m[1],"utf8").digest("base64")+"'");
+ return["default-src 'self'","script-src 'self' "+[...hs].join(" "),"style-src 'self' 'unsafe-inline'","img-src 'self' data: blob:","font-src 'self' data:","connect-src 'self'","media-src 'self' blob:","worker-src 'self'","manifest-src 'self'","object-src 'none'","base-uri 'self'","form-action 'self'","frame-ancestors 'none'"].concat(isHttps(req)?["upgrade-insecure-requests"]:[]).join("; ")}
+function sendHtml(res,req,code,html,extra){res.writeHead(code,Object.assign({"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache","Content-Security-Policy":cspFor(html,req)},extra||{}));return res.end(html)}
 /* ---- photo uploads: images only, 5 MB max, magic bytes checked, stored under DATA_DIR/uploads ---- */
 const IMG={"image/jpeg":{ext:"jpg",ok:b=>b[0]===0xff&&b[1]===0xd8&&b[2]===0xff},"image/png":{ext:"png",ok:b=>b.slice(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))},"image/webp":{ext:"webp",ok:b=>b.slice(0,4).toString("latin1")==="RIFF"&&b.slice(8,12).toString("latin1")==="WEBP"}};
 function upload(req,res){
@@ -181,6 +187,7 @@ const BRC=new Map();function brot(zl,b){const buf=Buffer.isBuffer(b)?b:Buffer.fr
  return zl.brotliCompressSync(buf,{params:{[zl.constants.BROTLI_PARAM_QUALITY]:5}})}
 const server=http.createServer(async(req,res)=>{
  for(const[k,v]of Object.entries(SEC))res.setHeader(k,v);
+ if(isHttps(req))res.setHeader("Strict-Transport-Security","max-age=31536000; includeSubDomains");// SW-004
  const AE=req.headers["accept-encoding"]||"";if(/\b(gzip|br)\b/.test(AE)){const zl=require("zlib"),useBr=/\bbr\b/.test(AE);const wh=res.writeHead.bind(res),en=res.end.bind(res);let hd=null;
   res.writeHead=(c,h)=>{hd=[c,h||{}];return res};const wr=res.write.bind(res);res.write=(...a)=>{if(hd&&hd!=="done"){wh(...hd);hd="done"}else if(!hd){wh(res.statusCode,{});hd="done"}return wr(...a)};// v11 fix: a 2nd chunk used to re-send headers and cut streamed photos off at 64 KB
   res.end=(b,...r)=>{if(hd==="done")return en(b,...r);if(!hd)hd=[res.statusCode,{}];const[c,h]=hd;const ct=String(h["Content-Type"]||res.getHeader("Content-Type")||"");
@@ -188,7 +195,7 @@ const server=http.createServer(async(req,res)=>{
    wh(c,h);return en(b,...r)}}
  const url=new URL(req.url,"http://x");const p=url.pathname;
  try{
- if(req.method==="GET"&&(p==="/"||p==="/index.html")){res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});return res.end(preHome(req,withMeta(req,{title:"Sawyer: hire pros you'd trust with your house",desc:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees, and the business tools are included. Reviews only from completed jobs.",path:"/",ld:{"@context":"https://schema.org","@type":"Organization",name:"Sawyer",url:ORIGIN(req),logo:ORIGIN(req)+"/icons/icon-512.png"}})))}
+ if(req.method==="GET"&&(p==="/"||p==="/index.html")){return sendHtml(res,req,200,preHome(req,withMeta(req,{title:"Sawyer: hire pros you'd trust with your house",desc:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees, and the business tools are included. Reviews only from completed jobs.",path:"/",ld:{"@context":"https://schema.org","@type":"Organization",name:"Sawyer",url:ORIGIN(req),logo:ORIGIN(req)+"/icons/icon-512.png"}})))}
  if(req.method==="GET"&&/^\/img\/[a-z0-9-]+\.webp$/.test(p)){const f=path.join(__dirname,"public/img",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"image/webp","Cache-Control":"public, max-age=604800"});return res.end(fs.readFileSync(f))}
  if(req.method==="GET"&&/^\/icons\/[a-z0-9-]+\.(png|svg|webmanifest)$/.test(p)){const f=path.join(__dirname,"public/icons",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});const ty={png:"image/png",svg:"image/svg+xml",webmanifest:"application/manifest+json"}[p.split(".").pop()];res.writeHead(200,{"Content-Type":ty,"Cache-Control":"public, max-age=86400","X-Content-Type-Options":"nosniff"});return res.end(fs.readFileSync(f))}
  if(req.method==="GET"&&/^\/fonts\/[a-z0-9-]+\.woff2$/.test(p)){const f=path.join(__dirname,"public/fonts",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"font/woff2","Cache-Control":"public, max-age=31536000, immutable","Access-Control-Allow-Origin":"*"});return res.end(fs.readFileSync(f))}
@@ -196,7 +203,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==="GET"&&p==="/sw.js"){res.writeHead(200,{"Content-Type":"text/javascript; charset=utf-8","Cache-Control":"no-cache","Service-Worker-Allowed":"/"});return res.end(SW_JS)}
  if(req.method==="GET"&&p==="/robots.txt"){res.writeHead(200,{"Content-Type":"text/plain; charset=utf-8"});return res.end("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /auth/\nDisallow: /u/\nSitemap: "+ORIGIN(req)+"/sitemap.xml\n")}
  if(req.method==="GET"&&p==="/sitemap.xml"){const o=ORIGIN(req),d=DB();const urls=["/"].concat((d.users||[]).filter(u=>u.role==="contractor"&&u.biz).map(u=>"/p/"+u.id),(d.tcalls||[]).filter(c=>c.status!=="closed").map(c=>"/t/"+c.id));res.writeHead(200,{"Content-Type":"application/xml; charset=utf-8","Cache-Control":"public, max-age=3600"});return res.end('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'+urls.map(u=>"<url><loc>"+o+u+"</loc></url>").join("\n")+"\n</urlset>\n")}
- {const sm=/^\/([pt])\/([A-Za-z0-9_-]{1,40})$/.exec(p);if(req.method==="GET"&&sm){const html=SEO_PAGE(req,sm[1],sm[2]);if(!html)return htmlPage(res,404,"Not found","<p>That page doesn't exist. <a href=\"/\">Go home</a></p>");res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});return res.end(html)}}
+ {const sm=/^\/([pt])\/([A-Za-z0-9_-]{1,40})$/.exec(p);if(req.method==="GET"&&sm){const html=SEO_PAGE(req,sm[1],sm[2]);if(!html)return htmlPage(res,404,"Not found","<p>That page doesn't exist. <a href=\"/\">Go home</a></p>");return sendHtml(res,req,200,html)}}
  if(req.method==="GET"&&p==="/favicon.ico"){res.writeHead(200,{"Content-Type":"image/png","Cache-Control":"public, max-age=86400"});return res.end(fs.readFileSync(path.join(__dirname,"public/icons/favicon-32.png")))}
  if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:APP_VERSION,app:BRAND.name,data:VER});
  if(req.method==="GET"&&/^\/u\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(p)){const f=path.join(UPLOADS,path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});const ext=p.split(".").pop();res.writeHead(200,{"Content-Type":ext==="jpg"?"image/jpeg":"image/"+ext,"Cache-Control":"public, max-age=31536000, immutable","Content-Security-Policy":"default-src 'none'; sandbox"});return fs.createReadStream(f).pipe(res)}
