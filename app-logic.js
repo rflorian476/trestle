@@ -3424,6 +3424,10 @@ function cs12Pending(){try{const x=JSON.parse(sessionStorage.getItem("sw12cs"));
 const cs12PendHTML=(x,signedIn)=>`<div class="wrap cs12-pend" role="status"><span>${I("cal",18)}</span><p><b>${signedIn?"Finish booking":"Sign in to finish booking"}</b> your free consult with ${esc(v12Nm(x.u))}: ${esc(v7DateNice(x.date))}, ${v12T12(x.time)}.${signedIn?"":" We'll bring you right back to it."}</p>${signedIn?`<a class="btn sm primary" href="${href("pro",x.pid,{book:"1"})}">Finish booking</a>`:""}</div>`;
 {const os=VIEWS.signup;VIEWS.signup=(p,q)=>{const h=os(p,q);const x=q&&/\?book=1$/.test(q.next||"")?cs12Pending():null;return x&&!me()?cs12PendHTML(x,false)+h:h}}
 if(VIEWS.account){const oa=VIEWS.account;VIEWS.account=(...a)=>{const h=oa(...a);const x=me()&&cs12Pending();return x?cs12PendHTML(x,true)+h:h}}
+/* v13 perf: the server sends signed-out /p/<id> visits with the pro's cover already in <main> (#pre11).
+   When the app mounts, keep those painted images instead of swapping in identical new ones. */
+if(typeof document!=="undefined"&&typeof render==="function"){const or=render;let keep=null,until=0;render=function(){const pre=document.getElementById("pre11");const pc=pre&&pre.querySelector(".px-cover");if(pc){keep=pc;until=Date.now()+5000}const r=or.apply(this,arguments);
+ if(keep){if(Date.now()>until)keep=null;else try{const nu=document.querySelector("#app .px-cover");const k=e=>[...e.querySelectorAll("img")].map(i=>i.getAttribute("src")).join("|");if(nu&&nu!==keep&&k(nu)===k(keep)&&nu.className===keep.className){const bl=nu.querySelector(".backlink"),ob=keep.querySelector(".backlink");if(bl&&ob)ob.replaceWith(bl);nu.replaceWith(keep)}}catch(e){}}return r}}
 
 boot();
-;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY};
+;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
