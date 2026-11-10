@@ -78,7 +78,12 @@ function clean(v,depth=0){ // strings capped, control chars removed, structure b
  if(typeof v==="object"){const o={};for(const k of Object.keys(v).slice(0,60)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;o[k]=clean(v[k],depth+1)}return o}
  return null}
 const ACTIONS=new Set(["updatePro","fav","postJob","interest","quote","hire","complete","review","reply","send","readNotifs","readNotif","postProject","applyRole","acceptApp","declineApp","markDone","reviewCrew","advancePhase","crewSend","inviteCrew","respondInvite","addPhoto","confirmDone","setMilestones","fundMilestone","requestRelease","releaseMilestone","saveEstimate","setBusy","flagLead","reportNoShow","disputeReview","sharePhone","cancelPlan","resumePlan","requestCOI","sendCOI","addLocation","addRecurring","updateMe","saveTravel","travAvail","postTravel","applyTravel","withdrawTravel","decideTravel","inviteTraveler","closeTravel","saveCall","setAlert","delAlert","stageTravel","saveCust","addCustNote","addCustPhoto","saveDoc","delDoc","saveBill","sendBill","remindBill","recordPay","payBill","approveEst","convertEst","voidBill","addLedger","delLedger","logTime","approveTime","delTime","postLodging","closeLodging","reviewCo","setCallDetails","setCrew","tripCheck","setAlertPrefs","saveVisit","visitStatus","delVisit","setFocus","custFromJob","setRecurring","setAutoRemind","sweep9","openCase","caseReply","caseAccept","caseEscalate","caseWithdraw","signEst","travStatus","setNotifPrefs","inviteQuote","crewSave","crewDel","crewClock","refAsk","refGive","refDecline"]);
-const PRO_LOCKED=["id","role","email","verified","paid","founding","bg","demo","joined","favs"];
+// SW-001: pro profile edits are an ALLOWLIST. Privilege and trust flags (staff, verified, bg, paid, plan, role, ...) are
+// never taken from the client; "verified" only changes through the staff-only POST /api/staff/verify, never from license text.
+const PRO_EDITABLE=["bio","rate","phone","license","insurance","availNow"];
+function pickPro(o){const r={};if(!o||typeof o!=="object"||Array.isArray(o))return r;for(const k of PRO_EDITABLE)if(Object.prototype.hasOwnProperty.call(o,k))r[k]=o[k];return r}
+// strip privilege keys from any top-level object argument of any action (defence in depth for every action, not just updatePro)
+function stripPriv(args){for(const a of args)if(a&&typeof a==="object"&&!Array.isArray(a))for(const k of ["staff","admin","verified","founding","bg","planStatus","planEnds","credits"])delete a[k];return args}
 
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
 function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===uid):[];const crewOf=p=>(p.roles||[]).flatMap(r=>r.filled||[]);
@@ -200,6 +205,9 @@ const server=http.createServer(async(req,res)=>{
   const a=db.prepare("SELECT * FROM accounts WHERE email=?").get(email);
   if(!a||!a.hash||!checkPw(pw,a.salt,a.hash))return send(res,401,{error:"Wrong email or password."});
   const t=newSession(a.uid);setCookie(res,req,t,SESS_DAYS*86400);return send(res,200,{ok:true,state:snapshot(a.uid)})}
+ // staff-only trust action: mark a pro's license + insurance as checked. Off unless ADMIN_TOKEN is set on the server.
+ if(p==="/api/staff/verify"){const tok=process.env.ADMIN_TOKEN||"",got=String(req.headers["x-admin-token"]||"");if(!tok||got.length!==tok.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(tok)))return send(res,404,{error:"Not found"});
+  const u=DB().users.find(x=>x.id===String(b.uid||"")&&x.role==="contractor");if(!u)return send(res,400,{error:"Unknown pro"});u.verified=b.verified!==false;u.verifyPending=false;u.verifiedAt=u.verified?Date.now():null;persist();return send(res,200,{ok:true,uid:u.id,verified:u.verified})}
  if(p==="/api/auth/start")return AUTH.start(req,res,b);
  if(p==="/api/auth/verify")return AUTH.verify(req,res,b);
  if(p==="/api/passkey/login/options")return AUTH.pkLoginOptions(req,res);
@@ -237,7 +245,9 @@ const server=http.createServer(async(req,res)=>{
   if(name==="postJob"&&args[0]&&Array.isArray(args[0].photos))args[0].photos=args[0].photos.filter(u=>ownsUpload(uid,u));
   if(name==="saveDoc"&&args[0]&&args[0].file&&!ownsUpload(uid,args[0].file)){const prev=(DB().bdocs||[]).find(d=>d.id===args[0].id&&d.by===uid);if(!prev||prev.file!==args[0].file)args[0].file=""}
   if(name==="saveEstimate"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
-  if(name==="updatePro"&&args[0]&&typeof args[0]==="object")for(const k of PRO_LOCKED)delete args[0][k];
+  if(name==="updatePro"){const me_=DB().users.find(u=>u.id===uid);if(!me_||me_.role!=="contractor")return send(res,403,{error:"Only pro accounts have a pro profile",res:{ok:false,msg:"Only pro accounts have a pro profile"},state:snapshot(uid)});args[0]=pickPro(args[0]);args.length=1}
+  stripPriv(args);
+  if(name==="hire"){const cand=DB().users.find(u=>u.id===args[1]);if(!cand||cand.role!=="contractor")return send(res,400,{error:"Pick a pro who quoted",res:{ok:false,msg:"Pick a pro who quoted"},state:snapshot(uid)})}
   // demo accounts auto-reply (they're not real people); real users never get fake replies
   const isDemo=id=>!!(DB().users.find(u=>u.id===id)||{}).demo;
   allowAuto=(name==="send"&&isDemo(args[0]))||name==="inviteCrew"||(name==="crewSend"&&(()=>{const pr=(DB().projects||[]).find(x=>x.id===args[0]);return pr&&pr.demo})());
