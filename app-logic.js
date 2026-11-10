@@ -2175,7 +2175,7 @@ const v7Compare=(id)=>`<section class="v7cmp" id="${id||"compare"}"><div class="
 {const ov=VIEWS.pros;VIEWS.pros=(p,q)=>ov(p,q)+v7Compare("why")}
 /* ---- customers see their invoices on the dashboard ---- */
 {const ov=VIEWS.dash;VIEWS.dash=()=>{let h=ov();const m=me();if(!m)return h;if(m.role==="customer"){const bs=(DB.bills||[]).filter(b=>b.cuid===m.id&&b.status!=="draft"&&b.status!=="void");if(!bs.length)return h;const due=bs.filter(b=>b.type==="inv").reduce((a,b)=>a+billCalc(b).bal,0),wait=bs.filter(b=>b.type!=="inv"&&b.status==="sent").length;
-  const blk=`<div class="o7-wrap"><a class="card v7billcard" href="${href("bills")}"><span class="o7k-i">${I("receipt",20)}</span><div><b>${due?v7$(due)+" due on your invoices":"Your invoices are paid up"}</b><small class="muted">${wait?wait+" estimate"+(wait>1?"s":"")+" waiting for your approval · ":""}${bs.length} from pros you've hired</small></div><span class="btn sm primary">View and pay</span></a></div>`;return blk+h}
+  const blk=`<div class="o7-wrap"><a class="card v7billcard" href="${href("bills")}"><span class="o7k-i">${I("receipt",20)}</span><div><b>${due?v7$(due)+" due on your invoices":"Your invoices are paid up"}</b><small class="muted">${[wait?wait+" estimate"+(wait>1?"s":"")+" waiting for your approval":"",(n=>n?n+" invoice"+(n>1?"s":"")+" from pros you've hired":"")(bs.filter(b=>b.type==="inv").length)].filter(Boolean).join(" · ")}</small></div><span class="btn sm primary">View and pay</span></a></div>`;return blk+h}
  if(v7Pro(m)){const s=oStats(m);const blk=`<div class="o7-wrap"><a class="card v7billcard" href="${href("office")}"><span class="o7k-i">${I("brief",20)}</span><div><b>The Office: ${v7$0(s.out)} outstanding${s.overN?`, <span class="bad7">${s.overN} overdue</span>`:""}</b><small class="muted">Estimates, invoices, expenses, timesheets and COIs</small></div><span class="btn sm primary">Open</span></a></div>`;return blk+h}return h}}
 /* ---- nav: Office, Invoices, Wallet ---- */
 {const os=SHELL;SHELL=function(){os.apply(this,arguments);if(typeof document==="undefined"||!document.getElementById)return;const m=me();if(!m)return;
@@ -3451,7 +3451,8 @@ if(typeof PROCARD==="function"){const oc=PROCARD;PROCARD=function(x){const h=oc(
  const pre=h.slice(0,s);if(!pre.trim())return h;const e=h.indexOf("</header>",i);if(e<0)return h;const rest=h.slice(s,e+9),tail=h.slice(e+9);return rest+`<div class="v13-dtop">${pre}</div>`+tail}catch(x){return h}}}
 
 /* v13 design pass: home storytelling (hero trust cards, proof band, one "How it works", homeowner + pro
-   comparison, stories after the proof), calmer dashboards, desktop profile bar only after the hero. */
+   comparison, stories after the proof), calmer dashboards, quieter search helpers, folded traveler map. */
+if(typeof ZIPS!=="undefined"&&!ZIPS["78734"])ZIPS["78734"]=["Lakeway, TX",30.3635,-97.9795];
 {const oh=VIEWS.home;VIEWS.home=(...a)=>{let h=oh(...a);try{
  const cut=(re)=>{const m=h.match(re);if(!m)return"";h=h.replace(m[0],"");return m[0]};
  // hero copy
@@ -3480,6 +3481,14 @@ if(typeof PROCARD==="function"){const oc=PROCARD;PROCARD=function(x){const h=oc(
  if(trav){const s=h.indexOf('<section class="v4w v4split"');h=s<0?h+trav:h.slice(0,s)+trav+h.slice(s)}
  }catch(e){}return h}}
 {const oa=AFTER.home;AFTER.home=(...a)=>{oa&&oa(...a);const tabs=[...document.querySelectorAll("[data-vs13]")];tabs.forEach(b=>b.onclick=()=>tabs.forEach(x=>{const on=x===b;x.classList.toggle("on",on);x.setAttribute("aria-selected",on);const t=document.getElementById("vs"+x.dataset.vs13);if(t)t.hidden=!on}))}}
+/* traveler board: calls first; the state map stays folded until someone opens it (remembered for the session) */
+{const oa=AFTER.travel;AFTER.travel=(...a)=>{oa&&oa(...a);try{const m=document.getElementById("tMap");if(!m)return;m.open=sessionStorage.tMapO==="1";m.addEventListener("toggle",()=>{sessionStorage.tMapO=m.open?"1":"0"})}catch(e){}}}
+/* dashboards: town instead of a bare ZIP, "property log" for businesses, no second "invoices due" card when what's-next already has Pay */
+{const od=VIEWS.dash;VIEWS.dash=(...a)=>{let h=od(...a);try{const m=me();if(!m)return h;
+ h=h.replace(/(<p class="uh-s">)(\d{5})( ·)/,(x,a,z,b)=>a+esc(townOf(z)||z)+b);
+ if(m.biz&&m.role==="customer")h=h.replace("<b>Your home log</b>","<b>Your property log</b>");
+ if(/<div class="v13-dtop">[\s\S]*?href="#\/pay\//.test(h)&&!/estimates? waiting for your approval/.test(h))h=h.replace(/<div class="o7-wrap"><a class="card v7billcard"[\s\S]*?<\/a><\/div>/,"");
+ }catch(e){}return h}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};

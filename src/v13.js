@@ -1,5 +1,6 @@
 /* v13 design pass: home storytelling (hero trust cards, proof band, one "How it works", homeowner + pro
-   comparison, stories after the proof), calmer dashboards, desktop profile bar only after the hero. */
+   comparison, stories after the proof), calmer dashboards, quieter search helpers, folded traveler map. */
+if(typeof ZIPS!=="undefined"&&!ZIPS["78734"])ZIPS["78734"]=["Lakeway, TX",30.3635,-97.9795];
 {const oh=VIEWS.home;VIEWS.home=(...a)=>{let h=oh(...a);try{
  const cut=(re)=>{const m=h.match(re);if(!m)return"";h=h.replace(m[0],"");return m[0]};
  // hero copy
@@ -28,3 +29,11 @@
  if(trav){const s=h.indexOf('<section class="v4w v4split"');h=s<0?h+trav:h.slice(0,s)+trav+h.slice(s)}
  }catch(e){}return h}}
 {const oa=AFTER.home;AFTER.home=(...a)=>{oa&&oa(...a);const tabs=[...document.querySelectorAll("[data-vs13]")];tabs.forEach(b=>b.onclick=()=>tabs.forEach(x=>{const on=x===b;x.classList.toggle("on",on);x.setAttribute("aria-selected",on);const t=document.getElementById("vs"+x.dataset.vs13);if(t)t.hidden=!on}))}}
+/* traveler board: calls first; the state map stays folded until someone opens it (remembered for the session) */
+{const oa=AFTER.travel;AFTER.travel=(...a)=>{oa&&oa(...a);try{const m=document.getElementById("tMap");if(!m)return;m.open=sessionStorage.tMapO==="1";m.addEventListener("toggle",()=>{sessionStorage.tMapO=m.open?"1":"0"})}catch(e){}}}
+/* dashboards: town instead of a bare ZIP, "property log" for businesses, no second "invoices due" card when what's-next already has Pay */
+{const od=VIEWS.dash;VIEWS.dash=(...a)=>{let h=od(...a);try{const m=me();if(!m)return h;
+ h=h.replace(/(<p class="uh-s">)(\d{5})( ·)/,(x,a,z,b)=>a+esc(townOf(z)||z)+b);
+ if(m.biz&&m.role==="customer")h=h.replace("<b>Your home log</b>","<b>Your property log</b>");
+ if(/<div class="v13-dtop">[\s\S]*?href="#\/pay\//.test(h)&&!/estimates? waiting for your approval/.test(h))h=h.replace(/<div class="o7-wrap"><a class="card v7billcard"[\s\S]*?<\/a><\/div>/,"");
+ }catch(e){}return h}}
