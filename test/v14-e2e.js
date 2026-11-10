@@ -1,4 +1,4 @@
-// v14 end-to-end: QA retest-1 fixes (SW-039 review author ids stay with the parties)
+// v14 end-to-end: QA retest-1 fixes (SW-039 review author ids stay with the parties, SW-040 HTML 404 fits a phone)
 // 
 // usage: node test/v14-e2e.js http://localhost:8899 [shotdir]   (NODE_PATH must include playwright)
 const {chromium}=require("playwright");const fs=require("fs"),path=require("path"),os=require("os"),cp=require("child_process");
@@ -47,6 +47,16 @@ const noX=p=>p.evaluate(()=>document.documentElement.scrollWidth<=document.docum
  // a party view still renders the full author on the job page of a reviewed job
  const rj=hs.reviews.find(r=>r.uid===hs.me&&r.job);if(rj){await nav(hp,"/job/"+rj.job);const n=await hp.textContent("article.review header b").catch(()=>"");ok(/\S+ \S{2,}/.test(n),"job party sees the author's full name on the job page",n)}
  await hp.context().close();await pub.context().close()}
+
+// ---- SW-040: HTML 404 fits a 390px phone, branded ----
+for(const p0 of ["/homelog-nope","/p/nope-404","/does-not-exist"]){const r=await fetch(B+p0);const t=await r.text();
+ ok(r.status===404&&/<title>Page not found · Sawyer<\/title>/.test(t)||(p0.startsWith("/p/")&&r.status===404),p0+" is an HTML 404",r.status);}
+for(const w of [390,320,1440]){const p=await mk(w);await p.goto(B+"/does-not-exist",{waitUntil:"networkidle"});
+ ok(await noX(p),"404 page has no horizontal scroll at "+w+"px",await p.evaluate(()=>document.documentElement.scrollWidth+" vs "+document.documentElement.clientWidth));
+ ok(await p.$("main h1")!==null&&await p.$("main a.brand svg")!==null,"404 page has one H1 and the house logo at "+w+"px");
+ const ff=await p.evaluate(()=>getComputedStyle(document.body).fontFamily);ok(/Plus Jakarta Sans/.test(ff),"404 page uses Plus Jakarta Sans",ff);
+ const bg=await p.evaluate(()=>getComputedStyle(document.body).backgroundColor);ok(bg==="rgb(247, 246, 243)","404 page background is linen",bg);
+ if(w===390)await shot(p,"sw040-404-390");await p.context().close()}
 
 ok(errs.length===0,"zero console/page errors"+(errs.length?" :: "+errs.slice(0,3).join(" | "):""));
 await br.close();console.log(fail?fail+" FAILED":"ALL PASS");process.exit(fail?1:0)})().catch(e=>{console.error("FAIL crashed:",e);process.exit(1)});
