@@ -3225,6 +3225,7 @@ function v12Meter(u){const s=proSetup(u),d=s.filter(x=>x[2]).length,pct=Math.rou
  const fr='<p class="muted small center">Free for customers. No obligation.</p>';
  if(!own&&c.on)h=h.replace(fr,()=>`<button class="btn block cs12-btn" id="cs12Open" type="button">${I("cal",16)}Book a free consult</button>`+fr.replace("No obligation.","No obligation. Consults are "+c.len+" min."));
  if(own)h=h.replace(/(<a class="btn primary block" href="#\/dash">[\s\S]*?<\/a>)/,`$1<button class="btn block" id="cs12Set" type="button">${I("cal",16)}${c.on&&u.consult12?"Consult hours":"Turn on consult booking"}</button>`);
+ if(u.rate)h=h.replace(/(<div class="pxcta"[^>]*><div>)(<b>)/,(x,a,b)=>a+`<b class="pxr12">${esc(u.rate)}</b>`+b);
  if(!own&&c.on)h=h.replace(/(<div class="pxcta"[^>]*>[\s\S]*?)(<a class="btn primary" id="pxQuote")/,`$1<button class="btn ghost pxcs12" type="button" data-cs12open aria-label="Book a free consult">${I("cal",17)}</button>$2`);
  }catch(e){console.warn("v12 pro",e)}return h}}
 {const oa=AFTER.pro;AFTER.pro=(id,...r)=>{oa&&oa(id,...r);const u=U(id);if(!u)return;const $=x=>document.getElementById(x);

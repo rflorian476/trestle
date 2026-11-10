@@ -183,7 +183,7 @@
  .m12-r{grid-template-columns:minmax(0,1fr) auto;row-gap:8px}.m12-r .btn{grid-column:1/-1;justify-self:start}
  .m12-er{grid-template-columns:minmax(0,1fr) 18px 80px 36px;grid-template-areas:none}.m12-er select{grid-column:1/2}.m12-er input[name=note]{grid-column:2/5}
  .h12-t,.h12-w,.h12-tl li{grid-template-columns:36px minmax(0,1fr)}.h12-ta,.h12-wx{grid-column:1/-1;justify-content:flex-start;text-align:left}
- .cs12-l li{grid-template-columns:48px minmax(0,1fr)}.cs12-l li .badge{justify-self:start}.cs12-btns{grid-column:1/-1;justify-content:flex-start}.cs12-modes{grid-template-columns:1fr}
+ .cs12-l li{grid-template-columns:48px minmax(0,1fr)}.cs12-l li .badge{justify-self:start}.cs12-btns{grid-column:1/-1;justify-content:flex-start}.cs12-modes{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.cs12-m{align-items:center;text-align:center;padding:10px 6px}.cs12-m small{display:none}.cs12-m b{font-size:13px;line-height:1.2}
  .b12-row{grid-template-columns:1fr}.b12-lab{border-right:0}.b12-head .b12-lab{display:none}.b12-track{min-height:40px;margin:0 10px 8px}.b12-role .b12-lab{padding-left:14px}
  .g12-ed li{grid-template-columns:72px minmax(0,1fr) auto}.g12-ed li select{grid-column:2}.g12-ed img{width:72px;height:54px}
  .imp12-s{grid-template-columns:1fr}.lb12-p{left:6px}.lb12-n{right:6px}#modal .row2{grid-template-columns:1fr}}
@@ -202,3 +202,5 @@
 .cs12-pend>span{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#fff;color:#B4531A;flex:none}
 .cs12-pend p{margin:0;flex:1;font-size:.92rem}.cs12-pend .btn{flex:none}
 @media(max-width:640px){.cs12-pend{margin-left:12px;margin-right:12px;flex-wrap:wrap}}
+@media(max-width:700px){body:has(.pxcta) .mbar{display:none}.pxcta{bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:8px;padding:10px 10px 10px 16px}.pxcta>div:first-child{min-width:0;flex:1}.pxcta>div:first-child b:not(.pxr12){display:none}.pxcta>div:first-child small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pxcta .pxr12{display:block;font-size:1.05rem}.pxcta #pxQuote{flex:none;padding-left:14px;padding-right:14px}.pxcta .pxcs12{margin-left:0;margin-right:0;flex:none}}
+@media(min-width:701px){.pxcta .pxr12{display:none}}
