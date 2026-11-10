@@ -22,6 +22,7 @@ c=rep(c,'<div class="fld"><label for="cu-z">','<div class="fld"><label for="cu-p
 c=rep(c,'<div class="fld"><label for="pms-z"','<div class="fld"><label for="pms-p">Password (8+ characters)</label><input id="pms-p" name="password" type="password" autocomplete="new-password" minlength="8"></div><div class="fld"><label for="pms-z"');
 c=rep(c,'<button class="linkbtn" id="resetBtn">Reset demo data</button>','');
 c=rep(c,'Demo prototype. Every business, person, license and review here is fictional.','Beta test. Listings marked (demo) are fictional sample data; everything else was posted by real beta users.');
+c=rep(c,'class="stars" aria-label=','class="stars" role="img" aria-label=');
 c=rep(c,'Demo prototype. Every business, person, city listing, license and review here is fictional sample data.','Beta test. Listings marked (demo) are fictional sample data; everything else was posted by real beta users.');
 // v9 perf: run the live-mode patches before boot so the page renders once instead of twice
 {const post=fs.readFileSync(path.join(__dirname,"client-post.js"),"utf8");const tail="try{render()}catch(e){}\n})();";if(!post.trimEnd().endsWith(tail.trim()))throw new Error("client-post tail changed");

@@ -204,3 +204,4 @@
 @media(max-width:640px){.cs12-pend{margin-left:12px;margin-right:12px;flex-wrap:wrap}}
 @media(max-width:700px){body:has(.pxcta) .mbar{display:none}.pxcta{bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:8px;padding:10px 10px 10px 16px}.pxcta>div:first-child{min-width:0;flex:1}.pxcta>div:first-child b:not(.pxr12){display:none}.pxcta>div:first-child small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pxcta .pxr12{display:block;font-size:1.05rem}.pxcta #pxQuote{flex:none;padding-left:14px;padding-right:14px}.pxcta .pxcs12{margin-left:0;margin-right:0;flex:none}}
 @media(min-width:701px){.pxcta .pxr12{display:none}}
+.o9-trf a{text-decoration:underline;text-underline-offset:2px}
