@@ -73,3 +73,10 @@
 .bigbadges .bb svg{color:#C2531E;flex:0 0 auto;margin-top:2px}
 @media(min-width:900px){.pside{position:sticky;top:112px;align-self:start}.pside .px-book.sticky{position:static}.pxcta{display:none}}
 .px-guar{background:#F3F8F5;border-color:#D7EBDF}
+/* search: quieter helpers so results start higher */
+.emband.off{margin-top:6px;padding:4px 0}.emband.off a{font-size:.88rem;font-weight:600;color:#C2531E}
+.v3rank:not([open]){border:0;background:none;padding:0;margin:0 0 6px;display:inline-block}
+.v3rank:not([open]) summary{font-size:.86rem;font-weight:600;color:var(--muted)}
+.v3rank:not([open]) summary svg{width:15px;height:15px}
+.w11-fline{font-size:.84rem;margin-bottom:14px}
+@media(max-width:760px){.emband.off{margin-top:0}.fx-res .v3rank:not([open]){margin-bottom:2px}}
