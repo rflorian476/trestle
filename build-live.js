@@ -11,7 +11,7 @@ let js=src.slice(a+8,b);
 const V2JS=T(fs.readFileSync(path.join(__dirname,"src/v2.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v4.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v5.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v6.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v7.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v8.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v9.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v10.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v11.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/sec.js"),"utf8"));
 if(!js.includes("\nboot();"))throw new Error("boot anchor missing");
 js=js.replace("\nboot();","\n//@@SPLIT@@\n"+V2JS+"\nboot();");
-fs.writeFileSync(path.join(__dirname,"app-logic.js"),js+"\n;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY};\n");
+fs.writeFileSync(path.join(__dirname,"app-logic.js"),js+"\n;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};\n");
 function rep(s,from,to){if(!s.includes(from))throw new Error("patch anchor missing: "+from.slice(0,60));return s.split(from).join(to)}
 let c=js;
 c=rep(c,"try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){DB=null}\nif(!DB||!DB.users||DB.v!==1)seed();","DB=__liveLoad();");
