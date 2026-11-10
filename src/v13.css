@@ -45,9 +45,7 @@
 .v13-dtop .na8-t{min-width:0;flex:1}
 .v13-dtop .na8-c{flex:0 0 auto}
 @media(max-width:760px){.v13-dtop .na8-l{grid-template-columns:minmax(0,1fr)}.v13-dtop .na8-t b,.v13-dtop .na8-t small{-webkit-line-clamp:2}}
-/* profile: floating quote bar waits until the visitor scrolls past the hero (desktop) */
 .pxcta{transition:opacity .2s,transform .2s}
-@media(min-width:900px){body:not(.v13-scrolled) .pxcta{opacity:0;pointer-events:none;transform:translateY(12px)}}
 /* micro-interactions */
 .btn,.v4go,.v4btn{transition:transform .12s ease,box-shadow .15s ease,background-color .15s ease}
 .btn:active,.v4go:active,.v4btn:active{transform:scale(.97)}
@@ -69,3 +67,9 @@
  .v13band .v4stats{gap:0;padding-block:8px}
  .v13band .v4stats>div:nth-child(n+3){border-top:1px solid var(--line)}
 }
+/* profile: highlights as a 2-column grid, sidebar sticks as one block (no overlap with the guarantee card) */
+@media(min-width:700px){.bigbadges{grid-template-columns:1fr 1fr;gap:10px}}
+.bigbadges .bb{padding:12px 14px;background:#fff;border:1px solid var(--line)}
+.bigbadges .bb svg{color:#C2531E;flex:0 0 auto;margin-top:2px}
+@media(min-width:900px){.pside{position:sticky;top:112px;align-self:start}.pside .px-book.sticky{position:static}.pxcta{display:none}}
+.px-guar{background:#F3F8F5;border-color:#D7EBDF}

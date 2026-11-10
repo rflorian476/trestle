@@ -28,5 +28,3 @@
  if(trav){const s=h.indexOf('<section class="v4w v4split"');h=s<0?h+trav:h.slice(0,s)+trav+h.slice(s)}
  }catch(e){}return h}}
 {const oa=AFTER.home;AFTER.home=(...a)=>{oa&&oa(...a);const tabs=[...document.querySelectorAll("[data-vs13]")];tabs.forEach(b=>b.onclick=()=>tabs.forEach(x=>{const on=x===b;x.classList.toggle("on",on);x.setAttribute("aria-selected",on);const t=document.getElementById("vs"+x.dataset.vs13);if(t)t.hidden=!on}))}}
-/* desktop profile: the floating quote bar only appears once the sidebar CTA has scrolled away */
-if(typeof window!=="undefined"&&window.addEventListener){let raf=0;const chk=()=>{raf=0;const b=document.body;if(!b)return;b.classList.toggle("v13-scrolled",scrollY>520)};window.addEventListener("scroll",()=>{if(!raf)raf=requestAnimationFrame(chk)},{passive:true});window.addEventListener("hashchange",()=>setTimeout(chk,50))}
