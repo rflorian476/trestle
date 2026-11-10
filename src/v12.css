@@ -143,7 +143,7 @@
 .b12-sw{display:inline-block;width:18px;height:10px;border-radius:3px}
 .b12-cf{display:flex;gap:10px;margin-bottom:14px}
 /* marketing */
-.g12t{display:grid;gap:18px}
+.g12t{grid-template-columns:minmax(0,1fr);display:grid;gap:18px}
 .g12-kp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .g12-sec{padding:18px 20px}.g12-sec h2{display:flex;gap:8px;align-items:center;font-size:1.1rem;margin:0 0 4px;color:#0F2A44}
 .g12-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
@@ -178,7 +178,7 @@
 .mod12-f .row{gap:6px;flex-wrap:wrap}
 .danger12{background:#a8320b!important;color:#fff!important;border-color:#a8320b!important}
 .mod12-dec{display:flex;gap:6px;align-items:center;margin:12px 0 0;color:#3d4756}
-@media (max-width:900px){.st12{grid-template-columns:repeat(3,minmax(0,1fr))}.g12-2{grid-template-columns:1fr}.g12-kp{grid-template-columns:repeat(2,minmax(0,1fr))}.mod12-g{grid-template-columns:1fr}.ar12{grid-template-columns:1fr}.b12-row{grid-template-columns:200px minmax(0,1fr)}}
+@media (max-width:900px){.st12{grid-template-columns:repeat(3,minmax(0,1fr))}.g12-2{grid-template-columns:minmax(0,1fr)}.g12-kp{grid-template-columns:repeat(2,minmax(0,1fr))}.mod12-g{grid-template-columns:1fr}.ar12{grid-template-columns:1fr}.b12-row{grid-template-columns:200px minmax(0,1fr)}}
 @media (max-width:640px){.g12{grid-template-columns:repeat(2,1fr);grid-auto-rows:110px}.st12{grid-template-columns:repeat(2,minmax(0,1fr))}.h12-k{grid-template-columns:repeat(2,minmax(0,1fr))}
  .m12-r{grid-template-columns:minmax(0,1fr) auto;row-gap:8px}.m12-r .btn{grid-column:1/-1;justify-self:start}
  .m12-er{grid-template-columns:minmax(0,1fr) 18px 80px 36px;grid-template-areas:none}.m12-er select{grid-column:1/2}.m12-er input[name=note]{grid-column:2/5}
@@ -195,3 +195,6 @@
 .pc12-scr{display:flex;justify-content:space-between;align-items:center;gap:10px;max-width:380px;padding:14px 16px;border:1px dashed #b9c1cf;border-radius:12px;background:#fff;color:#0F2A44}
 .pc12-scr .pc12-l{display:flex;flex-direction:column;gap:1px;font-size:13px}.pc12-scr .pc12-l b{font-size:15px}.pc12-scr small{color:var(--muted);font-size:11.5px;margin-top:4px}
 .em12-pv iframe{height:470px}
+
+.cm12-imp{display:flex;align-items:center;gap:6px;margin:6px 0 10px;color:var(--muted,#5b6475)}.cm12-imp .linkbtn{font-weight:700}
+.rr12-t th,.rr12-t td{position:relative}
