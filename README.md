@@ -17,8 +17,19 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Project manager (Dana, Copperline Build Group) | `demo-pm@sawyer.test` | **Crew builder** on the Tampa deck & seawall project: dated slots, available-pro suggestions, invite or book the whole crew. |
 | Business (Lakeway Dental Group) | `demo-business@sawyer.test` | Invoices to pay, multi-location requests, COIs. |
 | Traveling electrician (Marcus Delgado) | `demo-traveler@sawyer.test` | References from foremen, "Ask for a reference", status picker, saved calls and alerts with live match counts. |
+| Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, with job signals; keep, remove (rating updates everywhere) or ask for proof. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+## v12 features
+- **Pro profile**: **Services & starting prices** (pros set "From $X" per service, others show Sawyer's typical price), a real-photo **portfolio** with a full-screen lightbox (arrow keys, captions, before/after tags) that also becomes the cover, a **Track record** block (median reply, customer-confirmed jobs, quotes in 90 days, hire rate, repeat customers, member since), **Towns covered** with a "Do they come to you?" ZIP check, and **Book a free consult** (on-site, video or phone; 14-day day/time picker, taken slots blocked, 2 live bookings per customer per pro, .ics download). Visitors can pick a time before signing in; the pick survives sign-in/sign-up.
+- **Completeness + import (demo)**: the setup checklist gains prices, 3+ photos and consults; once complete it becomes a 100% ring. **Import from Google or Facebook** fills description, phone, hours, services, years and website after you check each field (test mode: sample data). Reviews never import.
+- **Home log** (`/homelog`, homeowners and businesses): maintenance schedule with Done/Snooze/Book a pro, **warranties** (read from pro invoices and estimates plus your own, with receipt photo), past jobs, pros you've hired and receipts, with CSV export.
+- **Project board** (`/board`, PMs): every project's crew slots on one Gantt-lite timeline, crew counts, open slots and double-booking warnings. Click a bar to set that crew's dates.
+- **Reviews & marketing** (Office → Reviews & marketing): ask finished customers for a review (editable template; test mode sends an in-app notice), one reminder after 3 days, share link + **QR code** (SVG/PNG, printable leave-behind cards), and an **embeddable review widget** (`/embed/<pro id>`, frameable anywhere, no scripts).
+- **Trust**: anyone signed in can **Report** a review (not their own); the trust team decides in `/mod`. Removed reviews are archived and everyone involved is told why.
+- **Fixed**: duplicate stats and mismatched stock "before/after" photos on profiles with a portfolio, two stacked sticky bars on mobile profiles, leftover "Demo prototype" footer copy, several contrast and ARIA issues.
+- Tests: `node test/v12-e2e.js http://localhost:8899 shots/v12/final`.
 
 ## v11 features
 - **Guided request** (`/post`): 4 steps (trade → details + photos → timing, location and budget with the typical price range → review). Type the problem to get a trade suggestion. Signed-out visitors can fill it in; the draft survives sign-up and a banner offers "Finish and send".
