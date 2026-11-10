@@ -274,7 +274,11 @@ const server=http.createServer(async(req,res)=>{
   if(name==="saveDoc"&&args[0]&&args[0].file&&!ownsUpload(uid,args[0].file)){const prev=(DB().bdocs||[]).find(d=>d.id===args[0].id&&d.by===uid);if(!prev||prev.file!==args[0].file)args[0].file=""}
   if(name==="saveEstimate"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
   if(name==="updatePro"&&args[0]&&typeof args[0]==="object")for(const k of PRO_LOCKED)delete args[0][k];
-  if(name==="setGal12"&&Array.isArray(args[0])){const prev=new Set(((DB().users.find(u=>u.id===uid)||{}).gal12||[]).map(x=>x.src));args[0]=args[0].filter(x=>x&&(prev.has(x.src)||ownsUpload(uid,x.src)))}
+  // v13 (QA SW-037): a portfolio is only cleared by an explicit empty list; if every submitted photo is rejected, nothing is written.
+  // Demo pros may restore their seeded /img/g-*.webp demo photos.
+  if(name==="setGal12"){if(!Array.isArray(args[0]))return send(res,200,{res:{ok:false,msg:"Send a list of photos"},state:snapshot(uid)});const gu=DB().users.find(u=>u.id===uid)||{};const prev=new Set((gu.gal12||[]).map(x=>x.src));const n=args[0].length;
+   args[0]=args[0].filter(x=>x&&typeof x.src==="string"&&(prev.has(x.src)||ownsUpload(uid,x.src)||(gu.demo&&/^\/img\/g-[a-z0-9-]+\.webp$/.test(x.src))));
+   if(n&&!args[0].length)return send(res,200,{res:{ok:false,msg:"Those photos couldn't be added. Upload them again from your device."},state:snapshot(uid)})}
   if(name==="homeItem12"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))args[0].photo="";
   // demo accounts auto-reply (they're not real people); real users never get fake replies
   const isDemo=id=>!!(DB().users.find(u=>u.id===id)||{}).demo;

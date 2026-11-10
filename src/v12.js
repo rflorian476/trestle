@@ -60,6 +60,7 @@ function m12Modal(){const m=me();const mn=v12Menu(m);const row=(x,i)=>`<div clas
 const G12OK=s=>/^\/img\/g-[a-z0-9-]+\.webp$/.test(String(s||""))||UPLOAD_RE.test(String(s||""));
 const g12Thumb=s=>/^\/img\/g-/.test(s)?s.replace(/\.webp$/,"-sm.webp"):s;
 A.setGal12=function(list){const m=me();if(!m||m.role!=="contractor")return{ok:false,msg:"Pro accounts only"};const rows=(Array.isArray(list)?list:[]).slice(0,12).filter(x=>x&&G12OK(x.src)).map(x=>({src:String(x.src),cap:v7S(x.cap,90),tag:["before","after","finished","in-progress"].includes(x.tag)?x.tag:"finished",date:+x.date||Date.now()}));
+ if(Array.isArray(list)&&list.length&&!rows.length)return{ok:false,msg:"Those photos couldn't be added. Upload them again from your device."};/* v13 SW-037: only an explicit [] clears */
  m.gal12=rows;save();return{ok:true,msg:rows.length?"Portfolio saved":"Portfolio cleared"}};
 function g12Grid(u,own){const g=u.gal12||[];const vp=typeof verifiedPhotos==="function"?verifiedPhotos(u.id).filter(p=>UPLOAD_RE.test(p.src||"")):[];const all=g.map(x=>({src:x.src,cap:x.cap,tag:x.tag,ver:false})).concat(vp.map(p=>({src:p.src,cap:p.cap||"",tag:p.kind,ver:true})));
  if(!all.length)return own?`<div class="g12-empty">${I("camera",22)}<div><b>Add photos of your work</b><small>Real job photos are the #1 thing customers look at. Up to 12.</small></div><button class="btn sm primary" id="g12Edit" type="button">Add photos</button></div>`:"";

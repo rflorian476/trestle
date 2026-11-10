@@ -79,6 +79,18 @@ ok(!(await q.evaluate(()=>JSON.stringify(DB.users.map(u=>u.name)))).match(/Fakes
 const up=await q.evaluate(async()=>{const r=await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"image/png"},body:"x"});return [r.status,(await r.json()).status]});ok(up[0]===401&&up[1]===401,"signed-out upload returns HTTP 401 (SW-019) "+up);
 ok((await q.request.get(B+"/icons/icon-dark-512.png")).status()===404,"unused dark icon no longer shipped (SW-025)");
 ok(!(await cu.evaluate(()=>A.updatePro({bio:"hacked"}))).ok,"homeowners can't use the pro-profile editor (SW-017)");
+// ---- 7. QA sweep-2 validation (SW-035..SW-038) ----
+{const pp=await as("demo-pro@sawyer.test",1300);await nav(pp,"/dash");
+ const g0=await pp.evaluate(()=>(DB.users.find(u=>u.id==="c1").gal12||[]).length);
+ const r1=await pp.evaluate(()=>A.setGal12([{src:"/u/0123456789abcdef0123456789abcdef.jpg",cap:"x"},{src:"https://example.com/a.jpg"}]));
+ const g1=await pp.evaluate(()=>(DB.users.find(u=>u.id==="c1").gal12||[]).length);
+ ok(!r1.ok&&g0>0&&g1===g0,"a portfolio save with only rejected photos is refused and keeps the gallery (SW-037) "+g0+"/"+g1);
+ const r2=await pp.evaluate(()=>{const keep=(DB.users.find(u=>u.id==="c1").gal12||[]);return A.setGal12(keep)});ok(r2.ok,"re-saving the existing portfolio still works");
+ const jq=await pp.evaluate(()=>{const p=DB.jobs.find(j=>j.status==="posted"),h=DB.jobs.find(j=>j.status!=="posted"&&j.hired);return[A.quote(p.id,"abc"),A.quote(p.id,"99999999"),A.quote(p.id,"-50"),h?A.quote(h.id,"500"):{ok:false,msg:"none"}]});
+ ok(jq.every(r=>!r.ok),"quotes reject text, negative and huge prices, and closed jobs (SW-035) "+jq.map(r=>r.msg).join(" | "));
+ await pp.context().close()}
+{const r=await cu.evaluate(()=>A.postJob({title:"A".repeat(200),cat:"plumbing",zip:"78704",desc:"Leaky tap"}));ok(!r.ok&&/90/.test(r.msg),"job titles are capped at 90 characters (SW-036)")}
+ok(require("fs").readFileSync(__dirname+"/../app-logic.js","utf8").includes('file.size>5*1024*1024')&&require("fs").readFileSync(__dirname+"/../app-logic.js","utf8").includes('(e&&e.message)||"Upload failed'),"message photo pre-check matches the 5 MB server limit and shows the real error (SW-038)");
 // signed-in profile is the live app, not the pre-render
 const sraw=await (await cu.request.get(B+"/p/c1")).text();ok(!/id="pre11"/.test(sraw),"signed-in visitors get the live profile, not the pre-rendered one");
 ok(errs.length===0,"no page errors ("+errs.length+")"+(errs.length?": "+errs.slice(0,3).join(" | "):""));

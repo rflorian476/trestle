@@ -119,3 +119,4 @@
 /* QA SW-015: result grids never wait for a scroll-reveal (blank gaps in long lists / full-page captures) */
 .progrid>.rv,.projgrid>.rv{opacity:1;transform:none;transition:none}
 .nf13 h1{color:var(--ink)}
+#app :is(h1,h2,h3,b){overflow-wrap:break-word}
