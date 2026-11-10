@@ -11,6 +11,6 @@ await p.close();
 p=await as("demo-homeowner@sawyer.test",390);await nav(p,"/track/vc10");ok(await p.$(".tk8"),"homeowner sees live job tracker");await nav(p,"/dash");ok(await p.$(".na8"),"homeowner next actions");await p.close();
 p=await as("demo-business@sawyer.test");await nav(p,"/dash");ok(await p.$(".na8"),"business owner login + dashboard");await p.close();
 const g=async u=>{const r=await fetch(B+u);return[r.status,await r.text()]};
-let [s,t]=await g("/sitemap.xml");ok(s===200&&t.includes("<urlset"),"sitemap.xml");[s,t]=await g("/robots.txt");ok(s===200&&t.includes("Sitemap"),"robots.txt");
-[s,t]=await g("/p/c1");ok(s===200&&t.includes("application/ld+json")&&t.includes("og:title"),"pro SEO page has OG + JSON-LD");[s,t]=await g("/sw.js");ok(s===200,"service worker served");
+let [s,t]=await g("/sitemap.xml");ok(s===200&&t.includes("<urlset")&&!t.includes("/p/c1")&&!/\/t\//.test(t),"sitemap omits demo profiles and calls");[s,t]=await g("/robots.txt");ok(s===200&&/\nDisallow: \/\s*\n/.test(t),"robots disallows the temporary site");
+[s,t]=await g("/p/c1");ok(s===200&&t.includes("og:title")&&t.includes("noindex")&&!t.includes("application/ld+json"),"demo pro page has OG, noindex, and no structured data");[s,t]=await g("/sw.js");ok(s===200,"service worker served");
 ok(errs.length===0,"no console errors "+errs.slice(0,3).join(" | "));await br.close();process.exit(fail?1:0)})();

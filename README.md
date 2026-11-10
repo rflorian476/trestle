@@ -199,6 +199,29 @@ This repo is deploy-ready, and nothing has been pushed anywhere yet.
    - Move to Postgres or proper SQLite tables.
    - Backups.
    - Terms and privacy pages.
+   - Turn indexing on (below) only after this host is the custom domain.
+
+## Search indexing (off until launch)
+
+`/p/:id` and `/t/:id` are real URLs, but this temporary domain is full of fictional demo listings, so nothing is indexable until you opt in.
+
+- `GET /robots.txt` is `Disallow: /`.
+- Every response sends `X-Robots-Tag: noindex, nofollow`.
+- Records labelled demo (`demo: true` or a name/title containing `(demo)`) are never in `/sitemap.xml`, and their pages stay `noindex` with no JSON-LD even after indexing is turned on.
+
+**Launch switch (one line):**
+
+```
+SAWYER_INDEXABLE=1
+```
+
+Also set the canonical origin (no path). Open Graph and canonical tags use it, then `PUBLIC_URL`, then the request host:
+
+```
+SAWYER_BASE_URL=https://your-domain
+```
+
+Leave `SAWYER_INDEXABLE` unset or `0` until then. With it on, the sitemap lists `/` plus non-demo pro and traveler-call URLs only.
 
 ### v11 performance notes
 - App JS ships as hashed, immutable `public/js/a*.js` files (built by `build-live.js`), preloaded in `<head>` and run in order by a tiny loader.

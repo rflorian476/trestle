@@ -12,3 +12,10 @@ services:
       # Free tier has no persistent disk: data/ is wiped on every deploy/restart/spin-down (OK for testing)
       - key: DATA_DIR
         value: ./data
+      # One-line index switch. Keep 0 while this temporary domain serves demo listings.
+      # At launch, on the custom domain: SAWYER_INDEXABLE=1 and
+      # SAWYER_BASE_URL=https://your-domain (origin only, no path).
+      - key: SAWYER_INDEXABLE
+        value: "0"
+      - key: SAWYER_BASE_URL
+        value: https://trestle-twjo.onrender.com

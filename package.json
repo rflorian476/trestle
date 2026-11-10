@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "rebuild-ui": "node build-live.js"
+    "rebuild-ui": "node build-live.js",
+    "test:seo": "node test/seo.js"
   },
   "engines": { "node": ">=22.13.0 <25" }
 }
