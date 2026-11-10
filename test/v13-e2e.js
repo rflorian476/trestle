@@ -1,0 +1,72 @@
+// v13 end-to-end: lazy-loaded heavy pages (home log, project board, moderation, marketing), pre-rendered
+// signed-out profile cover, non-overlapping map labels, honest "photos coming soon" for pros without a
+// portfolio, search-card photos, dashboard header order, mobile fit, no page errors.
+// usage: node test/v13-e2e.js http://localhost:8899 [shotdir]   (NODE_PATH must include playwright)
+const {chromium}=require("playwright");const fs=require("fs");
+const B=process.argv[2]||"http://localhost:8899";const OUT=process.argv[3]||"";let fail=0;const errs=[];
+const ok=(c,n)=>{console.log((c?"PASS ":"FAIL ")+n);if(!c)fail++};
+if(OUT)fs.mkdirSync(OUT,{recursive:true});
+(async()=>{const br=await chromium.launch();
+const mk=async(w=1300)=>{const c=await br.newContext({viewport:{width:w,height:w<500?844:900},deviceScaleFactor:w<500?2:1});const p=await c.newPage();p.lz=[];p.on("request",r=>{if(/\/js\/lz\d+\./.test(r.url()))p.lz.push(r.url())});p.on("pageerror",e=>errs.push(String(e).slice(0,200)));p.on("console",m=>{if(m.type()==="error"&&!/Failed to load resource/.test(m.text()))errs.push(m.text().slice(0,200))});p.on("dialog",d=>d.accept());return p};
+const as=async(email,w=1300)=>{const p=await mk(w);await p.goto(B+"/");const r=await p.evaluate(async e=>{const o=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:"sawyer-demo-2026"})});return o.json()},email);if(!r.ok&&!r.state)throw Error("login failed "+email);await p.reload();await p.waitForTimeout(400);return p};
+const nav=async(p,r)=>{await p.goto(B+"/#"+r);await p.reload();await p.waitForTimeout(800)};
+const shot=async(p,n,full)=>{if(OUT)await p.screenshot({path:OUT+"/"+n+".png",fullPage:!!full})};
+const noX=p=>p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1);
+const txt=(p,s)=>p.textContent(s).catch(()=>"");
+const labelsClear=p=>p.$$eval(".usmap .m-town text",ts=>{const b=ts.map(t=>t.getBoundingClientRect());let bad=0;for(let i=0;i<b.length;i++)for(let j=i+1;j<b.length;j++){const a=b[i],c=b[j];if(a.left<c.right-1&&a.right>c.left+1&&a.top<c.bottom-1&&a.bottom>c.top+1)bad++}return{n:b.length,bad}});
+// ---- 1. signed-out profile is pre-rendered, cover first ----
+const pub=await mk();
+const raw=await (await pub.request.get(B+"/p/c1")).text();
+ok(/<div id="pre11"><section class="px">/.test(raw)&&/px-cover/.test(raw),"signed-out /p/c1 HTML already contains the profile cover");
+ok(/<link rel="?preload"? as="?image"?[^>]*fetchpriority="?high/.test(raw),"cover photo is preloaded with high priority");
+ok(!/<link[^>]+rel=["']?(preload|modulepreload)["']?[^>]+\/js\//.test(raw),"no script preloads compete with the cover");
+ok(!/<script[^>]*>[^<]*<script/i.test(raw.slice(raw.indexOf('id="pre11"'),raw.indexOf('id="pre11"')+20000).replace(/<script>if\(location[\s\S]*?<\/script>/,"")),"pre-rendered cover has no injected scripts");
+await pub.goto(B+"/p/c1",{waitUntil:"networkidle"});await pub.waitForTimeout(3500);
+ok(pub.lz.length===0,"profile page never downloads the lazy home-log/board/moderation/marketing code");
+ok(await pub.$(".g12 [data-g12]")!==null&&await pub.$("#prices")!==null,"full profile takes over after load (portfolio + prices)");
+ok(!(await pub.evaluate(()=>typeof h12Csv==="function")),"home-log code is not in the profile page");
+await shot(pub,"desktop-pro-profile");
+let m=await labelsClear(pub);ok(m.n>=3&&m.bad===0,"c1 map: "+m.n+" town names, none overlap");
+await (await pub.$(".usmap")).scrollIntoViewIfNeeded();await pub.waitForTimeout(200);await shot(pub,"desktop-map-c1");
+await pub.goto(B+"/p/c9",{waitUntil:"networkidle"});await pub.waitForTimeout(800);m=await labelsClear(pub);ok(m.bad===0,"c9 map: "+m.n+" town names, none overlap");
+await pub.goto(B+"/",{waitUntil:"networkidle"});await pub.waitForTimeout(3000);ok(pub.lz.length===0,"home page doesn't download the lazy code either");
+// ---- 2. pros without their own photos ----
+await pub.goto(B+"/p/c3",{waitUntil:"networkidle"});await pub.waitForTimeout(800);
+ok(await pub.$(".g12-soon")!==null&&/Job photos coming soon/.test(await txt(pub,".g12-soon")),"pro without a portfolio shows 'Job photos coming soon'");
+ok(await pub.$(".g12-soon a[href*='post']")!==null,"empty state offers 'Request a quote'");
+ok(await pub.$(".gallery")===null&&await pub.$("section.v2pro")===null,"no stock 'Recent work' or before/after photos");
+ok((await pub.$$eval(".px-cover img",x=>x.map(i=>i.alt))).every(a=>a===""),"stock cover photos carry no made-up captions");
+const fr=await pub.evaluate(()=>({f:(document.body.innerText.match(/Fast responder/g)||[]).length,r:(document.body.innerText.match(/Rapid responder/g)||[]).length}));ok(!(fr.f&&fr.r),"no 'Fast responder' + 'Rapid responder' double badge");
+ok(!/undefined|NaN/.test(await txt(pub,"main")),"c3 profile text is clean");
+await shot(pub,"desktop-photos-coming-soon");
+// search cards: own photo with its caption, or a plain trade image with no caption
+await nav(pub,"/find");const cards=await pub.$$eval(".pc-img img",x=>x.map(i=>({s:i.getAttribute("src")||"",a:i.alt})));
+ok(cards.length>=4&&cards.every(c=>/\/img\/g-|\/u\//.test(c.s)?c.a.length>0:c.a===""),"search cards: own photos captioned, stock images uncaptioned ("+cards.length+")");
+await shot(pub,"desktop-search");
+// ---- 3. mobile ----
+const mob=await mk(390);await mob.goto(B+"/p/c2",{waitUntil:"networkidle"});await mob.waitForTimeout(800);
+m=await labelsClear(mob);ok(m.bad===0,"mobile c2 map: "+m.n+" town names, none overlap");ok(await noX(mob),"mobile profile fits the screen");
+await (await mob.$(".usmap")).scrollIntoViewIfNeeded();await mob.waitForTimeout(200);await shot(mob,"mobile-map-c2");
+await mob.goto(B+"/p/c3",{waitUntil:"networkidle"});await mob.waitForTimeout(800);ok(await noX(mob),"mobile c3 fits");await mob.$eval(".g12-soon",e=>e.scrollIntoView({block:"center"}));await shot(mob,"mobile-photos-coming-soon");
+// ---- 4. lazy pages load when opened, as each role ----
+const lazy=async(email,route,sel,name,w=1300)=>{const p=await as(email,w);await nav(p,route);await p.waitForSelector(sel,{timeout:8000}).catch(()=>{});
+ ok(await p.$(sel)!==null,route+" loads its code on demand and renders ("+email.split("@")[0]+", "+w+"px)");ok(p.lz.length>=1,route+" fetched the lazy bundle");
+ ok(!/undefined|NaN/.test(await txt(p,"main")),route+" text is clean");if(w<500)ok(await noX(p),route+" fits a phone");await shot(p,name,w<500);return p};
+const cu=await lazy("demo-homeowner@sawyer.test","/homelog",".h12-k","desktop-home-log");
+ok(await cu.evaluate(()=>typeof h12Csv==="function"),"home-log code present after opening it");
+await nav(cu,"/homelog/warranty");await cu.click("#h12Add");await cu.waitForTimeout(300);ok(await cu.$("#h12F")!==null,"warranty form opens from the lazy code");
+await lazy("demo-homeowner@sawyer.test","/homelog",".h12-k","mobile-home-log",390);
+const pm=await lazy("demo-pm@sawyer.test","/board",".b12",  "desktop-project-board");
+await lazy("demo-pm@sawyer.test","/board",".b12","mobile-project-board",390);
+await lazy("demo-trust@sawyer.test","/mod",".mod12","desktop-moderation");
+const pro=await lazy("demo-pro@sawyer.test","/office/grow","#em12c, #rr12F, #pc12","desktop-marketing");
+// ---- 5. dashboards open with their own header ----
+for(const [e,n] of [["demo-homeowner","homeowner"],["demo-pro","pro"],["demo-pm","pm"],["demo-business","business"],["demo-remodeler","remodeler"]]){
+ for(const w of [1300,390]){const p=await as(e+"@sawyer.test",w);await nav(p,"/dash");
+  const o=await p.evaluate(()=>{const h=document.querySelector("main header.uh, main .uh");if(!h)return{h:0};const d=document.querySelector(".v13-dtop");const firstNa=document.querySelector("main .na8");return{h:1,ok:!firstNa||!!(h.compareDocumentPosition(firstNa)&Node.DOCUMENT_POSITION_FOLLOWING),dup:document.querySelectorAll("main .uh").length,boards:[...document.querySelectorAll("main .na8 a, main .na8 button")].filter(x=>/Project board/.test(x.textContent)).length}});
+  ok(o.h&&o.ok&&o.dup===1,n+" dashboard ("+w+"px) starts with its own header, next steps below");if(n==="pm")ok(o.boards<=1,"pm dashboard lists the project board once");
+  if(w<500)ok(await noX(p),n+" dashboard fits a phone");if(w===1300&&(n==="pm"||n==="homeowner"))await shot(p,"desktop-dash-"+n);if(w<500&&n==="pro")await shot(p,"mobile-dash-pro",true);await p.context().close()}}
+// signed-in profile is the live app, not the pre-render
+const sraw=await (await cu.request.get(B+"/p/c1")).text();ok(!/id="pre11"/.test(sraw),"signed-in visitors get the live profile, not the pre-rendered one");
+ok(errs.length===0,"no page errors ("+errs.length+")"+(errs.length?": "+errs.slice(0,3).join(" | "):""));
+await br.close();console.log(fail?`\n${fail} FAILED`:"\nALL PASS");process.exit(fail?1:0)})().catch(e=>{console.error(e);process.exit(1)});
