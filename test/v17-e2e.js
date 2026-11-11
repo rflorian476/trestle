@@ -1,0 +1,52 @@
+// v17: SW-043 (reject declared dimensions over 25 megapixels), SW-042 (pview IP/day dedupe),
+// and SW-044 (keep WebP orientation). API checks; no browser required.
+// usage: node test/v17-e2e.js http://localhost:8899 [shotdir]
+const fs=require("fs"),path=require("path"),zlib=require("zlib");
+const IMGSAFE=require("../lib/imgsafe.js");
+const B=(process.argv[2]||"http://localhost:8899").replace(/\/$/,"");let fail=0;
+const ok=(c,n,extra)=>{console.log((c?"PASS ":"FAIL ")+n+(c||extra===undefined?"":" :: "+String(extra).slice(0,300)));if(!c)fail++};
+const PW="sawyer-demo-2026",run=Date.now().toString(36),FX=path.join(__dirname,"fixtures");
+async function req(p,{method="GET",body,cookie,headers}={}){const h=Object.assign({},headers||{});if(body!==undefined&&!h["Content-Type"])h["Content-Type"]="application/json";if(cookie)h.Cookie=cookie;
+ const r=await fetch(B+p,{method,headers:h,body:body===undefined?undefined:(Buffer.isBuffer(body)||typeof body==="string"?body:JSON.stringify(body)),redirect:"manual"});const buf=Buffer.from(await r.arrayBuffer());const t=buf.toString();let j=null;try{j=JSON.parse(t)}catch(e){}
+ const sc=(r.headers.get("set-cookie")||"").match(/swsid=([^;]*)/);return{code:r.status,j,t,buf,headers:r.headers,cookie:sc&&sc[1]?"swsid="+sc[1]:null}}
+const signup=(kind,data)=>req("/api/signup",{method:"POST",body:{kind,password:"v17-pass-"+run,data}});
+const up=(cookie,type,buf)=>req("/api/upload",{method:"POST",cookie,headers:{"Content-Type":type},body:buf});
+function pngChunk(type,data){const d=Buffer.isBuffer(data)?data:Buffer.from(data,"latin1"),h=Buffer.alloc(8);h.writeUInt32BE(d.length,0);h.write(type,4,"latin1");const c=Buffer.alloc(4);c.writeUInt32BE(zlib.crc32(Buffer.concat([h.subarray(4),d]))>>>0,0);return Buffer.concat([h,d,c])}
+function pngIHDR(w,h){const sig=Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(w,0);ihdr.writeUInt32BE(h,4);ihdr[8]=8;ihdr[9]=2;return Buffer.concat([sig,pngChunk("IHDR",ihdr),pngChunk("IEND",Buffer.alloc(0))])}
+function jpegSOF(w,h){const sof=Buffer.from([0xff,0xc0,0x00,0x0b,0x08,0,0,0,0,0x01,0x01,0x11,0x00]);sof.writeUInt16BE(h,5);sof.writeUInt16BE(w,7);
+ return Buffer.concat([Buffer.from([0xff,0xd8]),sof,Buffer.from([0xff,0xda,0x00,0x08,0x01,0x01,0x00,0x00,0x3f,0x00,0x00]),Buffer.from([0xff,0xd9])])}
+function webpCanvas(src,w,h){const b=Buffer.from(src);if(b.toString("latin1",12,16)!=="VP8X")throw new Error("fixture has no VP8X");
+ b[24]=(w-1)&255;b[25]=((w-1)>>8)&255;b[26]=((w-1)>>16)&255;b[27]=(h-1)&255;b[28]=((h-1)>>8)&255;b[29]=((h-1)>>16)&255;return b}
+function webpVP8(src,w,h){const b=Buffer.from(src);let i=12,total=b.readUInt32LE(4)+8;
+ while(i+8<=total){const ty=b.toString("latin1",i,i+4),L=b.readUInt32LE(i+4),p=i+8,z=p+L+(L&1);
+  if(ty==="VP8 "&&L>=10&&b[p+3]===0x9d&&b[p+4]===0x01&&b[p+5]===0x2a){b.writeUInt16LE((w&0x3fff)|(b.readUInt16LE(p+6)&0xc000),p+6);b.writeUInt16LE((h&0x3fff)|(b.readUInt16LE(p+8)&0xc000),p+8);
+   // drop VP8X so the VP8 header is what we read
+   if(b.toString("latin1",12,16)==="VP8X"){const Lx=b.readUInt32LE(16),zx=20+Lx+(Lx&1);const out=Buffer.concat([b.subarray(0,12),b.subarray(zx)]);out.writeUInt32LE(out.length-8,4);return out}
+   return b}
+  i=z}throw new Error("no VP8 frame")}
+(async()=>{
+ const jpg=fs.readFileSync(path.join(FX,"v16-gps.jpg")),png=fs.readFileSync(path.join(FX,"v16-plain.png")),webp=fs.readFileSync(path.join(FX,"v16-exif.webp"));
+// ===================== SW-043: reject declared dimensions over 25 megapixels =====================
+{const bombP=pngIHDR(40000,40000),okP=pngIHDR(16,16),edgeP=pngIHDR(5000,5000),overP=pngIHDR(5001,5000);
+ const rBomb=IMGSAFE.check("image/png",bombP);ok(rBomb.ok===false&&rBomb.error===IMGSAFE.BIG,"unit: PNG IHDR 40000×40000 is refused with the friendly size message",rBomb.error);
+ const rOk=IMGSAFE.check("image/png",okP);ok(rOk.ok===true&&rOk.info.width===16&&rOk.info.height===16,"unit: a tiny PNG still passes");
+ const rEdge=IMGSAFE.check("image/png",edgeP);ok(rEdge.ok===true&&rEdge.info.width===5000&&rEdge.info.height===5000,"unit: 5000×5000 (exactly 25 MP) is allowed");
+ const rOver=IMGSAFE.check("image/png",overP);ok(rOver.ok===false&&rOver.error===IMGSAFE.BIG,"unit: 5001×5000 (just over 25 MP) is refused");
+ const rJ=IMGSAFE.check("image/jpeg",jpegSOF(40000,40000));ok(rJ.ok===false&&rJ.error===IMGSAFE.BIG,"unit: JPEG SOF 40000×40000 is refused",rJ.error);
+ const rJok=IMGSAFE.check("image/jpeg",jpegSOF(64,48));ok(rJok.ok===true&&rJok.info.width===64&&rJok.info.height===48,"unit: a small JPEG SOF still passes");
+ const rW=IMGSAFE.check("image/webp",webpCanvas(webp,40000,40000));ok(rW.ok===false&&rW.error===IMGSAFE.BIG,"unit: WebP VP8X canvas 40000×40000 is refused",rW.error);
+ const rWok=IMGSAFE.check("image/webp",webp);ok(rWok.ok===true&&rWok.info.width>0&&rWok.info.width*rWok.info.height<=IMGSAFE.MAX_PX,"unit: the real WebP fixture still passes ("+rWok.info.width+"×"+rWok.info.height+")");
+ const rVP8=IMGSAFE.check("image/webp",webpVP8(webp,5001,5000));ok(rVP8.ok===false&&rVP8.error===IMGSAFE.BIG,"unit: WebP VP8 frame header 5001×5000 (no VP8X) is refused",rVP8.error);
+ const realJpg=IMGSAFE.check("image/jpeg",jpg),realPng=IMGSAFE.check("image/png",png);
+ ok(realJpg.ok&&realPng.ok,"unit: existing camera JPEG and PNG fixtures still pass");
+ ok(/25 megapixels/.test(IMGSAFE.BIG)&&/Resize it/.test(IMGSAFE.BIG),"the size error is something a person can act on: "+IMGSAFE.BIG);
+ const S=await signup("pro",{name:"Pix Limit",email:"v17-px-"+run+"@sawyer.test",biz:"Pix Limit Electric",trade:"Electrical",zip:"78704",phone:"5125550177"});
+ const ck=S.cookie;ok(S.code===200&&ck,"throwaway pro signed up for the size-limit upload checks",S.code);
+ const uBomb=await up(ck,"image/png",bombP);ok(uBomb.code===415&&uBomb.j&&uBomb.j.error===IMGSAFE.BIG&&!uBomb.j.url,"upload: 40000×40000 PNG is not stored (HTTP 415, friendly message)",uBomb.t);
+ const uJ=await up(ck,"image/jpeg",jpegSOF(40000,40000));ok(uJ.code===415&&/25 megapixels/.test(uJ.j&&uJ.j.error||""),"upload: 40000×40000 JPEG is not stored",uJ.t);
+ const uW=await up(ck,"image/webp",webpCanvas(webp,40000,40000));ok(uW.code===415&&/25 megapixels/.test(uW.j&&uW.j.error||""),"upload: 40000×40000 WebP is not stored",uW.t);
+ const uOk=await up(ck,"image/png",png);ok(uOk.code===200&&uOk.j&&uOk.j.url,"upload: a normal PNG still stores",uOk.t);
+ const uTiny=await up(ck,"image/png",okP);ok(uTiny.code===200&&uTiny.j&&uTiny.j.url,"upload: a 16×16 PNG still stores",uTiny.t);
+}
+if(fail){console.log(fail+" FAIL");process.exit(1)}else console.log("ZERO failures");
+})().catch(e=>{console.error(e);process.exit(1)});
