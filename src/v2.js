@@ -178,9 +178,9 @@ VIEWS.compare=(jid)=>{const j=DB.jobs.find(x=>x.id===jid),m=me();if(!j)return VI
  const minP=Math.min(...rows.map(x=>x.q.price)),minD=Math.min(...rows.map(x=>x.q.days||999)),maxR=Math.max(...rows.map(x=>x.r.avg)),maxV=Math.max(...rows.map(x=>x.vj));
  const best=(c,t)=>c?`<i class="win">${t}</i>`:"";
  return`<section class="v2page">${UH(I("layers",14)+" Compare bids",esc(j.title),`${rows.length} bids · ${esc(townOf(j.zip))} · side by side on price, timeline, reputation and proof of work.`,`<a class="btn glass" href="${href("job",jid)}">${I("back",16)}Back to job</a>`)}
- <div class="wrap"><div class="cmp" role="table" aria-label="Bid comparison" style="--n:${rows.length}">
-  <div class="cmp-col cmp-lbl" role="rowgroup" aria-hidden="true"><div class="cmp-h"></div><div>Price</div><div>Timeline</div><div>Rating</div><div>Verified jobs</div><div>Response</div><div>Badges</div><div>Their note</div><div></div></div>
-  ${rows.map(x=>`<article class="cmp-col ${x.q.price===minP?"lead":""}" role="row" data-bid="${x.u.id}"><div class="cmp-h">${avatar(x.u)}<div><a href="${href("pro",x.u.id)}"><b>${esc(x.u.biz)}</b></a><small>${esc(townOf(x.u.zip))} · ${x.d<999?x.d+" mi":""}</small></div></div>
+ <div class="wrap"><div class="cmp" aria-label="Bid comparison" style="--n:${rows.length}">
+  <div class="cmp-col cmp-lbl" aria-hidden="true"><div class="cmp-h"></div><div>Price</div><div>Timeline</div><div>Rating</div><div>Verified jobs</div><div>Response</div><div>Badges</div><div>Their note</div><div></div></div>
+  ${rows.map(x=>`<article class="cmp-col ${x.q.price===minP?"lead":""}" data-bid="${x.u.id}"><div class="cmp-h">${avatar(x.u)}<div><a href="${href("pro",x.u.id)}"><b>${esc(x.u.biz)}</b></a><small>${esc(townOf(x.u.zip))} · ${x.d<999?x.d+" mi":""}</small></div></div>
    <div data-k="Price"><b class="cmp-price">${money(x.q.price)}</b>${best(x.q.price===minP,"Lowest")}</div>
    <div data-k="Timeline">${x.q.days?`<b>${x.q.days} day${x.q.days>1?"s":""}</b>`:`<span class="muted">Not given</span>`}${best(x.q.days&&x.q.days===minD,"Fastest")}</div>
    <div data-k="Rating">${x.r.n?`${starStr(x.r.avg)} <b>${x.r.avg.toFixed(1)}</b> <span class="muted">(${x.r.n})</span>`:`<span class="muted">New</span>`}${best(x.r.n&&x.r.avg===maxR,"Top rated")}</div>
