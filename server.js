@@ -395,6 +395,8 @@ const server=http.createServer(async(req,res)=>{
   if(p==="/api/passkey/delete")return send(res,200,{ok:AUTH.pkDelete(uid,b.id)});
   // SW-032: changing an existing password needs the current one (a session cookie alone isn't enough), and signs out other sessions.
   if(p==="/api/account/password"){const pw=String(b.password||"");if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});
+   // v18: shared demo accounts keep the published password; changing it would lock every tester out and sign them out.
+   if(u.demo)return send(res,400,{error:"Demo accounts are shared, so their password can't be changed. Create your own account to try this."});
    if(pw===DEMO_PW&&!demoSharedOk(uid))return send(res,400,{error:"Choose a different password."});
    const acc=db.prepare("SELECT salt,hash FROM accounts WHERE uid=?").get(uid)||{};const kP="pwfail:"+uid;
    const reset=codeFresh(req)&&!b.current;if(acc.hash&&!reset){if(overLimit(kP,5,15*60e3))return send(res,429,{error:"Too many wrong passwords. Try again in 15 minutes."},{"Retry-After":"900"});
