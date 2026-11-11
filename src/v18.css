@@ -18,3 +18,11 @@
 .mc8-i span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .mc8-i em{flex:none}
 #exportGo{display:inline-flex;gap:8px;align-items:center;margin-top:4px}
+.pw18-in{position:relative;display:flex}
+.pw18-in input{flex:1;padding-right:64px}
+.pw18-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--ink);font:600 13px/1 var(--font);padding:8px 8px;border-radius:8px;cursor:pointer;text-decoration:underline}
+.pw18-eye:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.pw18-forgot{display:block;margin:6px 0 0;text-align:left;width:auto;font-size:13.5px;text-decoration:underline;color:var(--ink);background:none;border:0;padding:0;cursor:pointer}
+.pw18-hint.pw18-warn{color:#8A3A12}
+.pw18-err{margin:4px 0 12px;padding:10px 12px;border-radius:10px;background:#FBEAE6;color:#8B2416;font-size:14px}
+#npwGo:disabled{opacity:.55;cursor:not-allowed}
