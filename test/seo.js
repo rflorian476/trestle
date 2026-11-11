@@ -52,9 +52,9 @@ function locs(xml){return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m=>m[1])
   assert(/data-sawyer-robots="beta"/.test(html)&&/noindex, nofollow/.test(html),"beta home robots meta");
   assert(/rel="canonical" href="https:\/\/beta\.example\/"/.test(html),"canonical uses the request host when the base URL is unset");
   assert(/property="og:url" content="https:\/\/beta\.example\/"/.test(html),"og:url matches the canonical host");
-  assert(html.includes('"@type":"Organization"'),"home keeps the Organization schema");
+  assert(!html.includes("application/ld+json")&&!html.includes('"@type":"Organization"'),"SW-045: beta home has no JSON-LD while the host is not indexable");
   const zipped=await get(betaPort,"/",Object.assign({"Accept-Encoding":"gzip"},hdr));
-  assert(zipped.headers["x-robots-tag"]==="noindex, nofollow"&&zipped.body.toString("utf8").includes("Organization"),"gzipped home still sends noindex");
+  assert(zipped.headers["x-robots-tag"]==="noindex, nofollow"&&/data-sawyer-robots="beta"/.test(zipped.body.toString("utf8"))&&!zipped.body.toString("utf8").includes("ld+json"),"gzipped home still sends noindex and no JSON-LD");
 
   const robots=(await get(betaPort,"/robots.txt")).body.toString("utf8");
   assert(/\nDisallow: \/\s*\n/.test(robots)&&!/^Sitemap:/m.test(robots)&&robots.includes("SAWYER_INDEXABLE=1"),"beta robots disallows everything and documents the switch");
@@ -79,13 +79,14 @@ function locs(xml){return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m=>m[1])
   const offId=JSON.parse(offSignup.body.toString("utf8")).res.id;
   assert(offId,"signed up a real pro while indexing is off");
   const offPage=await get(betaPort,"/p/"+offId,hdr);
-  assert(offPage.headers["x-robots-tag"]==="noindex, nofollow"&&offPage.body.toString("utf8").includes("HomeAndConstructionBusiness"),"a real profile stays noindex until the switch, and keeps its schema");
+  assert(offPage.headers["x-robots-tag"]==="noindex, nofollow"&&!offPage.body.toString("utf8").includes("application/ld+json"),"SW-045: a real profile stays noindex with no schema until the switch");
   assert(!locs((await get(betaPort,"/sitemap.xml",hdr)).body.toString("utf8")).some(u=>u.includes("/p/")),"real profiles are not listed while indexing is off");
 
   const liveHome=await get(livePort,"/",{Host:"other.example","X-Forwarded-Proto":"http"});
   const liveHtml=liveHome.body.toString("utf8");
   assert(!liveHome.headers["x-robots-tag"],"indexable home has no X-Robots-Tag");
   assert(!/name="robots"/.test(liveHtml),"indexable home has no robots meta");
+  assert(liveHtml.includes('"@type":"Organization"')&&liveHtml.includes('"url":"https://sawyer.example"'),"indexable home has the Organization schema on SAWYER_BASE_URL");
   assert(/rel="canonical" href="https:\/\/sawyer\.example\/"/.test(liveHtml)&&/og:url" content="https:\/\/sawyer\.example\/"/.test(liveHtml),"canonical and og:url use SAWYER_BASE_URL");
   const liveRobots=(await get(livePort,"/robots.txt")).body.toString("utf8");
   assert(liveRobots.includes("Allow: /")&&liveRobots.includes("Sitemap: https://sawyer.example/sitemap.xml")&&!/\nDisallow: \/\s*\n/.test(liveRobots),"live robots allows the site");
