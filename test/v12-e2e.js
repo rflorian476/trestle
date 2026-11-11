@@ -90,7 +90,7 @@ await pro.click("#cs12Set");await pro.waitForTimeout(250);await pro.click("#cs12
 // reviews & marketing
 await nav(pro,"/office/grow");ok(/Reviews & marketing/.test(await txt(pro,".otabs, main")),"office has a Reviews & marketing tab");
 const qr=await pro.$("#sh12qr svg");ok(qr!==null,"share QR code renders");const url=await pro.inputValue("#sh12u");ok(/\/p\/c1\?ref=/.test(url),"share link points at the public profile");
-let qrOk=null;if(OUT){try{const el=await pro.$("#sh12qr");await el.screenshot({path:"/tmp/v12qr.png"});const r=execFileSync("python3",["-c","import cv2;i=cv2.imread('/tmp/v12qr.png');i=cv2.copyMakeBorder(i,40,40,40,40,cv2.BORDER_CONSTANT,value=(255,255,255));print(cv2.QRCodeDetector().detectAndDecode(i)[0])"]).toString().trim();qrOk=r.replace(/ref=\w+/,"")===url.replace(/ref=\w+/,"")}catch(e){qrOk=null}}
+let qrOk=null;if(OUT){try{const el=await pro.$("#sh12qr");await el.screenshot({path:"/tmp/v12qr.png"});const r=execFileSync("python3",["-c","import cv2;i=cv2.imread('/tmp/v12qr.png');i=cv2.copyMakeBorder(i,40,40,40,40,cv2.BORDER_CONSTANT,value=(255,255,255));t=cv2.QRCodeDetectorAruco().detectAndDecode(i)[0] or cv2.QRCodeDetector().detectAndDecode(i)[0];print(t)"]).toString().trim();qrOk=r.replace(/ref=\w+/,"")===url.replace(/ref=\w+/,"")}catch(e){qrOk=null}}
 if(qrOk!==null)ok(qrOk,"QR code scans to the share link");
 ok(/\/embed\/c1/.test(await pro.inputValue("#em12c")),"embed code points at the widget");ok(await pro.$("iframe[src*='/embed/c1']")!==null,"widget preview shows");
 const rq0=await pro.evaluate(()=>(DB.rreq12||[]).length);const elig=await pro.$$("#rr12F input[name=job]");ok(elig.length>=1,"finished jobs without a review are listed ("+elig.length+")");
