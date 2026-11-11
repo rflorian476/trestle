@@ -80,7 +80,8 @@ const meOf=(st,id)=>st.users.find(u=>u.id===id);
  /* ---------- SW-006: public snapshot redaction ---------- */
  const chk=(st,label)=>{const ph=st.users.filter(u=>u.phone).length,em=st.users.filter(u=>u.email).length,lc=st.users.filter(u=>u.locations||u.recurring||u.plan||u.favs).length,jc=st.jobs.filter(j=>j.cust).length,jd=st.jobs.filter(j=>j.desc).length,es=st.jobs.filter(j=>j.escrow).length,bw=st.users.filter(u=>(u.busy||[]).some(b=>b.why)).length;
   ok(!ph&&!em&&!lc&&!jc&&!jd&&!es&&!bw,label+": no phones, emails, business addresses, plans, job descriptions, customer ids, escrow, private busy reasons",JSON.stringify({ph,em,lc,jc,jd,es,bw}));
-  ok(st.users.filter(u=>u.role==="contractor").length>=40&&st.jobs.length>=40&&st.reviews.length>=20,label+": public profiles, job cards and reviews still present")};
+  if(st.partial){const pid=st.partial;ok(st.users.some(u=>u.id===pid&&u.role==="contractor")&&(st.reviews||[]).some(r=>r.pro===pid||r.to===pid||r.cid===pid),label+": slim profile state (v16 SW-018) still has that pro and their reviews")}
+  else ok(st.users.filter(u=>u.role==="contractor").length>=40&&st.jobs.length>=40&&st.reviews.length>=20,label+": public profiles, job cards and reviews still present")};
  {chk((await req("/api/state")).j.state,"signed-out /api/state");
   for(const p of ["/","/p/c1","/prices"]){const h=(await req(p)).t;const m=h.match(/<script>window\.__ST=([\s\S]*?)<\/script>/);ok(!!m,"__ST inlined on "+p);if(m)chk(JSON.parse(m[1]),"inlined __ST on "+p)}
   const P=await login("demo-pro@sawyer.test");const sp=(await req("/api/state",{cookie:P.cookie})).j.state;
