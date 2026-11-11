@@ -43,11 +43,22 @@ function hashPw0(pw){const salt=crypto.randomBytes(16).toString("hex");return{sa
 {const d=DB();if(!getKV.get("meta")||!JSON.parse(getKV.get("meta").v).labeled){
   d.users.forEach(u=>{u.demo=true;u.email=u.id+"@demo.invalid"});(d.projects||[]).forEach(p=>{p.demo=true;if(!/^Demo: /.test(p.title))p.title="Demo: "+p.title});(d.jobs||[]).forEach(j=>j.demo=true);
   d.pmsgs=(d.pmsgs||[]);d.me=null;persist();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now());console.log("seeded demo data:",d.users.length,"users")}}
-// demo logins (README): fixed accounts for the seeded homeowner, pro and project manager
+// demo logins (README): fixed accounts for the seeded homeowner, pro and project manager.
+// The shared password is only for those demo people. Staff is separate: on a public host it stays
+// disabled unless STAFF_DEMO_PASSWORD is set, and it never keeps the published demo password.
 const DEMO_PW=BRAND.slug+"-demo-2026";
-for(const[uid_,email]of[["u1","demo-homeowner@"+BRAND.slug+".test"],["c1","demo-pro@"+BRAND.slug+".test"],["m1","demo-pm@"+BRAND.slug+".test"],["c26","demo-remodeler@"+BRAND.slug+".test"],["b1","demo-business@"+BRAND.slug+".test"],["tv1","demo-traveler@"+BRAND.slug+".test"],["a1","demo-trust@"+BRAND.slug+".test"]]){
+const isPublicHost=require("./lib/auth.js").isPublicHost;
+for(const[uid_,email]of[["u1","demo-homeowner@"+BRAND.slug+".test"],["c1","demo-pro@"+BRAND.slug+".test"],["m1","demo-pm@"+BRAND.slug+".test"],["c26","demo-remodeler@"+BRAND.slug+".test"],["b1","demo-business@"+BRAND.slug+".test"],["tv1","demo-traveler@"+BRAND.slug+".test"]]){
  const u=DB().users.find(x=>x.id===uid_);if(!u||db.prepare("SELECT 1 FROM accounts WHERE uid=? OR email=?").get(uid_,email))continue;
  const h=hashPw0(DEMO_PW);db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created) VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}
+{const uid_="a1",email="demo-trust@"+BRAND.slug+".test",u=DB().users.find(x=>x.id===uid_);
+ if(u){const row=db.prepare("SELECT uid FROM accounts WHERE uid=? OR email=?").get(uid_,email);
+  const pw=isPublicHost()?String(process.env.STAFF_DEMO_PASSWORD||"").trim():DEMO_PW;
+  // Unset on a public host: claim the email with a random secret so the shared demo password cannot open it.
+  const secret=pw||crypto.randomBytes(24).toString("hex");
+  if(!row){if(pw||isPublicHost()){const h=hashPw0(secret);db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created) VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}}
+  else if(isPublicHost()){const h=hashPw0(secret);db.prepare("UPDATE accounts SET email=?,salt=?,hash=? WHERE uid=?").run(email,h.salt,h.hash,row.uid);if(u.email!==email){u.email=email;persist()}}}}
+function demoSharedOk(uid){const u=DB().users.find(x=>x.id===uid);return !!(u&&u.demo&&!(u.staff&&isPublicHost()))}
 // v5: travel work collection added to existing databases
 if(!getKV.get("tcalls")){if(!Array.isArray(DB().tcalls)&&ctx.__v5)ctx.__v5.seedTravel();persist();console.log("travel work seeded:",(DB().tcalls||[]).length,"calls")}
 // v12: consults, review requests, reports and the trust account added to existing databases
@@ -95,6 +106,11 @@ function stripPriv(args){for(const a of args)if(a&&typeof a==="object"&&!Array.i
 
 const PRO_PRIVATE=["email","sharedWith","credits","coiReqs","cois","flags","favs","plan","planStatus","planEnds","paidThru","tsaved","talerts","trip","aprefs","focus8","crew8","nprefs11","home12","rrTpl12","locations","recurring","saved","autoRem9","needsSetup","verifyPending","emailHidden","staff","admin"];
 const PUBLIC_USER=["id","role","acct","name","biz","zip","bio","demo","joined","created","trav","avatar","photo"];
+// A project is fully visible to its PM, crew, applicants, and to signed-in pros (they apply from the public board).
+function onProject(p,uid){if(!uid||!p)return false;if(p.pm===uid)return true;return(p.roles||[]).some(r=>(r.filled||[]).includes(uid)||(r.done||[]).includes(uid)||(r.apps||[]).some(a=>a&&a.cid===uid)||(r.invites||[]).some(i=>i&&(i.cid===uid||i===uid)))}
+// Signed-out (and other non-parties): no description, no PM id, no applicant notes. Demo rows keep the town so the board still browses; a real project's ZIP does not.
+function pubProject(p){const c=Object.assign({},p);c.desc="";c.notes="";c.pm=null;if(!p.demo)c.zip="";c.roles=(p.roles||[]).map(r=>{const x=Object.assign({},r);x.apps=[];x.invites=[];x.done=[];x.note="";return x});return c}
+function pubLodging(l){const c=Object.assign({},l);c.notes="";if(!l.demo){c.loc="";c.near=""}return c}
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
 function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===uid):[];const crewOf=p=>(p.roles||[]).flatMap(r=>r.filled||[]);
  const rc=ctx.__v2&&ctx.__v2.respCalc;const staff=!!(uid&&(d.users.find(u=>u.id===uid)||{}).staff);
@@ -118,7 +134,7 @@ function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===ui
  // per-review token (not linkable across reviews or to users[]) plus the short display name ("Pat H.") the card shows.
  const uName=new Map(d.users.map(u=>[u.id,u.name]));const shortNm=n=>{const w=String(n||"").trim().split(/\s+/).filter(Boolean);return w.length?w[0]+(w[1]?" "+w[1][0]+".":""):"Customer"};
  const reviews=(d.reviews||[]).map(r=>(staff||(uid&&(r.uid===uid||r.cid===uid)))?r:Object.assign({},r,{uid:"rv-"+r.id,an:shortNm(uName.get(r.uid))}));
- return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:d.projects||[],pmsgs,tcalls:(d.tcalls||[]).map(c=>c.by===uid?c:Object.assign({},c,{napps:(c.apps||[]).filter(a=>a.status!=="withdrawn").length,apps:(c.apps||[]).filter(a=>a.status==="hired"||(uid&&a.uid===uid)).map(a=>a.uid===uid?a:{uid:a.uid,status:a.status,date:a.date}),invites:(c.invites||[]).filter(x=>x===uid)})),bills:uid?(d.bills||[]).filter(b=>b.by===uid||(b.cuid===uid&&b.status!=="draft")):[],bcust:own(d.bcust),bdocs:own(d.bdocs),ledger:own(d.ledger),tsheets:own(d.tsheets),lodging:d.lodging||[],creviews:d.creviews||[],visits:uid?(d.visits||[]).filter(v=>v.by===uid||v.cuid===uid):[],cases:uid?(d.cases||[]).filter(c=>c.cu===uid||c.pro===uid):[],crew:own(d.crew),refs:(d.refs||[]).filter(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))).map(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))?r:null),consults:(d.consults||[]).map(c=>uid&&(c.pro===uid||c.cu===uid)?c:(c.status==="requested"||c.status==="confirmed")?{id:c.id,pro:c.pro,date:c.date,time:c.time,status:c.status}:null).filter(Boolean),rreq12:uid?(d.rreq12||[]).filter(r=>r.by===uid||r.cu===uid):[],reports12:staff?(d.reports12||[]):uid?(d.reports12||[]).filter(r=>r.by===uid):[],rmrev12:staff?(d.rmrev12||[]):[],me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
+ return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:(d.projects||[]).map(p=>(uid&&(isPro||onProject(p,uid)))?p:pubProject(p)),pmsgs,tcalls:(d.tcalls||[]).map(c=>c.by===uid?c:Object.assign({},c,{napps:(c.apps||[]).filter(a=>a.status!=="withdrawn").length,apps:(c.apps||[]).filter(a=>a.status==="hired"||(uid&&a.uid===uid)).map(a=>a.uid===uid?a:{uid:a.uid,status:a.status,date:a.date}),invites:(c.invites||[]).filter(x=>x===uid)})),bills:uid?(d.bills||[]).filter(b=>b.by===uid||(b.cuid===uid&&b.status!=="draft")):[],bcust:own(d.bcust),bdocs:own(d.bdocs),ledger:own(d.ledger),tsheets:own(d.tsheets),lodging:(d.lodging||[]).map(l=>uid?l:pubLodging(l)),creviews:d.creviews||[],visits:uid?(d.visits||[]).filter(v=>v.by===uid||v.cuid===uid):[],cases:uid?(d.cases||[]).filter(c=>c.cu===uid||c.pro===uid):[],crew:own(d.crew),refs:(d.refs||[]).filter(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))).map(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))?r:null),consults:(d.consults||[]).map(c=>uid&&(c.pro===uid||c.cu===uid)?c:(c.status==="requested"||c.status==="confirmed")?{id:c.id,pro:c.pro,date:c.date,time:c.time,status:c.status}:null).filter(Boolean),rreq12:uid?(d.rreq12||[]).filter(r=>r.by===uid||r.cu===uid):[],reports12:staff?(d.reports12||[]):uid?(d.reports12||[]).filter(r=>r.by===uid):[],rmrev12:staff?(d.rmrev12||[]):[],me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
 
 function run(uid,name,args){const d=DB();d.me=uid;let r;try{r=api.A[name](...args)}catch(e){r={ok:false,msg:"That didn't work. The item may have changed, refresh and try again."}}finally{DB().me=null}if(dirty)persist();return r}
 
@@ -224,7 +240,12 @@ function createUser({role,name,email,phone}){const d=DB();d.me=null;const nm=Str
  db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created,phone) VALUES(?,?,?,?,?,?,?)").run(id,em,"","",u.role,Date.now(),phone||null);persist();return{ok:true,uid:id}}
 // v13 SW-033: sessions started by a one-time code in the last 15 minutes may set a new password without the old one (forgot password).
 const CODE_SESS=new Map();const codeFresh=req=>{const t=cookies(req).swsid,e=t&&CODE_SESS.get(t);return !!(e&&e>Date.now())};
-const AUTH=require("./lib/auth.js")({onCodeLogin:t=>{CODE_SESS.set(t,Date.now()+15*60e3);if(CODE_SESS.size>5000)for(const[k,v]of CODE_SESS)if(v<Date.now())CODE_SESS.delete(k)},db,limited,ip:r=>ip(r),newSession,setCookie,sessionUid,send,createUser,SESS_DAYS,brand:BRAND,html:htmlPage});
+const makeAuth=require("./lib/auth.js");
+function emailIsReal(email){const em=String(email||"").trim().toLowerCase();const row=db.prepare("SELECT uid FROM accounts WHERE email=?").get(em);
+ if(row){const u=DB().users.find(x=>x.id===row.uid);return !(u&&u.demo&&!u.staff)}
+ const u=DB().users.find(x=>(x.email||"").toLowerCase()===em);return !!(u&&(!u.demo||u.staff))}
+function demoMayAdopt(uid){const u=DB().users.find(x=>x.id===uid);return !!(u&&u.demo&&!u.staff)}
+const AUTH=makeAuth({onCodeLogin:t=>{CODE_SESS.set(t,Date.now()+15*60e3);if(CODE_SESS.size>5000)for(const[k,v]of CODE_SESS)if(v<Date.now())CODE_SESS.delete(k)},db,limited,ip:r=>ip(r),newSession,setCookie,sessionUid,send,createUser,SESS_DAYS,brand:BRAND,html:htmlPage,emailIsReal,demoMayAdopt,markDemo:uid=>{const u=DB().users.find(x=>x.id===uid);if(u&&!u.demo){u.demo=true;persist()}}});
 function formBody(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>16e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>ok(Object.fromEntries(new URLSearchParams(Buffer.concat(c).toString()))))})}
 // v9 perf: brotli for big text. Fast level now, max level computed off-thread and cached for repeat bodies (the signed-out home page).
 const BRC=new Map();function brot(zl,b){const buf=Buffer.isBuffer(b)?b:Buffer.from(b);if(buf.length<65536)return zl.brotliCompressSync(buf,{params:{[zl.constants.BROTLI_PARAM_QUALITY]:5}});
@@ -296,7 +317,8 @@ const server=http.createServer(async(req,res)=>{
   const kA="loginfail:"+ip(req)+"|"+email,kI="loginfail:"+ip(req),W=15*60e3;
   if(overLimit(kA,+process.env.LOGIN_RATE_MAX||10,W)||overLimit(kI,+process.env.LOGIN_IP_MAX||50,W))return send(res,429,{error:"Too many wrong passwords. Try again in 15 minutes."},{"Retry-After":"900"});
   const a=db.prepare("SELECT * FROM accounts WHERE email=?").get(email);
-  if(!a||!a.hash||!checkPw(pw,a.salt,a.hash)){addHit(kA);addHit(kI);return send(res,401,{error:"Wrong email or password."})}
+  // The published demo password only opens demo accounts, and never the staff account on a public host.
+  if(!a||!a.hash||!checkPw(pw,a.salt,a.hash)||(pw===DEMO_PW&&!demoSharedOk(a.uid))){addHit(kA);addHit(kI);return send(res,401,{error:"Wrong email or password."})}
   hits.delete(kA);
   const t=newSession(a.uid);setCookie(res,req,t,SESS_DAYS*86400);return send(res,200,{ok:true,state:snapshot(a.uid)})}
  // staff-only trust action: mark a pro's license + insurance as checked. Off unless ADMIN_TOKEN is set on the server.
@@ -312,6 +334,7 @@ const server=http.createServer(async(req,res)=>{
   if(p==="/api/passkey/delete")return send(res,200,{ok:AUTH.pkDelete(uid,b.id)});
   // SW-032: changing an existing password needs the current one (a session cookie alone isn't enough), and signs out other sessions.
   if(p==="/api/account/password"){const pw=String(b.password||"");if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});
+   if(pw===DEMO_PW&&!demoSharedOk(uid))return send(res,400,{error:"Choose a different password."});
    const acc=db.prepare("SELECT salt,hash FROM accounts WHERE uid=?").get(uid)||{};const kP="pwfail:"+uid;
    const reset=codeFresh(req)&&!b.current;if(acc.hash&&!reset){if(overLimit(kP,5,15*60e3))return send(res,429,{error:"Too many wrong passwords. Try again in 15 minutes."},{"Retry-After":"900"});
     if(!checkPw(String(b.current||""),acc.salt,acc.hash)){addHit(kP);return send(res,403,{error:"Your current password isn't right."})}hits.delete(kP)}
@@ -337,6 +360,7 @@ const server=http.createServer(async(req,res)=>{
   const email=String(d.email||"").trim().toLowerCase();
   if(!EMAIL.test(email))return send(res,400,{error:"Enter a valid email."});
   if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});
+  if(pw===DEMO_PW)return send(res,400,{error:"Choose a different password."});
   if(!String(d.name||"").trim()||String(d.name).length>80)return send(res,400,{error:"Enter your name (80 characters max)."});
   if(db.prepare("SELECT 1 FROM accounts WHERE email=?").get(email)||DB().users.some(u=>(u.email||"").toLowerCase()===email))return send(res,409,{error:"That email already has an account. Log in instead."});
   d.email=email;let r;DB().me=null;
