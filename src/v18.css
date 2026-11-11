@@ -8,3 +8,12 @@
 .dp8-l li.s-done{opacity:1}
 .dp8-l li.s-done small,.dp8-l li.s-done .muted{color:#5B6370}
 .b7.b7-mute{background:#eef0f4;color:#3F4452}
+/* v18: SW-036 long words and URLs wrap inside cards, bubbles, tables and headings instead of pushing the page sideways */
+#app :is(h1,h2,h3,h4,p,li,blockquote,dd,td,th,figcaption,small,label,.bubble,.msg){overflow-wrap:break-word}
+#app :is(h1,h2,h3,.bubble,.msg,blockquote){min-width:0}
+.v18-cnt{display:block;margin-top:4px;font-size:12.5px;color:#4F5866;text-align:right}
+.v18-cnt.v18-full{color:#9B2C1F;font-weight:600}
+/* v18: the job chip in a conversation fits a 390px phone (title clips, the quote amount stays visible) */
+.mc8-i{max-width:100%}
+.mc8-i span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.mc8-i em{flex:none}

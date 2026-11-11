@@ -21,6 +21,7 @@ const BRAND=require("./brand.json");const APP_VERSION=require("./package.json").
 const UPLOADS=path.join(DATA,"uploads");fs.mkdirSync(UPLOADS,{recursive:true});
 const MAX_UPLOAD=5*1024*1024;
 const IMGSAFE=require("./lib/imgsafe.js");
+const LIMITS=require("./lib/limits.js");
 
 /* ---- shared business rules: the same A.* actions the UI was built on, run server-side ---- */
 let VER=Date.now(),allowAuto=false,dirty=false,PUB_ST={t:0,s:"",v:0};
@@ -402,6 +403,7 @@ const server=http.createServer(async(req,res)=>{
   if(pw===DEMO_PW)return send(res,400,{error:"Choose a different password."});
   if(!String(d.name||"").trim()||String(d.name).length>80)return send(res,400,{error:"Enter your name (80 characters max)."});
   if(db.prepare("SELECT 1 FROM accounts WHERE email=?").get(email)||DB().users.some(u=>(u.email||"").toLowerCase()===email))return send(res,409,{error:"That email already has an account. Log in instead."});
+  {const lim=LIMITS.check("signup",[d]);if(lim)return send(res,400,{error:lim.msg,field:lim.field,max:lim.max})}
   d.email=email;let r;DB().me=null;
   try{r=kind==="customer"?api.A.signupCustomer(String(d.name),email,String(d.zip||"")):kind==="pm"?api.A.signupPM(d):api.A.signupPro(d)}catch(e){r={ok:false,msg:"Sign-up failed, check the form."}}
   const newId=DB().me;DB().me=null;
@@ -421,6 +423,7 @@ const server=http.createServer(async(req,res)=>{
   if(name==="saveEstimate"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
   if(name==="updatePro"){const me_=DB().users.find(u=>u.id===uid);if(!me_||me_.role!=="contractor")return send(res,403,{error:"Only pro accounts have a pro profile",res:{ok:false,msg:"Only pro accounts have a pro profile"},state:snapshot(uid)});args[0]=pickPro(args[0]);args.length=1}
   stripPriv(args);
+  {const lim=LIMITS.check(name,args);if(lim)return send(res,400,{error:lim.msg,field:lim.field,max:lim.max,res:{ok:false,msg:lim.msg},state:snapshot(uid)})}
   if(name==="hire"){const cand=DB().users.find(u=>u.id===args[1]);if(!cand||cand.role!=="contractor")return send(res,400,{error:"Pick a pro who quoted",res:{ok:false,msg:"Pick a pro who quoted"},state:snapshot(uid)})}
   // v13 (QA SW-037): a portfolio is only cleared by an explicit empty list; if every submitted photo is rejected, nothing is written.
   if(name==="setGal12"){if(!Array.isArray(args[0]))return send(res,200,{res:{ok:false,msg:"Send a list of photos"},state:snapshot(uid)});const gu=DB().users.find(u=>u.id===uid)||{};const prev=new Set((gu.gal12||[]).map(x=>x.src));const n=args[0].length;
