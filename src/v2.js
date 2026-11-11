@@ -142,8 +142,9 @@ Object.assign(TITLES,{estimate:"Photo-to-quote estimate",compare:"Compare bids"}
 const MOCKTAG=`<span class="mocktag" role="note">${I("lock",12)} Test mode · simulated escrow · no real money moves</span>`;
 const rapidChip=cid=>isRapid(cid)?`<span class="badge b-rapid">${I("zap",12)}Rapid responder</span>`:"";
 const respLine=cid=>{const r=respStats(cid);return r.n?`Median first reply <b>${mins(r.med)}</b> <span class="muted">(${r.n} msgs & leads)</span>`:`<span class="muted">No response history yet</span>`};
-async function v2upload(file){if(!file)throw Error("Choose a photo");if(!/^image\/(jpeg|png|webp)$/.test(file.type))throw Error("JPEG, PNG or WebP images only");if(file.size>5*1024*1024)throw Error("Photos must be 5 MB or smaller");
- const r=await fetch("/api/upload",{method:"POST",headers:{"Content-Type":file.type},body:file,credentials:"same-origin"});const j=await r.json().catch(()=>({error:"Upload failed"}));if(!j.ok)throw Error(j.error||"Upload failed");return j.url}
+async function v2upload(file,opts){if(!file)throw Error("Choose a photo");if(!/^image\/(jpeg|png|webp)$/.test(file.type))throw Error("JPEG, PNG or WebP images only");if(file.size>5*1024*1024)throw Error("Photos must be 5 MB or smaller");
+ const headers={"Content-Type":file.type};if(opts&&opts.kind==="coi")headers["x-sawyer-upload"]="coi";
+ const r=await fetch("/api/upload",{method:"POST",headers,body:file,credentials:"same-origin"});const j=await r.json().catch(()=>({error:"Upload failed"}));if(!j.ok)throw Error(j.error||"Upload failed");return j.url}
 function v2pull(){try{const r=__xhr("GET","/api/state");if(r&&r.state)__applyState(r.state)}catch(e){}}
 
 /* ---------- PHOTO-TO-QUOTE ---------- */

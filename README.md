@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.2.0
+# Sawyer (beta) — v2.3.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.2.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.3.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -21,6 +21,18 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v20: real sign-in emails through Resend
+Builds on v19 (live as `bf75b1f`).
+- **Email delivery.** When `RESEND_API_KEY` is set, sign-in codes, forgot-password codes and magic links are sent as a branded plain+HTML email (Linen & Navy, Sawyer wordmark, no hosted images). The code and link expire in 10 minutes. The API never returns the code or link on a public host (`NODE_ENV=production` or `RENDER`). Locally, test mode still shows the code when no key is set.
+- **From address.** `MAIL_FROM` defaults to `Sawyer <onboarding@resend.dev>`. Until a domain is verified on Resend, Resend only delivers to the account owner's email. A 403 from Resend becomes HTTP 503 with "Email delivery isn't fully enabled yet." and is logged server-side (the key and the code are never logged). Other provider failures are a friendly 502.
+- **Text messages.** SMS is still unavailable on the public host. The response is 503 and tells the person to use email instead.
+- **Verified reminders.** The 60 / 30 / 7 / 0-day license and insurance notices (and the "badge came off" notice) are also emailed when a provider is configured and the account has a real email. Demo addresses (`@sawyer.test`, `@demo.invalid`, `@phone.invalid`) are skipped. A failed reminder email is logged and does not break the in-app notice.
+- **COI uploads** are marked `kind=coi` at POST time (`x-sawyer-upload: coi` or `?kind=coi` on `/api/upload`), so the file is served at `/api/coi/…` immediately and `/u/…` is 404. `submitVerify19` still rewrites any leftover `/u/` path.
+- **Pretty in-app hrefs (SW-016)** stay deferred. Typed `/prices`, `/find`, `/job/j1` and `/p/:id` already open the right view. Changing `href()` from `#/` routes would break current suites and the hash router, so it is not low-risk.
+- **Env (also listed in `render.yaml`):** `RESEND_API_KEY` (secret, `sync: false`), `MAIL_FROM`. `RESEND_API_URL` is a local test hook that is ignored when `NODE_ENV=production`.
+- Tests: `node test/v20-e2e.js` starts a mock Resend server and is part of `test/run-all.sh`.
+
 ## v19: a real Verified badge, honest job photos, and a clearer path to hire
 Builds on v18 (live as `b184c44`).
 - **Public snapshot:** signed-out `/api/state` no longer lists deleted "Former Sawyer member" rows, so throwaway account deletes don't accumulate in the public payload. People who share a job, review, message thread or consult (and staff) still see the anonymized card.
@@ -33,7 +45,7 @@ Builds on v18 (live as `b184c44`).
 - **SW-050:** the Verified badge stays on through the printed expiry date and comes off at the end of that day (the next calendar day). Reminders fire at 60, 30 and 7 days and on the expiry date ("expires today"). A `TEST_NOW` env var can shift the clock in non-production runs only.
 - **SW-051:** hiring (including from compare) notifies the other bidders that the job was filled, without naming the winner or the price.
 - **SW-052:** compare bid columns are plain articles, not `role="row"` outside a grid.
-- Email and SMS provider setup is still out of scope (needs the owner). Forgot-password and sign-in codes correctly return 503 on a public host until a provider is configured.
+- Email is now delivered through Resend when `RESEND_API_KEY` is set (v20). SMS is still not configured; the public host tells people to use email.
 - Tests: `node test/v19-e2e.js http://localhost:8899 shots/v19` (needs `playwright` on `NODE_PATH`). It's part of `test/run-all.sh`.
 
 ## v18: QA leftovers, field limits, Your data, a real Change password dialog
@@ -228,7 +240,7 @@ tail -f logs/server.log logs/tunnel.log
 ## Limitations
 - **Scale:** one Node process holds the whole dataset in memory. Each SQLite collection is stored as a JSON document. That's fine for a beta with hundreds of users, but not for real scale.
 - **Live updates:** polling every 4 seconds, not websockets. Actions use synchronous XHR so the original UI code stays unchanged. Chrome logs a deprecation *warning* for this, not an error.
-- **Accounts:** no email verification yet. Password reset (one-time code) and account deletion exist (v13).
+- **Accounts:** password reset (one-time code) and account deletion exist (v13). On a public host with `RESEND_API_KEY` set, the code is emailed (v20). There is still no separate "confirm your email" step at sign-up.
 - **Profile views:** the per-day dedupe set is in memory, so a server restart can count a returning visitor once more that day.
 - **Hosting:** if the box restarts, run `./start.sh` again. There is no systemd or pm2 boot hook.
 
@@ -248,6 +260,12 @@ This repo is deploy-ready, and nothing has been pushed anywhere yet.
    - The first request after an idle period takes about 30–60 seconds while the service wakes up.
 5. `public/index.html` and `app-logic.js` are committed build outputs. To regenerate them from the design source, run `npm run rebuild-ui`; it is skipped when `../ultimate` is missing.
 
+## Email (Resend)
+- `RESEND_API_KEY` — required to send mail. Set it in the Render dashboard; `render.yaml` lists it as `sync: false` so a Blueprint sync will not overwrite it.
+- `MAIL_FROM` — defaults to `Sawyer <onboarding@resend.dev>`. After you verify a domain on Resend, change this to an address on that domain (for example `Sawyer <hello@your-domain>`).
+- `RESEND_API_URL` — local tests only. Ignored when `NODE_ENV=production`. Never point this at an untrusted host.
+- Until the domain is verified, Resend only delivers to the account owner. Recipients get a friendly 503: "Email delivery isn't fully enabled yet."
+
 ## Box-only env
 - **`run-server.sh`:** binds to 127.0.0.1:8787.
 - **Defaults:** `HOST=0.0.0.0`, `PORT=8787`, `DATA_DIR=./data` (next to `server.js`).
@@ -261,7 +279,7 @@ This repo is deploy-ready, and nothing has been pushed anywhere yet.
 3. **Domain:** buy one (about $10–12/yr, e.g. Cloudflare Registrar) and add a CNAME to the Render or Fly hostname. HTTPS is automatic.
 4. **Before a public launch:**
    - Real Stripe Checkout (hosted, so no card data touches the server).
-   - Email verification and password reset (Postmark or Resend).
+   - Password reset and sign-in codes are emailed through Resend when `RESEND_API_KEY` is set (v20). A verified sending domain is still needed so mail can go to addresses other than the Resend account owner. SMS is still outstanding.
    - Move to Postgres or proper SQLite tables.
    - Backups.
    - Terms and privacy pages.

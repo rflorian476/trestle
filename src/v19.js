@@ -157,7 +157,7 @@ VIEWS.verify=()=>{const m=me();if(!m)return VIEWS.signup(null,{next:"/verify"});
  return`<section class="page narrow v19-verify"><div class="pagehead"><h1>Get Verified</h1><p class="muted">A person on Sawyer's Trust team reviews your state license and certificate of insurance. The badge then shows what was checked and when, and it comes off when either document expires.</p></div>${v19PacketForm(m)}</section>`};
 AFTER.verify=()=>{const f=document.getElementById("v19vf");if(!f)return;
  f.onsubmit=async e=>{e.preventDefault();const b=document.getElementById("v19vGo");b.disabled=true;try{const o=readForm(f);const file=(document.getElementById("v19-coi")||{}).files&&document.getElementById("v19-coi").files[0];
-  if(file){if(typeof v2upload!=="function")throw Error("Photo upload isn't available");o.coiFile=await v2upload(file)}else o.coiFile=(me()&&me().coiFile)||"";
+  if(file){if(typeof v2upload!=="function")throw Error("Photo upload isn't available");o.coiFile=await v2upload(file,{kind:"coi"})}else o.coiFile=(me()&&me().coiFile)||"";
   act(A.submitVerify19(o),()=>go("verify"))}catch(err){toast(err.message||"Upload failed","err");b.disabled=false}}};
 
 function v19ModHtml(m,q){const pending=(DB.users||[]).filter(u=>u.role==="contractor"&&u.verifyPending).sort((a,b)=>(a.verifySubmitted||0)-(b.verifySubmitted||0));

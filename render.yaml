@@ -19,3 +19,9 @@ services:
         value: "0"
       - key: SAWYER_BASE_URL
         value: https://trestle-twjo.onrender.com
+      # Set the value in the Render dashboard. Blueprint sync will not overwrite it.
+      # Until a domain is verified on Resend, mail only delivers to the Resend account owner.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        value: "Sawyer <onboarding@resend.dev>"

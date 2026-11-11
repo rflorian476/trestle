@@ -24,6 +24,7 @@ try{db.exec("ALTER TABLE uploads ADD COLUMN kind TEXT NOT NULL DEFAULT 'photo'")
 const MAX_UPLOAD=5*1024*1024;
 const IMGSAFE=require("./lib/imgsafe.js");
 const LIMITS=require("./lib/limits.js");
+const mailer=require("./lib/mailer");
 
 /* ---- shared business rules: the same A.* actions the UI was built on, run server-side ---- */
 let VER=Date.now(),allowAuto=false,dirty=false,PUB_ST={t:0,s:"",v:0};
@@ -328,6 +329,23 @@ function emailIsReal(email){const em=String(email||"").trim().toLowerCase();if(!
  const u=DB().users.find(x=>x&&x.role!=="deleted"&&(x.email||"").toLowerCase()===em);return !!(u&&(!u.demo||u.staff))}
 function demoMayAdopt(uid){const u=DB().users.find(x=>x.id===uid);return !!(u&&u.demo&&!u.staff)}
 const AUTH=makeAuth({onCodeLogin:t=>{CODE_SESS.set(t,Date.now()+15*60e3);if(CODE_SESS.size>5000)for(const[k,v]of CODE_SESS)if(v<Date.now())CODE_SESS.delete(k)},db,limited,ip:r=>ip(r),newSession,setCookie,sessionUid,send,createUser,SESS_DAYS,brand:BRAND,html:htmlPage,emailIsReal,demoMayAdopt,markDemo:uid=>{const u=DB().users.find(x=>x.id===uid);if(u&&!u.demo){u.demo=true;persist()}}});
+function mailOrigin(){return String(process.env.SAWYER_BASE_URL||process.env.PUBLIC_URL||"").trim().replace(/\/$/,"")}
+function notifIds(){return new Set((DB().notifs||[]).map(n=>n.id))}
+async function deliverVerifyEmails(before){
+ if(!mailer.configured()||!before)return;
+ const fresh=(DB().notifs||[]).filter(n=>n&&!before.has(n.id)&&n.link==="verify");
+ const origin=mailOrigin();
+ for(const n of fresh){
+  try{
+   const row=db.prepare("SELECT email FROM accounts WHERE uid=?").get(n.to);
+   const em=row&&row.email;if(!mailer.mailable(em))continue;
+   const heading=/expired|comes off|came off/i.test(n.text||"")?"Your Sawyer Verified badge":"A reminder from Sawyer";
+   const mail=mailer.noticeEmail({brand:BRAND.name,heading,body:n.text,ctaUrl:origin?origin+"/#/verify":"",ctaLabel:"Renew on Sawyer"});
+   await mailer.send({to:em,subject:mail.subject,text:mail.text,html:mail.html});
+  }catch(e){console.error("mailer: reminder not sent")}
+ }
+}
+
 function formBody(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>16e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>ok(Object.fromEntries(new URLSearchParams(Buffer.concat(c).toString()))))})}
 // v9 perf: brotli for big text. Fast level now, max level computed off-thread and cached for repeat bodies (the signed-out home page).
 const BRC=new Map();function brot(zl,b){const buf=Buffer.isBuffer(b)?b:Buffer.from(b);if(buf.length<65536)return zl.brotliCompressSync(buf,{params:{[zl.constants.BROTLI_PARAM_QUALITY]:5}});
@@ -503,9 +521,11 @@ const server=http.createServer(async(req,res)=>{
   // SW-041: a missing recipient is a normal "doesn't exist" error, not the cap. Check the account exists before counting or refusing a new thread.
   let newThread=false;if(name==="send"){const to=String(args[0]||"");const exists=!!(to&&DB().users.find(u=>u.id===to));newThread=exists&&to!==uid&&!DB().msgs.some(x=>(x.a===uid&&x.b===to)||(x.a===to&&x.b===uid));
    if(newThread){const now=Date.now(),k="newthread:"+uid,a=(hits.get(k)||[]).filter(t=>now-t<864e5);hits.set(k,a);if(a.length>=NEW_THREAD_MAX*RATE_X)return send(res,429,{error:"You've started a lot of new conversations today. Reply in your existing threads, or try again tomorrow.",res:{ok:false,msg:"You've started a lot of new conversations today. Reply in your existing threads, or try again tomorrow."},state:snapshot(uid)})}}
+  const mailBefore=(name==="sweepVerify19"||name==="sweep9"||name==="modVerify19")?notifIds():null;
   const r=run(uid,name,args);allowAuto=false;
   if(newThread&&r&&r.ok!==false&&DB().msgs.some(x=>x.from===uid&&(x.a===String(args[0])||x.b===String(args[0]))))hits.get("newthread:"+uid).push(Date.now());
   if(name==="submitVerify19"&&r&&r.ok!==false){const me_=DB().users.find(u=>u.id===uid);const nm=uploadName(me_&&me_.coiFile);if(nm){markCoi(nm);me_.coiFile="/api/coi/"+nm;persist()}}
+  if(mailBefore)await deliverVerifyEmails(mailBefore);
   return send(res,200,{res:r===undefined?{ok:true}:r,state:snapshot(uid)})}
  return send(res,404,{error:"Not found"});
  }catch(e){console.error(e);return send(res,400,{error:"Bad request"})}
@@ -514,9 +534,11 @@ const server=http.createServer(async(req,res)=>{
 // v16: expiry notices for licenses, policies, permits and vendor COIs go out for every account that has a dated record,
 // not only for pros with payment reminders on, so nobody has to open the app to hear their insurance is about to lapse.
 function sweepAll(){try{const d=DB();const dated=new Set((d.bdocs||[]).filter(x=>x&&x.exp).map(x=>x.by));
+ const mailBefore=notifIds();
  for(const u of (d.users||[]).slice()){const pro=u.role==="contractor"&&(u.autoRem9||(d.bills||[]).some(b=>b.by===u.id&&b.rec9&&b.rec9.on));
   const has=pro||dated.has(u.id)||(u.cois||[]).some(c=>c&&c.exp);if(has)run(u.id,"sweep9",[]);
-  if(u.role==="contractor"&&(u.verified||u.verifyPending||u.licExp||u.insExp))run(u.id,"sweepVerify19",[])}}catch(e){console.error("sweep",e.message)}}
+  if(u.role==="contractor"&&(u.verified||u.verifyPending||u.licExp||u.insExp))run(u.id,"sweepVerify19",[])}
+ deliverVerifyEmails(mailBefore).catch(()=>console.error("mailer: reminder batch failed"))}catch(e){console.error("sweep",e.message)}}
 setTimeout(sweepAll,5000).unref();setInterval(sweepAll,+process.env.SWEEP_MS||3600e3).unref();
 setInterval(()=>{db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());const now=Date.now();for(const[k,a]of hits)if(!a.some(t=>now-t<(k.startsWith("newthread:")?864e5:3600e3)))hits.delete(k)},3600e3).unref();
 server.listen(PORT,HOST,()=>{console.log(`${BRAND.name} live on http://${HOST}:${PORT} (data: ${DATA})`);
