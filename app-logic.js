@@ -3669,7 +3669,8 @@ if(typeof AFTER!=="undefined"&&typeof document!=="undefined"&&typeof fetch==="fu
    them while typing. A field gets a maxlength the first time it's focused (if it has none), and a quiet counter appears
    once it's 80% full. Free-text boxes without a known name get the message limit (2,000). */
 const V18LIM={name:80,biz:80,company:80,first:40,last:40,title:120,headline:120,tagline:120,trade:60,phone:30,zip:10,email:254,city:80,loc:80,license:120,insurance:160,rate:40,budget:60,cap:120,bio:1500,about:1500,desc:2000,description:2000,note:1000,notes:2000,reason:1000,text:2000,body:2000,msg:2000};
-function v18Max(el){if(el.maxLength>0)return el.maxLength;const n=String(el.name||"").toLowerCase();if(Object.prototype.hasOwnProperty.call(V18LIM,n))return V18LIM[n];return el.tagName==="TEXTAREA"?2000:0}
+const V18ID={mtxt:2000};/* the chat composer */
+function v18Max(el){if(el.maxLength>0)return el.maxLength;if(V18ID[el.id])return V18ID[el.id];if(el.name==="t"&&el.closest&&el.closest("form[data-reply]"))return 1000;const n=String(el.name||"").toLowerCase();if(Object.prototype.hasOwnProperty.call(V18LIM,n))return V18LIM[n];return el.tagName==="TEXTAREA"?2000:0}
 function v18Count(el){const max=el.maxLength;if(!(max>0))return;let c=el.nextElementSibling&&el.nextElementSibling.classList&&el.nextElementSibling.classList.contains("v18-cnt")?el.nextElementSibling:null;
  const n=el.value.length,show=n>=Math.floor(max*.8);if(!show){if(c)c.hidden=true;return}
  if(!c){c=document.createElement("small");c.className="v18-cnt";c.setAttribute("aria-live","polite");el.insertAdjacentElement("afterend",c)}
