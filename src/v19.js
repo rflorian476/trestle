@@ -5,11 +5,18 @@ if(typeof TITLES!=="undefined")Object.assign(TITLES,{verify:"Get Verified",compa
 
 const V19_STATES={"AL":"Alabama","AK":"Alaska","AZ":"Arizona","AR":"Arkansas","CA":"California","CO":"Colorado","CT":"Connecticut","DE":"Delaware","DC":"District of Columbia","FL":"Florida","GA":"Georgia","HI":"Hawaii","ID":"Idaho","IL":"Illinois","IN":"Indiana","IA":"Iowa","KS":"Kansas","KY":"Kentucky","LA":"Louisiana","ME":"Maine","MD":"Maryland","MA":"Massachusetts","MI":"Michigan","MN":"Minnesota","MS":"Mississippi","MO":"Missouri","MT":"Montana","NE":"Nebraska","NV":"Nevada","NH":"New Hampshire","NJ":"New Jersey","NM":"New Mexico","NY":"New York","NC":"North Carolina","ND":"North Dakota","OH":"Ohio","OK":"Oklahoma","OR":"Oregon","PA":"Pennsylvania","RI":"Rhode Island","SC":"South Carolina","SD":"South Dakota","TN":"Tennessee","TX":"Texas","UT":"Utah","VT":"Vermont","VA":"Virginia","WA":"Washington","WV":"West Virginia","WI":"Wisconsin","WY":"Wyoming"};
 const v19St=z=>{const t=ZIPS[z]&&ZIPS[z][0];return t?String(t).slice(-2):""};
+/* SW-050: calendar-day difference. The badge stays on through the printed expiry date
+   and comes off at the start of the next calendar day (end of that day). "Expires today"
+   fires when left===0. TEST_NOW (via __now) is honored only outside production. */
+function v19Now(){try{if(typeof __now==="function")return __now()}catch(e){}return Date.now()}
+function v19Ymd(ms){const d=new Date(ms);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function v19When(v){if(v==null||v==="")return 0;if(typeof v==="number"&&isFinite(v))return v>1e12?v:v>1e9?v*1000:0;
- const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s)){const t=Date.parse(s.slice(0,10)+"T23:59:59");return isFinite(t)?t:0}
+ const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s)){const t=Date.parse(s.slice(0,10)+"T12:00:00");return isFinite(t)?t:0}
  const n=+s;return isFinite(n)&&n>1e9?n:0}
-function v19Day(v){const t=v19When(v);if(!t)return"";const d=new Date(t);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
-function v19Left(v){const t=v19When(v);if(!t)return null;return Math.ceil((t-Date.now())/864e5)}
+function v19Day(v){if(v==null||v==="")return"";const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
+ const t=v19When(v);return t?v19Ymd(t):""}
+function v19Left(v){const day=v19Day(v);if(!day)return null;const p=day.split("-").map(Number),now=new Date(v19Now());
+ return Math.round((Date.UTC(p[0],p[1]-1,p[2])-Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()))/864e5)}
 function v19S(v,n){return String(v==null?"":v).trim().slice(0,n)}
 function v19Lookup(st){const k=String(st||"").toUpperCase();
  const map={TX:"https://www.tdlr.texas.gov/LicenseSearch/",FL:"https://www.myfloridalicense.com/wl11.asp?mode=0",CA:"https://www.cslb.ca.gov/OnlineServices/CheckLicenseII/CheckLicense.aspx",NY:"https://www.dos.ny.gov/licensing/",MI:"https://www.lara.mi.gov/",OH:"https://elicense.ohio.gov/",IL:"https://online-dfpr.micropact.com/",GA:"https://sos.ga.gov/index.php/licensing",WA:"https://secure.lni.wa.gov/verify/",CO:"https://apps.colorado.gov/dora/licensing/Lookup/LicenseLookup.aspx",AZ:"https://roc.az.gov/",PA:"https://www.dos.pa.gov/ProfessionalLicensing",NC:"https://www.nclicensing.org/",TN:"https://www.tn.gov/commerce/regboards.html",VA:"https://www.dpor.virginia.gov/License-Lookup",MA:"https://www.mass.gov/check-a-professional-license",NJ:"https://newjersey.mylicense.com/verification/",MN:"https://www.dli.mn.gov/",WI:"https://licensesearch.wi.gov/",OR:"https://www.oregon.gov/ccb",NV:"https://www.nvcontractorsboard.com/"};
@@ -26,7 +33,7 @@ function v19Status(u){if(!u||u.role!=="contractor")return "none";
 function v19Expire(u){if(!u||u.role!=="contractor"||!u.verified)return false;
  const licL=v19Left(u.licExp),insL=v19Left(u.insExp);
  if(!((licL!=null&&licL<0)||(insL!=null&&insL<0)))return false;
- u.verified=false;u.verifyPending=false;u.verifyExpired=true;u.verifyChecked=u.verifyChecked||{};u.verifyChecked.expiredAt=Date.now();
+ u.verified=false;u.verifyPending=false;u.verifyExpired=true;u.verifyChecked=u.verifyChecked||{};u.verifyChecked.expiredAt=v19Now();
  const which=licL!=null&&licL<0&&insL!=null&&insL<0?"license and insurance":licL!=null&&licL<0?"license":"insurance certificate";
  notify(u.id,"Your Verified badge came off because your "+which+" expired. Submit the renewal so the Trust team can put it back on.","verify");
  return true}
@@ -35,9 +42,12 @@ function v19Remind(u){if(!u||u.role!=="contractor")return 0;let n=0;
  [["licExp","license"],["insExp","insurance certificate"]].forEach(([k,label])=>{const left=v19Left(u[k]);if(left==null)return;
   const step=[0,7,30,60].find(x=>left<=x);if(step==null)return;
   u.verifyRem19=u.verifyRem19||{};const key=k+":"+(v19Day(u[k])||"") +":"+step;if(u.verifyRem19[key])return;
-  u.verifyRem19[key]=Date.now();
+  u.verifyRem19[key]=v19Now();
   const badge=u.verified;
-  notify(u.id,left<0?`Your ${label} expired ${v19Day(u[k])}. ${badge?"Your Verified badge comes off until the Trust team reviews the renewal.":"Upload the renewal and resubmit for review."}`:`Your ${label} expires in ${left} day${left===1?"":"s"} (${v19Day(u[k])}). ${badge?"Renew it and resubmit so your Verified badge stays on.":"Renew it before it lapses."}`,"verify");
+  const when=left<0?`Your ${label} expired ${v19Day(u[k])}. ${badge?"Your Verified badge comes off until the Trust team reviews the renewal.":"Upload the renewal and resubmit for review."}`
+   :left===0?`Your ${label} expires today (${v19Day(u[k])}). ${badge?"The Verified badge stays on through today and comes off at the end of the day. Renew it and resubmit so the badge can stay on.":"Renew it today and resubmit for review."}`
+   :`Your ${label} expires in ${left} day${left===1?"":"s"} (${v19Day(u[k])}). ${badge?"Renew it and resubmit so your Verified badge stays on.":"Renew it before it lapses."}`;
+  notify(u.id,when,"verify");
   n++});
  return n}
 
@@ -50,11 +60,11 @@ Object.assign(A,{
   if(!v19When(licExp)||v19Left(licExp)<0)return{ok:false,msg:"Enter a license expiry date that hasn't passed"};
   if(!insurance)return{ok:false,msg:"Enter the insurer and coverage, for example the carrier and $1M general liability"};
   if(!v19When(insExp)||v19Left(insExp)<0)return{ok:false,msg:"Enter an insurance expiry date that hasn't passed"};
-  if(!/^\/u\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(coiFile))return{ok:false,msg:"Upload a photo or PDF-style image of your certificate of insurance (JPEG, PNG or WebP)"};
+  if(!/^\/(?:u|api\/coi)\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(coiFile))return{ok:false,msg:"Upload a photo or PDF-style image of your certificate of insurance (JPEG, PNG or WebP)"};
   const changed=m.license!==license||m.licState!==licState||m.insurance!==insurance||m.coiFile!==coiFile||v19Day(m.licExp)!==licExp||v19Day(m.insExp)!==insExp;
   m.license=license;m.licState=licState;m.licExp=licExp;m.insurance=insurance;m.insExp=insExp;m.coiFile=coiFile;if(coiNum)m.coiNum=coiNum;if(coiCarrier)m.coiCarrier=coiCarrier;
   if(m.verified&&changed)m.verified=false;
-  m.verifyPending=true;m.verifyExpired=false;m.verifyReject="";m.verifySubmitted=Date.now();
+  m.verifyPending=true;m.verifyExpired=false;m.verifyReject="";m.verifySubmitted=v19Now();
   (DB.users||[]).filter(u=>u.staff).forEach(s=>notify(s.id,`${m.biz||nameOf(m)} submitted a license and insurance certificate for review`,"mod?t=verify"));
   save();return{ok:true,msg:"Submitted to Sawyer's Trust team. A person reviews your license and certificate of insurance, then the badge shows what was checked and when."}},
  modVerify19(uid,what,note){const m=me();if(!m||!m.staff)return{ok:false,msg:"Trust team only"};
@@ -62,12 +72,12 @@ Object.assign(A,{
   note=v19S(note,400);what=String(what||"");
   if(what==="approve"){if(!u.license||!u.licState||!u.insurance)return{ok:false,msg:"This packet is missing a license number, state or insurer"};
    if(v19Left(u.licExp)<0||v19Left(u.insExp)<0)return{ok:false,msg:"The license or insurance has already expired. Ask them to resubmit a current packet."};
-   u.verified=true;u.verifyPending=false;u.verifyExpired=false;u.verifyReject="";u.verifiedAt=Date.now();u.verifyBy=m.id;u.verifyNote=note;
+   u.verified=true;u.verifyPending=false;u.verifyExpired=false;u.verifyReject="";u.verifiedAt=v19Now();u.verifyBy=m.id;u.verifyNote=note;
    u.verifyChecked={license:true,coi:true,at:u.verifiedAt,by:m.id};save();
    notify(u.id,"You're Verified. The Trust team reviewed your "+(u.licState||"")+" license and certificate of insurance. The badge shows what was checked and when.","pro:"+u.id);
    return{ok:true,msg:"Approved. The Verified badge is on and shows the check date."}}
   if(what==="reject"){if(note.length<8)return{ok:false,msg:"Add a short reason the pro will see (8+ characters)"};
-   u.verified=false;u.verifyPending=false;u.verifyReject=note;u.verifyBy=m.id;u.verifyNote=note;u.verifyDecided=Date.now();save();
+   u.verified=false;u.verifyPending=false;u.verifyReject=note;u.verifyBy=m.id;u.verifyNote=note;u.verifyDecided=v19Now();save();
    notify(u.id,"The Trust team couldn't verify you yet: "+note+" Update your license or certificate and submit again.","verify");
    return{ok:true,msg:"Rejected, and the pro was told why."}}
   return{ok:false,msg:"Pick approve or reject"}},
@@ -96,26 +106,35 @@ if(typeof DB!=="undefined"&&DB&&DB.users){try{seedV19()}catch(e){}}
 
 /* ---- FAQ and copy: tell the truth about Verified ---- */
 if(typeof FAQS!=="undefined"){const i=FAQS.findIndex(x=>/check licenses and insurance/i.test(x[0])||/licenses and insurance/i.test(x[0]));
- const ans="Pros submit their license number, the state that issued it, the expiry date, and a photo of a current certificate of insurance. A person on Sawyer's Trust team reviews the packet, checks the license against the state's public lookup, and approves or rejects it with a reason you can see. The Verified badge then shows what was checked and the date of the review. It comes off automatically the day the license or certificate expires, and the pro gets reminders 60, 30 and 7 days ahead. Nobody can turn the badge on from their own profile.";
+ const ans="Pros submit their license number, the state that issued it, the expiry date, and a photo of a current certificate of insurance. A person on Sawyer's Trust team reviews the packet, checks the license against the state's public lookup, and approves or rejects it with a reason you can see. The Verified badge then shows what was checked and the date of the review. It stays on through the expiry date and comes off at the end of that day. The pro gets reminders 60, 30 and 7 days ahead, and one on the expiry date. Nobody can turn the badge on from their own profile.";
  if(i>=0)FAQS[i][1]=ans;else FAQS.splice(3,0,["How do you check licenses and insurance?",ans])}
 
 /* ---- Trust panel: only claim what we actually check ---- */
+function v19MonthYear(t){if(!t)return"";const d=new Date(t);return d.toLocaleString("en-US",{month:"short",year:"numeric"})}
 function v9Trust(u){if(!u||u.role!=="contractor")return"";const rs=(DB.reviews||[]).filter(r=>r.cid===u.id),n=rs.length||u.reviews||0;
  const st=v19Status(u),licL=v19Left(u.licExp),insL=v19Left(u.insExp);
  const checked=u.verifyChecked&&u.verifyChecked.at||u.verifiedAt;
+ const viewer=typeof me==="function"?me():null;const insider=!!(viewer&&(viewer.id===u.id||viewer.staff));
  const ok=(t,b,s,on)=>`<li class="${on?"on":"off"}"><span class="o9-ti">${I(on?"check":"x",14)}</span><div><b>${t}</b><small>${b}</small>${s?`<em>${s}</em>`:""}</div></li>`;
- const licLine=u.license?(u.licState?`${u.licState} #${u.license}`:`#${u.license}`)+(u.licExp?` · expires ${v19Day(u.licExp)}`:""):"Not submitted";
- const licSub=st==="verified"&&checked?`Reviewed by Sawyer's Trust team on ${fmtDate(checked)}` : st==="pending"?"Submitted, waiting on the Trust team":st==="expired"?"Expired — the badge is off until a current license is reviewed":st==="rejected"?"Needs an update before another review":"Not reviewed yet";
- const insLine=u.insurance?(u.coiCarrier||u.insurance)+(u.insExp?` · expires ${v19Day(u.insExp)}`:""):"Not submitted";
- const insOn=st==="verified"&&!!u.insurance&&!(insL!=null&&insL<0);
- const licOn=st==="verified"&&!!u.license&&!(licL!=null&&licL<0);
- return`<section class="wrap o9-trust" id="trust"><div class="card"><div class="o9-trh"><span class="o9-ic big">${I("shield",22)}</span><div><h2>How we checked ${esc(u.biz||nameOf(u))}</h2><p class="muted small">The Verified badge means a person on Sawyer's Trust team reviewed this license and certificate of insurance. It comes off the day either one expires.</p></div></div>
+ const exp=d=>d?`expires ${v19Day(d)}`:"";
+ const licLine=insider&&u.license?(u.licState?`${u.licState} #${u.license}`:`#${u.license}`)+(u.licExp?" · "+exp(u.licExp):"")
+  :st==="verified"?`License verified ${v19MonthYear(checked)}${u.licExp?", "+exp(u.licExp):""}`
+  :st==="expired"?"License expired — the badge is off until a current one is reviewed"
+  :"License is reviewed by the Trust team before the Verified badge appears";
+ const licSub=st==="verified"&&checked?`Reviewed by Sawyer's Trust team on ${fmtDate(checked)}` : st==="pending"&&insider?"Submitted, waiting on the Trust team":st==="expired"?"Expired — the badge is off until a current license is reviewed":st==="rejected"&&insider?"Needs an update before another review":"The public profile shows only what was checked and when, not license numbers or documents.";
+ const insLine=insider&&u.insurance?(u.coiCarrier||u.insurance)+(u.insExp?" · "+exp(u.insExp):"")
+  :st==="verified"?`Insurance on file${u.insExp?", "+exp(u.insExp):""}`
+  :st==="expired"?"Insurance expired — the badge is off until a current certificate is reviewed"
+  :"A current certificate of insurance is reviewed before the badge appears";
+ const insOn=st==="verified"&&((insider&&!!u.insurance)||(!insider&&u.verifyChecked&&u.verifyChecked.coi))&&!(insL!=null&&insL<0);
+ const licOn=st==="verified"&&((insider&&!!u.license)||(!insider&&u.verifyChecked&&u.verifyChecked.license))&&!(licL!=null&&licL<0);
+ return`<section class="wrap o9-trust" id="trust"><div class="card"><div class="o9-trh"><span class="o9-ic big">${I("shield",22)}</span><div><h2>How we checked ${esc(u.biz||nameOf(u))}</h2><p class="muted small">The Verified badge means a person on Sawyer's Trust team reviewed this license and certificate of insurance. The badge stays on through the expiry date and comes off at the end of that day.</p></div></div>
  <ul class="o9-trl">${ok("State license",licLine,licSub,licOn)}${ok("Certificate of insurance",insLine,insOn&&checked?`Reviewed ${fmtDate(checked)}`:(insL!=null&&insL<0?"Expired":st==="pending"?"Submitted with the license packet":""),insOn)}${u.bg?ok("Background check","Owner passed a 7-year county + national check","",true):""}${ok("Reviews",n?`${n} review${n===1?"":"s"}, every one from a hired job on Sawyer`:"No reviews yet","No paid reviews. No review gating. Pros can't delete reviews; disputes go to a person.",true)}</ul>
  <p class="small muted o9-trf">${I("info",14)}Something wrong with a verification? <a href="${href("msgs","a1")}">Tell the Trust team</a> and a person re-checks it.</p></div></section>`}
 
 /* ---- Pro: submit packet; staff: review queue ---- */
 function v19PacketForm(m){const st=v19Status(m);
- const banner=st==="verified"?`<div class="v19-note ok">${I("shield",16)}<div><b>You're Verified</b><small>Checked ${m.verifiedAt?fmtDate(m.verifiedAt):""}. The badge comes off if the license or certificate expires. Submit a renewal before then.</small></div></div>`
+ const banner=st==="verified"?`<div class="v19-note ok">${I("shield",16)}<div><b>You're Verified</b><small>Checked ${m.verifiedAt?fmtDate(m.verifiedAt):""}. The badge stays on through the expiry date and comes off at the end of that day. Submit a renewal before then.</small></div></div>`
   :st==="pending"?`<div class="v19-note">${I("clock",16)}<div><b>In review</b><small>The Trust team has your packet. You'll get a notification when they approve it or ask for a change.</small></div></div>`
   :st==="rejected"?`<div class="v19-note bad">${I("info",16)}<div><b>Needs an update</b><small>${esc(m.verifyReject||"The Trust team asked you to resubmit.")}</small></div></div>`
   :st==="expired"?`<div class="v19-note bad">${I("info",16)}<div><b>Your badge came off</b><small>A license or certificate expired. Submit the renewal to get Verified again.</small></div></div>`
