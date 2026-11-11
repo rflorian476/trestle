@@ -16,4 +16,11 @@ for s in $SUITES; do
   echo "$st $s ($(grep -c '^PASS\|"ok":true\|✓' "$LOG/$s.log") pass lines, $(grep -c '^FAIL' "$LOG/$s.log") FAIL lines)"
   kill $SP 2>/dev/null; wait $SP 2>/dev/null; rm -rf "$D"
 done
+
+# Self-contained suites start their own servers (seo, exposure). They must not use the shared e2e port.
+for s in seo exposure; do
+  [ -f "test/$s.js" ] || continue
+  if timeout 180 node "test/$s.js" >"$LOG/$s.log" 2>&1 && ! grep -q "^FAIL" "$LOG/$s.log"; then st=PASS; else st=FAIL; rc=1; fi
+  echo "$st $s ($(grep -c -E '^ok |^PASS' "$LOG/$s.log") pass lines, $(grep -c '^FAIL' "$LOG/$s.log") FAIL lines)"
+done
 exit $rc

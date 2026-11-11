@@ -27,7 +27,7 @@ Builds on v15 (SW-041: a missing recipient gets the normal "doesn't exist" error
   - It refuses files with HTML or script anywhere inside: in a comment segment, a PNG text chunk, EXIF/XMP, or tacked on after the image. The user is told what to do ("That image has web code hidden inside it… save the photo again… upload that copy"). Truncated files and HTML with an image header are refused too. All of these return HTTP 415.
   - Harmless bytes after the end marker, such as a phone's motion clip, are cut off, so only the image is stored.
   - **Location data is removed.** The GPS block of a JPEG's EXIF is blanked, and XMP, PNG `eXIf` and WebP EXIF/XMP are dropped. A homeowner's job photo never carries the house's coordinates. Orientation and camera tags stay.
-- **SW-018 finished:** a signed-out `/p/:id` page inlines only that profile's data (about 9 KB instead of about 94 KB for the whole public state). That covers the pro, their reviews (still tokenized), quotes, consults, the jobs and crew projects they're in, and those projects' PMs.
+- **SW-018 finished:** a signed-out `/p/:id` page inlines only that profile's data (about 9 KB instead of about 94 KB for the whole public state). That covers the pro, their reviews (still tokenized), quotes, consults, and the jobs and crew projects they're in. Signed-out project cards no longer include PM ids, so those accounts are not inlined.
   - The server uses the slim copy only if `VIEWS.pro` renders **byte for byte the same** from it as from the full public state. This is checked once per pro per data version; otherwise the full state is inlined as before. `SLIM_P=0` turns the slim copy off.
   - The browser loads the full public state in the background after the page loads. It also loads it synchronously before rendering any other page, so Find, other profiles and Home never render from the slim copy. Client-side demo seeding skips a partial state.
   - The server-rendered cover now uses the same stock-photo order as the browser's first render, so the preloaded LCP image is the one that paints.
@@ -225,6 +225,29 @@ This repo is deploy-ready, and nothing has been pushed anywhere yet.
    - Move to Postgres or proper SQLite tables.
    - Backups.
    - Terms and privacy pages.
+   - Turn indexing on (below) only after this host is the custom domain.
+
+## Search indexing (off until launch)
+
+`/p/:id` and `/t/:id` are real URLs, but this temporary domain is full of fictional demo listings, so nothing is indexable until you opt in.
+
+- `GET /robots.txt` is `Disallow: /`.
+- Every response sends `X-Robots-Tag: noindex, nofollow`.
+- Records labelled demo (`demo: true` or a name/title containing `(demo)`) are never in `/sitemap.xml`, and their pages stay `noindex` with no JSON-LD even after indexing is turned on.
+
+**Launch switch (one line):**
+
+```
+SAWYER_INDEXABLE=1
+```
+
+Also set the canonical origin (no path). Open Graph and canonical tags use it, then `PUBLIC_URL`, then the request host:
+
+```
+SAWYER_BASE_URL=https://your-domain
+```
+
+Leave `SAWYER_INDEXABLE` unset or `0` until then. With it on, the sitemap lists `/` plus non-demo pro and traveler-call URLs only.
 
 ### v11 performance notes
 - App JS ships as hashed, immutable `public/js/a*.js` files (built by `build-live.js`), preloaded in `<head>` and run in order by a tiny loader.

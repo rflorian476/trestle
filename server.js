@@ -45,11 +45,22 @@ function hashPw0(pw){const salt=crypto.randomBytes(16).toString("hex");return{sa
 {const d=DB();if(!getKV.get("meta")||!JSON.parse(getKV.get("meta").v).labeled){
   d.users.forEach(u=>{u.demo=true;u.email=u.id+"@demo.invalid"});(d.projects||[]).forEach(p=>{p.demo=true;if(!/^Demo: /.test(p.title))p.title="Demo: "+p.title});(d.jobs||[]).forEach(j=>j.demo=true);
   d.pmsgs=(d.pmsgs||[]);d.me=null;persist();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now());console.log("seeded demo data:",d.users.length,"users")}}
-// demo logins (README): fixed accounts for the seeded homeowner, pro and project manager
+// demo logins (README): fixed accounts for the seeded homeowner, pro and project manager.
+// The shared password is only for those demo people. Staff is separate: on a public host it stays
+// disabled unless STAFF_DEMO_PASSWORD is set, and it never keeps the published demo password.
 const DEMO_PW=BRAND.slug+"-demo-2026";
-for(const[uid_,email]of[["u1","demo-homeowner@"+BRAND.slug+".test"],["c1","demo-pro@"+BRAND.slug+".test"],["m1","demo-pm@"+BRAND.slug+".test"],["c26","demo-remodeler@"+BRAND.slug+".test"],["b1","demo-business@"+BRAND.slug+".test"],["tv1","demo-traveler@"+BRAND.slug+".test"],["a1","demo-trust@"+BRAND.slug+".test"]]){
+const isPublicHost=require("./lib/auth.js").isPublicHost;
+for(const[uid_,email]of[["u1","demo-homeowner@"+BRAND.slug+".test"],["c1","demo-pro@"+BRAND.slug+".test"],["m1","demo-pm@"+BRAND.slug+".test"],["c26","demo-remodeler@"+BRAND.slug+".test"],["b1","demo-business@"+BRAND.slug+".test"],["tv1","demo-traveler@"+BRAND.slug+".test"]]){
  const u=DB().users.find(x=>x.id===uid_);if(!u||db.prepare("SELECT 1 FROM accounts WHERE uid=? OR email=?").get(uid_,email))continue;
  const h=hashPw0(DEMO_PW);db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created) VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}
+{const uid_="a1",email="demo-trust@"+BRAND.slug+".test",u=DB().users.find(x=>x.id===uid_);
+ if(u){const row=db.prepare("SELECT uid FROM accounts WHERE uid=? OR email=?").get(uid_,email);
+  const pw=isPublicHost()?String(process.env.STAFF_DEMO_PASSWORD||"").trim():DEMO_PW;
+  // Unset on a public host: claim the email with a random secret so the shared demo password cannot open it.
+  const secret=pw||crypto.randomBytes(24).toString("hex");
+  if(!row){if(pw||isPublicHost()){const h=hashPw0(secret);db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created) VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}}
+  else if(isPublicHost()){const h=hashPw0(secret);db.prepare("UPDATE accounts SET email=?,salt=?,hash=? WHERE uid=?").run(email,h.salt,h.hash,row.uid);if(u.email!==email){u.email=email;persist()}}}}
+function demoSharedOk(uid){const u=DB().users.find(x=>x.id===uid);return !!(u&&u.demo&&!(u.staff&&isPublicHost()))}
 // v5: travel work collection added to existing databases
 if(!getKV.get("tcalls")){if(!Array.isArray(DB().tcalls)&&ctx.__v5)ctx.__v5.seedTravel();persist();console.log("travel work seeded:",(DB().tcalls||[]).length,"calls")}
 // v12: consults, review requests, reports and the trust account added to existing databases
@@ -107,6 +118,11 @@ const pvDay=t=>new Date(t).toISOString().slice(0,10);
 function pvOf(pid){const o={};for(const r of pvGet.all(pid,pvDay(Date.now()-62*864e5)))o[r.day]=r.n;return o}
 // demo pro sample: about 4 views a day for the last 60 days (fictional, like all seed data)
 if(!db.prepare("SELECT 1 FROM pviews LIMIT 1").get()&&DB().users.some(u=>u.id==="c1")){const ins=db.prepare("INSERT OR IGNORE INTO pviews(pid,day,n) VALUES(?,?,?)");for(let i=1;i<=60;i++)ins.run("c1",pvDay(Date.now()-i*864e5),2+((i*7)%5)+(i<=30?1:0))}
+// A project is fully visible to its PM, crew, applicants, and to signed-in pros (they apply from the public board).
+function onProject(p,uid){if(!uid||!p)return false;if(p.pm===uid)return true;return(p.roles||[]).some(r=>(r.filled||[]).includes(uid)||(r.done||[]).includes(uid)||(r.apps||[]).some(a=>a&&a.cid===uid)||(r.invites||[]).some(i=>i&&(i.cid===uid||i===uid)))}
+// Signed-out (and other non-parties): no description, no PM id, no applicant notes. Demo rows keep the town so the board still browses; a real project's ZIP does not.
+function pubProject(p){const c=Object.assign({},p);c.desc="";c.notes="";c.pm=null;if(!p.demo)c.zip="";c.roles=(p.roles||[]).map(r=>{const x=Object.assign({},r);x.apps=[];x.invites=[];x.done=[];x.note="";return x});return c}
+function pubLodging(l){const c=Object.assign({},l);c.notes="";if(!l.demo){c.loc="";c.near=""}return c}
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
 function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===uid):[];const crewOf=p=>(p.roles||[]).flatMap(r=>r.filled||[]);
  const rc=ctx.__v2&&ctx.__v2.respCalc;const staff=!!(uid&&(d.users.find(u=>u.id===uid)||{}).staff);
@@ -130,7 +146,7 @@ function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===ui
  // per-review token (not linkable across reviews or to users[]) plus the short display name ("Pat H.") the card shows.
  const uName=new Map(d.users.map(u=>[u.id,u.name]));const shortNm=n=>{const w=String(n||"").trim().split(/\s+/).filter(Boolean);return w.length?w[0]+(w[1]?" "+w[1][0]+".":""):"Customer"};
  const reviews=(d.reviews||[]).map(r=>(staff||(uid&&(r.uid===uid||r.cid===uid)))?r:Object.assign({},r,{uid:"rv-"+r.id,an:shortNm(uName.get(r.uid))}));
- return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:d.projects||[],pmsgs,tcalls:(d.tcalls||[]).map(c=>c.by===uid?c:Object.assign({},c,{napps:(c.apps||[]).filter(a=>a.status!=="withdrawn").length,apps:(c.apps||[]).filter(a=>a.status==="hired"||(uid&&a.uid===uid)).map(a=>a.uid===uid?a:{uid:a.uid,status:a.status,date:a.date}),invites:(c.invites||[]).filter(x=>x===uid)})),bills:uid?(d.bills||[]).filter(b=>b.by===uid||(b.cuid===uid&&b.status!=="draft")):[],bcust:own(d.bcust),bdocs:own(d.bdocs),ledger:own(d.ledger),tsheets:own(d.tsheets),lodging:d.lodging||[],creviews:d.creviews||[],visits:uid?(d.visits||[]).filter(v=>v.by===uid||v.cuid===uid):[],cases:uid?(d.cases||[]).filter(c=>c.cu===uid||c.pro===uid):[],crew:own(d.crew),refs:(d.refs||[]).filter(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))).map(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))?r:null),consults:(d.consults||[]).map(c=>uid&&(c.pro===uid||c.cu===uid)?c:(c.status==="requested"||c.status==="confirmed")?{id:c.id,pro:c.pro,date:c.date,time:c.time,status:c.status}:null).filter(Boolean),rreq12:uid?(d.rreq12||[]).filter(r=>r.by===uid||r.cu===uid):[],reports12:staff?(d.reports12||[]):uid?(d.reports12||[]).filter(r=>r.by===uid):[],rmrev12:staff?(d.rmrev12||[]):[],me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
+ return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:(d.projects||[]).map(p=>(uid&&(isPro||onProject(p,uid)))?p:pubProject(p)),pmsgs,tcalls:(d.tcalls||[]).map(c=>c.by===uid?c:Object.assign({},c,{napps:(c.apps||[]).filter(a=>a.status!=="withdrawn").length,apps:(c.apps||[]).filter(a=>a.status==="hired"||(uid&&a.uid===uid)).map(a=>a.uid===uid?a:{uid:a.uid,status:a.status,date:a.date}),invites:(c.invites||[]).filter(x=>x===uid)})),bills:uid?(d.bills||[]).filter(b=>b.by===uid||(b.cuid===uid&&b.status!=="draft")):[],bcust:own(d.bcust),bdocs:own(d.bdocs),ledger:own(d.ledger),tsheets:own(d.tsheets),lodging:(d.lodging||[]).map(l=>uid?l:pubLodging(l)),creviews:d.creviews||[],visits:uid?(d.visits||[]).filter(v=>v.by===uid||v.cuid===uid):[],cases:uid?(d.cases||[]).filter(c=>c.cu===uid||c.pro===uid):[],crew:own(d.crew),refs:(d.refs||[]).filter(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))).map(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))?r:null),consults:(d.consults||[]).map(c=>uid&&(c.pro===uid||c.cu===uid)?c:(c.status==="requested"||c.status==="confirmed")?{id:c.id,pro:c.pro,date:c.date,time:c.time,status:c.status}:null).filter(Boolean),rreq12:uid?(d.rreq12||[]).filter(r=>r.by===uid||r.cu===uid):[],reports12:staff?(d.reports12||[]):uid?(d.reports12||[]).filter(r=>r.by===uid):[],rmrev12:staff?(d.rmrev12||[]):[],me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
 
 function run(uid,name,args){const d=DB();d.me=uid;let r;try{r=api.A[name](...args)}catch(e){r={ok:false,msg:"That didn't work. The item may have changed, refresh and try again."}}finally{DB().me=null}if(dirty)persist();return r}
 
@@ -141,7 +157,14 @@ function send(res,code,obj,extra){if(code>=400&&obj&&typeof obj==="object")obj.s
 function body(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>256e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>{try{ok(c.length?JSON.parse(Buffer.concat(c).toString()):{})}catch(e){no(e)}})})}
 
 // v8: SEO + PWA helpers
-const ORIGIN=req=>(process.env.PUBLIC_URL||("http"+(req.headers["x-forwarded-proto"]==="https"?"s":"")+"://"+(req.headers.host||"localhost"))).replace(/\/$/,"");
+// Launch switch (one line), on the custom domain only, after demo listings are gone:
+//   SAWYER_INDEXABLE=1
+// Canonical and social URLs use SAWYER_BASE_URL (origin only), then PUBLIC_URL, then the request host.
+// Unset, empty, or anything other than 1/true/yes/on keeps the whole host out of the index.
+function indexable(){return /^(1|true|yes|on)$/i.test(String(process.env.SAWYER_INDEXABLE||"").trim())}
+function configuredOrigin(){const raw=String(process.env.SAWYER_BASE_URL||process.env.PUBLIC_URL||"").trim();if(!raw)return "";try{const u=new URL(raw);if((u.protocol!=="https:"&&u.protocol!=="http:")||u.username||u.password)return "";return u.origin}catch(e){return ""}}
+const ORIGIN=req=>{const set=configuredOrigin();if(set)return set;return ("http"+(req.headers["x-forwarded-proto"]==="https"?"s":"")+"://"+(req.headers.host||"localhost")).replace(/\/$/,"")};
+function isDemo(rec){if(!rec)return false;if(rec.demo)return true;return /\(demo\)/i.test([rec.name,rec.biz,rec.title].filter(Boolean).join(" "))}
 const xe=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 const sj=o=>JSON.stringify(o).replace(/</g,"\\u003c");
 // v11 perf: signed-out visitors to "/" get the real home hero inside <main> (public/pre-home.html, made by
@@ -168,7 +191,7 @@ function prePro(req,h,id){if(sessionUid(req))return h;const c=proCover(id);if(!c
 // v13 (QA SW-018): the public snapshot is the same for every signed-out visitor, so build it at most every 3 s instead of per request
 function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
 // v16 (QA SW-018): a signed-out /p/<id> page inlines only the data that profile needs (the pro, their reviews, quotes,
-// consults, the jobs and crew projects they're part of, and those projects' PMs), about 10 KB instead of the whole
+// consults, the jobs and crew projects they're part of), about 10 KB instead of the whole
 // public snapshot. The slim copy is used only if the profile renders byte-for-byte the same from it as from the full
 // public snapshot (checked once per pro per data version); otherwise the full snapshot is inlined as before. The
 // browser loads the rest right after first paint, and before any other page renders.
@@ -182,21 +205,29 @@ function slimFor(full,id){const s={};for(const k of Object.keys(full))s[k]=Array
  const qj=new Set((full.quotes||[]).filter(q=>q.cid===id).map(q=>q.job));
  s.reviews=(full.reviews||[]).filter(r=>r.cid===id);s.quotes=(full.quotes||[]).filter(q=>q.cid===id);s.consults=(full.consults||[]).filter(c=>c.pro===id);
  s.jobs=(full.jobs||[]).filter(j=>j.hired===id||qj.has(j.id)||has([j.interested||[],j.invited||[]]));
- s.projects=(full.projects||[]).filter(has);const pms=new Set(s.projects.map(p=>p.pm));
+ s.projects=(full.projects||[]).filter(has);const pms=new Set(s.projects.map(p=>p.pm).filter(Boolean));
  s.users=(full.users||[]).filter(u=>u.id===id||pms.has(u.id));s._v=0;s.partial=id;return s}
 function pubSlim(id){if(process.env.SLIM_P==="0")return null;if(SLIM.v!==VER)SLIM={v:VER,m:new Map()};if(SLIM.m.has(id))return SLIM.m.get(id);let out=null;
  try{if(api.VIEWS&&api.VIEWS.pro){const full=snapshot(null),sl=slimFor(full,id);const a=renderPro(full,id),b=renderPro(sl,id);if(a&&a===b)out=sj(sl);else console.warn("slim /p/"+id+" differs from full; inlining the full public state")}}catch(e){out=null}
  if(SLIM.m.size>500)SLIM.m.clear();SLIM.m.set(id,out);return out}
-function withMeta(req,m){let h=INDEX().toString();const o=ORIGIN(req);const og=`<meta property="og:type" content="${m.type||"website"}"><meta property="og:site_name" content="Sawyer"><meta property="og:title" content="${xe(m.title)}"><meta property="og:description" content="${xe(m.desc)}"><meta property="og:url" content="${xe(o+(m.path||"/"))}"><meta property="og:image" content="${xe(o+(m.img||"/img/hero.webp"))}"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${xe(o+(m.path||"/"))}">`+(m.ld?`<script type="application/ld+json">${sj(m.ld)}</script>`:"");
+function withMeta(req,m){let h=INDEX().toString();const o=ORIGIN(req);const block=!indexable()||!!m.noindex;const robots=block?`<meta name="robots" content="noindex, nofollow" data-sawyer-robots="${indexable()?"demo":"beta"}">`:"";const og=`<meta property="og:type" content="${m.type||"website"}"><meta property="og:site_name" content="Sawyer"><meta property="og:title" content="${xe(m.title)}"><meta property="og:description" content="${xe(m.desc)}"><meta property="og:url" content="${xe(o+(m.path||"/"))}"><meta property="og:image" content="${xe(o+(m.img||"/img/hero.webp"))}"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${xe(o+(m.path||"/"))}">`+robots+(m.ld&&!m.noindex?`<script type="application/ld+json">${sj(m.ld)}</script>`:"");
  h=h.replace(/<title>[^<]*<\/title>/,`<title>${xe(m.title)}</title>`).replace(/<meta name="description" content="[^"]*">/,`<meta name="description" content="${xe(m.desc)}">`+og);
  // v9 perf: inline the public snapshot for signed-out visitors so first paint skips the blocking /api/state round trip (never inline private state).
  if(!sessionUid(req)){const st=(m.slim&&pubSlim(m.slim))||pubST();h=h.replace("</head>",`<script>window.__ST=${st}</script></head>`)}
  if((m.path||"/")==="/")h=h.replace("</head>",`<link rel="preload" as="image" href="/img/hero-sm.webp" imagesrcset="/img/hero-sm.webp 800w, /img/hero.webp 1600w" imagesizes="(max-width: 900px) 100vw, 50vw" fetchpriority="high"></head>`);
  return h}
-function SEO_PAGE(req,k,id){const d=DB(),o=ORIGIN(req);if(k==="p"){const u=(d.users||[]).find(x=>x.id===id&&x.role==="contractor");if(!u)return null;const town=String(u.zip||"");const name=u.biz||u.name;
-  return prePro(req,withMeta(req,{title:`${name}: ${u.trade||"Contractor"} · Sawyer`,desc:`${name}, ${String(u.trade||"").toLowerCase()} pro. ${u.rating?(+u.rating).toFixed(1)+" stars from "+(u.reviews||0)+" verified reviews. ":""}Free quotes, no lead fees.`,path:"/p/"+id,slim:id,type:"profile",img:u.cover||"/img/pro-1.webp",ld:Object.assign({"@context":"https://schema.org","@type":"HomeAndConstructionBusiness",name,url:o+"/p/"+id,address:{"@type":"PostalAddress",postalCode:town,addressCountry:"US"}},u.rating&&u.reviews?{aggregateRating:{"@type":"AggregateRating",ratingValue:(+u.rating).toFixed(1),reviewCount:u.reviews}}:{})}),id)}
- const c=(d.tcalls||[]).find(x=>x.id===id);if(!c)return null;const org=(d.users||[]).find(x=>x.id===c.by)||{};
- return withMeta(req,{title:`${c.title} · ${c.loc||""}${c.state?", "+c.state:""} · Sawyer`,desc:`$${c.rate}/hr${c.perDiem?" + $"+c.perDiem+"/day per diem":""}, about ${c.weeks} weeks. Rate, per diem and layoff risk up front.`,path:"/t/"+id,img:"/img/tr-wire.webp",ld:{"@context":"https://schema.org","@type":"JobPosting",title:c.title,description:c.desc||c.title,datePosted:new Date(c.date||Date.now()).toISOString().slice(0,10),employmentType:"CONTRACTOR",hiringOrganization:{"@type":"Organization",name:org.biz||"Sawyer contractor"},jobLocation:{"@type":"Place",address:{"@type":"PostalAddress",addressLocality:c.loc||"",addressRegion:c.state||"",addressCountry:"US"}},baseSalary:{"@type":"MonetaryAmount",currency:"USD",value:{"@type":"QuantitativeValue",value:c.rate,unitText:"HOUR"}}}})}
+function SEO_PAGE(req,k,id){const d=DB(),o=ORIGIN(req);if(k==="p"){const u=(d.users||[]).find(x=>x.id===id&&x.role==="contractor");if(!u)return null;const town=String(u.zip||"");const name=u.biz||u.name;const demo=isDemo(u);
+  return prePro(req,withMeta(req,{title:`${name}: ${u.trade||"Contractor"} · Sawyer`,desc:`${name}, ${String(u.trade||"").toLowerCase()} pro. ${u.rating?(+u.rating).toFixed(1)+" stars from "+(u.reviews||0)+" verified reviews. ":""}Free quotes, no lead fees.`,path:"/p/"+id,slim:id,type:"profile",img:u.cover||"/img/pro-1.webp",noindex:demo,ld:demo?null:Object.assign({"@context":"https://schema.org","@type":"HomeAndConstructionBusiness",name,url:o+"/p/"+id,address:{"@type":"PostalAddress",postalCode:town,addressCountry:"US"}},u.rating&&u.reviews?{aggregateRating:{"@type":"AggregateRating",ratingValue:(+u.rating).toFixed(1),reviewCount:u.reviews}}:{})}),id)}
+ const c=(d.tcalls||[]).find(x=>x.id===id);if(!c)return null;const org=(d.users||[]).find(x=>x.id===c.by)||{};const demo=isDemo(c);
+ return withMeta(req,{title:`${c.title} · ${c.loc||""}${c.state?", "+c.state:""} · Sawyer`,desc:`$${c.rate}/hr${c.perDiem?" + $"+c.perDiem+"/day per diem":""}, about ${c.weeks} weeks. Rate, per diem and layoff risk up front.`,path:"/t/"+id,img:"/img/tr-wire.webp",noindex:demo,ld:demo?null:{"@context":"https://schema.org","@type":"JobPosting",title:c.title,description:c.desc||c.title,datePosted:new Date(c.date||Date.now()).toISOString().slice(0,10),employmentType:"CONTRACTOR",hiringOrganization:{"@type":"Organization",name:org.biz||"Sawyer contractor"},jobLocation:{"@type":"Place",address:{"@type":"PostalAddress",addressLocality:c.loc||"",addressRegion:c.state||"",addressCountry:"US"}},baseSalary:{"@type":"MonetaryAmount",currency:"USD",value:{"@type":"QuantitativeValue",value:c.rate,unitText:"HOUR"}}}})}
+function sitemapUrls(){if(!indexable())return ["/"];const d=DB();return ["/"].concat((d.users||[]).filter(u=>u.role==="contractor"&&u.biz&&!isDemo(u)).map(u=>"/p/"+u.id),(d.tcalls||[]).filter(c=>c.status!=="closed"&&!isDemo(c)).map(c=>"/t/"+c.id))}
+function robotsTxt(base){if(!indexable())return "# Sawyer beta on a temporary domain. Demo listings must not be indexed.\n# Launch switch (one line), on the custom domain: SAWYER_INDEXABLE=1\n# Also set SAWYER_BASE_URL=https://your-domain\n\nUser-agent: *\nDisallow: /\n";return "# Indexing is on because SAWYER_INDEXABLE=1. Demo records are omitted from the sitemap.\n\nUser-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /auth/\nDisallow: /u/\n\nSitemap: "+base+"/sitemap.xml\n"}
+// A pretty URL or /p /t path that points at a demo pro, job, project or traveler call.
+function pathDemo(p){const d=DB();let m=/^\/([pt])\/([A-Za-z0-9_-]{1,40})$/.exec(p);if(m)return isDemo(m[1]==="p"?(d.users||[]).find(u=>u.id===m[2]):(d.tcalls||[]).find(c=>c.id===m[2]));
+ m=/^\/(pro|traveler)\/([\w.-]{1,60})\/?$/.exec(p);if(m)return isDemo((d.users||[]).find(u=>u.id===m[2]));
+ m=/^\/job\/([\w.-]{1,60})\/?$/.exec(p);if(m)return isDemo((d.jobs||[]).find(j=>j.id===m[1]));
+ m=/^\/project\/([\w.-]{1,60})\/?$/.exec(p);if(m)return isDemo((d.projects||[]).find(x=>x.id===m[1]));
+ m=/^\/tcall\/([\w.-]{1,60})\/?$/.exec(p);if(m)return isDemo((d.tcalls||[]).find(c=>c.id===m[1]));return false}
 // SW-007: pretty URLs for app views (/prices, /find, /job/j12 ...) serve the app; the client maps the path to its #/ route.
 const VIEW_META={find:["Find pros","Search licensed, reviewed local pros by trade and distance. Free for customers."],prices:["Price guide","Typical prices for common home projects, adjusted by ZIP code."],pricing:["Pricing","Free for customers. Pros pay a flat $20/mo with no lead fees."],pros:["For pros","A flat $20/month gets you a profile, job-board leads and the business tools. No lead fees."],faq:["FAQ","Answers about quotes, reviews, payments and the pro plan."],about:["About","Why Sawyer exists and how it keeps reviews honest."],jobs:["Job board","Open jobs from customers near you. Pros quote free."],post:["Request a pro","Describe your project and get matched with local pros."],travel:["Traveling electricians","Traveler calls with rate, per diem and layoff risk up front."],traveling:["Traveling electricians","Traveler calls with rate, per diem and layoff risk up front."],signup:["Join","Customers are free. Pros pay a flat $20/mo."],credits:["Photo credits","Photo credits."]};
 function viewRoute(p){const m=/^\/([a-z0-9]{2,20})(?:\/([\w.-]{1,60}))?\/?$/.exec(p);if(!m||m[1]==="notfound"||m[1]==="api"||m[1]==="auth")return null;const V=api.VIEWS||{};return Object.prototype.hasOwnProperty.call(V,m[1])?m[1]:null}
@@ -243,7 +274,12 @@ function createUser({role,name,email,phone}){const d=DB();d.me=null;const nm=Str
  db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created,phone) VALUES(?,?,?,?,?,?,?)").run(id,em,"","",u.role,Date.now(),phone||null);persist();return{ok:true,uid:id}}
 // v13 SW-033: sessions started by a one-time code in the last 15 minutes may set a new password without the old one (forgot password).
 const CODE_SESS=new Map();const codeFresh=req=>{const t=cookies(req).swsid,e=t&&CODE_SESS.get(t);return !!(e&&e>Date.now())};
-const AUTH=require("./lib/auth.js")({onCodeLogin:t=>{CODE_SESS.set(t,Date.now()+15*60e3);if(CODE_SESS.size>5000)for(const[k,v]of CODE_SESS)if(v<Date.now())CODE_SESS.delete(k)},db,limited,ip:r=>ip(r),newSession,setCookie,sessionUid,send,createUser,SESS_DAYS,brand:BRAND,html:htmlPage});
+const makeAuth=require("./lib/auth.js");
+function emailIsReal(email){const em=String(email||"").trim().toLowerCase();const row=db.prepare("SELECT uid FROM accounts WHERE email=?").get(em);
+ if(row){const u=DB().users.find(x=>x.id===row.uid);return !(u&&u.demo&&!u.staff)}
+ const u=DB().users.find(x=>(x.email||"").toLowerCase()===em);return !!(u&&(!u.demo||u.staff))}
+function demoMayAdopt(uid){const u=DB().users.find(x=>x.id===uid);return !!(u&&u.demo&&!u.staff)}
+const AUTH=makeAuth({onCodeLogin:t=>{CODE_SESS.set(t,Date.now()+15*60e3);if(CODE_SESS.size>5000)for(const[k,v]of CODE_SESS)if(v<Date.now())CODE_SESS.delete(k)},db,limited,ip:r=>ip(r),newSession,setCookie,sessionUid,send,createUser,SESS_DAYS,brand:BRAND,html:htmlPage,emailIsReal,demoMayAdopt,markDemo:uid=>{const u=DB().users.find(x=>x.id===uid);if(u&&!u.demo){u.demo=true;persist()}}});
 function formBody(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>16e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>ok(Object.fromEntries(new URLSearchParams(Buffer.concat(c).toString()))))})}
 // v9 perf: brotli for big text. Fast level now, max level computed off-thread and cached for repeat bodies (the signed-out home page).
 const BRC=new Map();function brot(zl,b){const buf=Buffer.isBuffer(b)?b:Buffer.from(b);if(buf.length<65536)return zl.brotliCompressSync(buf,{params:{[zl.constants.BROTLI_PARAM_QUALITY]:5}});
@@ -276,6 +312,7 @@ const server=http.createServer(async(req,res)=>{
    wh(c,h);return en(b,...r)}}
  if(req.method==="HEAD")req.method="GET";// HEAD answers like GET (Node drops the body)
  const url=new URL(req.url,"http://x");const p=url.pathname;
+ if(!indexable()||pathDemo(p))res.setHeader("X-Robots-Tag","noindex, nofollow");
  try{
  if(req.method==="GET"&&(p==="/"||p==="/index.html")){return sendHtml(res,req,200,preHome(req,withMeta(req,{title:"Sawyer: hire pros you'd trust with your house",desc:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees, and the business tools are included. Reviews only from completed jobs.",path:"/",ld:{"@context":"https://schema.org","@type":"Organization",name:"Sawyer",url:ORIGIN(req),logo:ORIGIN(req)+"/icons/icon-512.png"}})))}
  if(req.method==="GET"&&/^\/img\/[a-z0-9-]+\.webp$/.test(p)){const f=path.join(__dirname,"public/img",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"image/webp","Cache-Control":"public, max-age=604800"});return res.end(fs.readFileSync(f))}
@@ -283,8 +320,8 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==="GET"&&/^\/fonts\/[a-z0-9-]+\.woff2$/.test(p)){const f=path.join(__dirname,"public/fonts",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"font/woff2","Cache-Control":"public, max-age=31536000, immutable","Access-Control-Allow-Origin":"*"});return res.end(fs.readFileSync(f))}
  if(req.method==="GET"&&/^\/js\/(a\d+|lz\d+)\.[0-9a-f]{10}\.js$/.test(p)){const f=path.join(__dirname,"public/js",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"text/javascript; charset=utf-8","Cache-Control":"public, max-age=31536000, immutable"});return res.end(fs.readFileSync(f))}
  if(req.method==="GET"&&p==="/sw.js"){res.writeHead(200,{"Content-Type":"text/javascript; charset=utf-8","Cache-Control":"no-cache","Service-Worker-Allowed":"/"});return res.end(SW_JS)}
- if(req.method==="GET"&&p==="/robots.txt"){res.writeHead(200,{"Content-Type":"text/plain; charset=utf-8"});return res.end("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /auth/\nDisallow: /u/\nSitemap: "+ORIGIN(req)+"/sitemap.xml\n")}
- if(req.method==="GET"&&p==="/sitemap.xml"){const o=ORIGIN(req),d=DB();const urls=["/"].concat((d.users||[]).filter(u=>u.role==="contractor"&&u.biz).map(u=>"/p/"+u.id),(d.tcalls||[]).filter(c=>c.status!=="closed").map(c=>"/t/"+c.id));res.writeHead(200,{"Content-Type":"application/xml; charset=utf-8","Cache-Control":"public, max-age=3600"});return res.end('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'+urls.map(u=>"<url><loc>"+o+u+"</loc></url>").join("\n")+"\n</urlset>\n")}
+ if(req.method==="GET"&&p==="/robots.txt"){res.writeHead(200,{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"public, max-age=300"});return res.end(robotsTxt(ORIGIN(req)))}
+ if(req.method==="GET"&&p==="/sitemap.xml"){const o=ORIGIN(req),urls=sitemapUrls();res.writeHead(200,{"Content-Type":"application/xml; charset=utf-8","Cache-Control":"public, max-age=3600"});return res.end('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'+urls.map(u=>"<url><loc>"+xe(o+u)+"</loc></url>").join("\n")+"\n</urlset>\n")}
  {const sm=/^\/([pt])\/([A-Za-z0-9_-]{1,40})$/.exec(p);if(req.method==="GET"&&sm){const html=SEO_PAGE(req,sm[1],sm[2]);if(!html)return htmlPage(res,404,"Not found","<p>That page doesn't exist. <a href=\"/\">Go home</a></p>");return sendHtml(res,req,200,html)}}
  {const em=/^\/embed\/([A-Za-z0-9_-]{1,40})$/.exec(p);if(req.method==="GET"&&em)return embedPage(req,res,em[1],url)}
  if(req.method==="GET"&&p==="/favicon.ico"){res.writeHead(200,{"Content-Type":"image/png","Cache-Control":"public, max-age=86400"});return res.end(fs.readFileSync(path.join(__dirname,"public/icons/favicon-32.png")))}
@@ -297,7 +334,7 @@ const server=http.createServer(async(req,res)=>{
   if(m[2]==="callback"){if(req.method==="POST"){if(!/x-www-form-urlencoded/.test(req.headers["content-type"]||""))return htmlPage(res,415,"Bad request","");const o=req.headers.origin;if(o&&o!=="null"&&new URL(o).host!==req.headers.host&&m[1]!=="apple")return htmlPage(res,403,"Blocked","<p>Cross-site form post refused.</p>");return AUTH.oauthCallback(req,res,m[1],url,await formBody(req))}return AUTH.oauthCallback(req,res,m[1],url,null)}
   return htmlPage(res,405,"Method not allowed","")}}
  if(!p.startsWith("/api/")){
-  if(req.method==="GET"){const v=viewRoute(p);if(v){const mm=VIEW_META[v];return sendHtml(res,req,200,withMeta(req,{title:mm?mm[0]+" · Sawyer":"Sawyer: hire pros you'd trust with your house",desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,"")}))}
+  if(req.method==="GET"){const v=viewRoute(p);if(v){const mm=VIEW_META[v];return sendHtml(res,req,200,withMeta(req,{title:mm?mm[0]+" · Sawyer":"Sawyer: hire pros you'd trust with your house",desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)}))}
    return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/\">Go to the home page</a></p>")}
   return send(res,404,{error:"Not found"})}
  if(req.method==="POST"&&p==="/api/upload")return upload(req,res);
@@ -319,7 +356,8 @@ const server=http.createServer(async(req,res)=>{
   const kA="loginfail:"+ip(req)+"|"+email,kI="loginfail:"+ip(req),W=15*60e3;
   if(overLimit(kA,+process.env.LOGIN_RATE_MAX||10,W)||overLimit(kI,+process.env.LOGIN_IP_MAX||50,W))return send(res,429,{error:"Too many wrong passwords. Try again in 15 minutes."},{"Retry-After":"900"});
   const a=db.prepare("SELECT * FROM accounts WHERE email=?").get(email);
-  if(!a||!a.hash||!checkPw(pw,a.salt,a.hash)){addHit(kA);addHit(kI);return send(res,401,{error:"Wrong email or password."})}
+  // The published demo password only opens demo accounts, and never the staff account on a public host.
+  if(!a||!a.hash||!checkPw(pw,a.salt,a.hash)||(pw===DEMO_PW&&!demoSharedOk(a.uid))){addHit(kA);addHit(kI);return send(res,401,{error:"Wrong email or password."})}
   hits.delete(kA);
   const t=newSession(a.uid);setCookie(res,req,t,SESS_DAYS*86400);return send(res,200,{ok:true,state:snapshot(a.uid)})}
  // staff-only trust action: mark a pro's license + insurance as checked. Off unless ADMIN_TOKEN is set on the server.
@@ -335,6 +373,7 @@ const server=http.createServer(async(req,res)=>{
   if(p==="/api/passkey/delete")return send(res,200,{ok:AUTH.pkDelete(uid,b.id)});
   // SW-032: changing an existing password needs the current one (a session cookie alone isn't enough), and signs out other sessions.
   if(p==="/api/account/password"){const pw=String(b.password||"");if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});
+   if(pw===DEMO_PW&&!demoSharedOk(uid))return send(res,400,{error:"Choose a different password."});
    const acc=db.prepare("SELECT salt,hash FROM accounts WHERE uid=?").get(uid)||{};const kP="pwfail:"+uid;
    const reset=codeFresh(req)&&!b.current;if(acc.hash&&!reset){if(overLimit(kP,5,15*60e3))return send(res,429,{error:"Too many wrong passwords. Try again in 15 minutes."},{"Retry-After":"900"});
     if(!checkPw(String(b.current||""),acc.salt,acc.hash)){addHit(kP);return send(res,403,{error:"Your current password isn't right."})}hits.delete(kP)}
@@ -360,6 +399,7 @@ const server=http.createServer(async(req,res)=>{
   const email=String(d.email||"").trim().toLowerCase();
   if(!EMAIL.test(email))return send(res,400,{error:"Enter a valid email."});
   if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});
+  if(pw===DEMO_PW)return send(res,400,{error:"Choose a different password."});
   if(!String(d.name||"").trim()||String(d.name).length>80)return send(res,400,{error:"Enter your name (80 characters max)."});
   if(db.prepare("SELECT 1 FROM accounts WHERE email=?").get(email)||DB().users.some(u=>(u.email||"").toLowerCase()===email))return send(res,409,{error:"That email already has an account. Log in instead."});
   d.email=email;let r;DB().me=null;

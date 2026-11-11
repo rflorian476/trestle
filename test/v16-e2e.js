@@ -49,7 +49,7 @@ function pngChunk(type,data){const d=Buffer.from(data,"latin1"),h=Buffer.alloc(8
  ok(x&&x.st.partial==="c1","signed-out /p/c1 inlines a slim state marked partial for c1");
  ok(x&&x.len<Math.min(20000,fullLen/4),"inline state is small: "+(x&&x.len)+" bytes vs "+fullLen+" for the full public state");
  ok(x&&x.st._v===0,"slim state carries no data version, so the client never treats it as current");
- ok(x&&x.st.users.some(u=>u.id==="c1")&&x.st.users.every(u=>u.id==="c1"||u.role==="pm"),"only the pro (and PMs of their crew projects) are inlined ("+(x&&x.st.users.length)+" users)");
+ ok(x&&x.st.users.some(u=>u.id==="c1")&&x.st.users.every(u=>u.id==="c1"),"only the pro is inlined; signed-out projects redact PM ids so those accounts are not in the slim state ("+(x&&x.st.users.length)+" users)");
  ok(x&&x.st.reviews.length>0&&x.st.reviews.every(r=>r.cid==="c1"&&/^rv-/.test(r.uid)),"inlined reviews are this pro's, still tokenized (SW-039)");
  ok(x&&!/"(email|phone|password|hash|salt)":"[^"]/.test(JSON.stringify(x.st.users.filter(u=>u.id!=="c1")))&&!x.st.users.some(u=>u.id==="c1"&&u.phone),"no contact details in the slim state");
  const pros=full.users.filter(u=>u.role==="contractor").slice(0,8);let n=0;for(const u of pros){const y=inl((await req("/p/"+u.id)).t);if(y&&y.st.partial===u.id&&y.len<20000)n++}
