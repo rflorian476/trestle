@@ -352,7 +352,7 @@ function seedV12(){if(!DB||!DB.users)return;const now=Date.now(),D=864e5;
  const cs=v7Col("consults");if(!cs.length&&c1){const day=n=>{let d=new Date(now+n*D);while(d.getDay()===0)d=new Date(d.getTime()+D);return d.toISOString().slice(0,10)};
   cs.push({id:"cs1",pro:"c1",cu:"u2",date:day(2),time:"10:00",mode:"video",len:30,note:"Want to talk through a whole-house repipe before we buy.",zip:"78704",status:"requested",created:now-3*36e5,log:[{s:"requested",t:now-3*36e5}],demo:true},
    {id:"cs2",pro:"c1",cu:"u1",date:day(3),time:"13:00",mode:"onsite",len:30,note:"Tankless quote. The garage is unlocked, dog is friendly.",zip:"78704",status:"confirmed",created:now-D,log:[{s:"requested",t:now-D},{s:"confirmed",t:now-D+40*6e4}],demo:true});
-  notify("c1","Chris Cottage booked a video call for "+v7DateNice(day(2))+", 10 am","consults")}
+  notify("c1","Chris Calloway booked a video call for "+v7DateNice(day(2))+", 10 am","consults")}
  const u1=U("u1");if(u1&&!u1.home12){const j6=(DB.jobs||[]).find(j=>j.id==="j6"),j10=(DB.jobs||[]).find(j=>j.id==="j10");u1.home12={tasks:{filter:{done:now-112*D},smoke:{done:now-40*D}},items:[
   {id:"hi1",kind:"warranty",name:"Gas furnace",brand:"Carrier",model:"59SC5A060E17",installed:v12Day(j6?j6.created+4*D:now-200*D),years:10,pro:"Cedar Park Heating & Air",note:"Parts warranty, registered online",photo:"",date:now-100*D},
   {id:"hi2",kind:"warranty",name:"Sump pump",brand:"Zoeller",model:"M53",installed:v12Day(j10?j10.created+2*D:now-30*D),years:3,pro:"Bluebonnet Plumbing & Drain",note:"",photo:"",date:now-20*D},
