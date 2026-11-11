@@ -21,6 +21,31 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+## v16: uploads hardening, slim profile pages, records and honest dashboards
+Builds on v15 (SW-041: a missing recipient gets the normal "doesn't exist" error even when the first-contact cap is hit).
+- **Uploads hardening (QA sweep 2, B5):** `lib/imgsafe.js` walks the real structure of every JPEG, PNG and WebP, not just the magic bytes.
+  - It refuses files with HTML or script anywhere inside: in a comment segment, a PNG text chunk, EXIF/XMP, or tacked on after the image. The user is told what to do ("That image has web code hidden inside it… save the photo again… upload that copy"). Truncated files and HTML with an image header are refused too. All of these return HTTP 415.
+  - Harmless bytes after the end marker, such as a phone's motion clip, are cut off, so only the image is stored.
+  - **Location data is removed.** The GPS block of a JPEG's EXIF is blanked, and XMP, PNG `eXIf` and WebP EXIF/XMP are dropped. A homeowner's job photo never carries the house's coordinates. Orientation and camera tags stay.
+- **SW-018 finished:** a signed-out `/p/:id` page inlines only that profile's data (about 9 KB instead of about 94 KB for the whole public state). That covers the pro, their reviews (still tokenized), quotes, consults, the jobs and crew projects they're in, and those projects' PMs.
+  - The server uses the slim copy only if `VIEWS.pro` renders **byte for byte the same** from it as from the full public state. This is checked once per pro per data version; otherwise the full state is inlined as before. `SLIM_P=0` turns the slim copy off.
+  - The browser loads the full public state in the background after the page loads. It also loads it synchronously before rendering any other page, so Find, other profiles and Home never render from the slim copy. Client-side demo seeding skips a partial state.
+  - The server-rendered cover now uses the same stock-photo order as the browser's first render, so the preloaded LCP image is the one that paints.
+- **Records (Office and business accounts):**
+  - Expiry notices for licenses, policies, permits and wallet documents now go out from the server for **every** account with a dated record. Before, they only went to pros who had payment reminders on. The schedule is the same everywhere: 60, 30 and 7 days before, and on the day. The Office copy now says so; it used to say "45 days" in two places.
+  - A renewed record starts its notices over.
+  - Notice copy fits the record type: only a license or liability policy mentions the verified badge, and permits say "close it out or ask for an extension".
+  - **Vendor COIs with real expiry dates:** when a pro sends a certificate of insurance, the customer or business gets the policy name, carrier, number and expiry from the pro's general-liability record. They get notices 30 and 7 days out and on the day, and can tap **Ask for an updated COI**. A pro with no policy on file is asked to add it.
+  - The demo business (Lakeway Dental) holds Bluebonnet's COI, which runs out with Bluebonnet's policy (23 days in the seed).
+  - The business panel's **Invoices** list shows real invoices to pay, with overdue dates and pay links. Before, it said "Invoices appear here when jobs complete" while an invoice was overdue.
+- **Honest dashboards and first-run guidance:**
+  - **Profile views are real.** The pro tile used to show a made-up number (40 to 200 by account id) with a fixed "+12% vs last month". `POST /api/pview` now counts one view per visitor per pro per day, sent when the profile renders in a browser. It is rate limited, and crawlers, Lighthouse and the pro's own visits don't count. Counts are stored in a `pviews` table, so a view never bumps the data version, and only the pro sees them. The tile shows the 30-day total, the change against the 30 days before, and a real sparkline.
+  - The random decorative sparklines on the other dashboard tiles are gone, including the ones drawn on zeros.
+  - The demo pro has a seeded sample view log.
+  - A brand-new homeowner's home log card says "Set up your maintenance plan" instead of "9 maintenance tasks due".
+  - A PM with no projects sees **How a crew comes together** (post, fill each slot, run it from one board) next to the empty projects card.
+- Tests: `node test/v16-e2e.js http://localhost:8899 shots/v16` (fixtures in `test/fixtures/`). It is part of `test/run-all.sh`.
+
 ## v14: QA retest-1 fixes + fair prices, traveler dashboard
 - **QA retest 1:**
   - **SW-039:** a review's author id is shared only with the parties to it: the author, the reviewed pro and staff. Signed-out visitors and everyone else get a per-review token (`rv-<id>`) and a short name such as "Pat H.". The token can't be linked across reviews or to `users[]`.
@@ -163,7 +188,8 @@ tail -f logs/server.log logs/tunnel.log
 ## Limitations
 - **Scale:** one Node process holds the whole dataset in memory. Each SQLite collection is stored as a JSON document. That's fine for a beta with hundreds of users, but not for real scale.
 - **Live updates:** polling every 4 seconds, not websockets. Actions use synchronous XHR so the original UI code stays unchanged. Chrome logs a deprecation *warning* for this, not an error.
-- **Accounts:** no email verification, password reset or account deletion UI yet. Photo uploads are not supported.
+- **Accounts:** no email verification yet. Password reset (one-time code) and account deletion exist (v13).
+- **Profile views:** the per-day dedupe set is in memory, so a server restart can count a returning visitor once more that day.
 - **Hosting:** if the box restarts, run `./start.sh` again. There is no systemd or pm2 boot hook.
 
 ## Deploy to Render (free tier)
