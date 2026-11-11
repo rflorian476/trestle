@@ -70,5 +70,42 @@ function webpVP8(src,w,h){const b=Buffer.from(src);let i=12,total=b.readUInt32LE
  const st=(await req("/api/state",{cookie:P.cookie})).j.state.users.find(u=>u.id===pid);const tot=Object.values(st&&st.pv16||{}).reduce((a,n)=>a+n,0);
  ok(tot===2,"the pro sees 2 views (one signed-out IP, one signed-in customer), not one per User-Agent ("+tot+")");
 }
+function webpChunks(b){const o=[];const total=b.readUInt32LE(4)+8;let i=12;while(i+8<=total){const ty=b.toString("latin1",i,i+4),L=b.readUInt32LE(i+4);o.push({ty,L,i,data:b.subarray(i+8,i+8+L)});i=i+8+L+(L&1)}return o}
+function webpExif(b){const ex=(webpChunks(b).find(c=>c.ty==="EXIF")||{}).data;if(!ex)return null;let t0=0;if(ex.toString("latin1",0,6)==="Exif\0\0")t0=6;
+ const le=ex.toString("latin1",t0,t0+2)==="II";const u16=o=>le?ex.readUInt16LE(o):ex.readUInt16BE(o),u32=o=>le?ex.readUInt32LE(o):ex.readUInt32BE(o);
+ const ifd=t0+u32(t0+4),n=u16(ifd);const r={orientation:null,gpsCount:-1,camera:ex.indexOf("TestCam")>=0,n};
+ for(let k=0;k<n;k++){const e=ifd+2+k*12;const tag=u16(e),typ=u16(e+2),cnt=u32(e+4),val=u32(e+8);
+  if(tag===0x0112)r.orientation=typ===3&&cnt===1?(le?val&0xffff:val>>>16):val;if(tag===0x8825){const g=t0+val;if(g+2<=ex.length)r.gpsCount=u16(g)}}
+ return r}
+function webpSetOri(src,ori){const b=Buffer.from(src);const ch=webpChunks(b).find(c=>c.ty==="EXIF");if(!ch)throw new Error("no EXIF");
+ let t0=ch.i+8;if(b.toString("latin1",t0,t0+6)==="Exif\0\0")t0+=6;const le=b.toString("latin1",t0,t0+2)==="II";
+ const u16=o=>le?b.readUInt16LE(o):b.readUInt16BE(o),u32=o=>le?b.readUInt32LE(o):b.readUInt32BE(o);
+ const ifd=t0+u32(t0+4),n=u16(ifd);
+ for(let k=0;k<n;k++){const e=ifd+2+k*12;if(u16(e)===0x0112){if(le)b.writeUInt16LE(ori,e+8);else b.writeUInt16BE(ori,e+8);return b}}
+ throw new Error("no orientation tag")}
+// ===================== SW-044: WebP EXIF keeps orientation and camera tags; GPS is blanked; XMP is dropped =====================
+{const src=fs.readFileSync(path.join(FX,"v16-exif.webp"));
+ const before=webpExif(src);ok(before&&before.orientation===1&&before.camera&&before.gpsCount>0,"fixture WebP carries orientation, camera name and GPS ("+JSON.stringify(before)+")");
+ const unit=IMGSAFE.check("image/webp",src);ok(unit.ok,"unit: WebP with EXIF still passes");
+ const after=webpExif(unit.buf);ok(after&&after.orientation===1&&after.camera,"unit: orientation and camera name are kept",JSON.stringify(after));
+ ok(after&&after.gpsCount===0,"unit: GPS IFD is blanked (count "+(after&&after.gpsCount)+")");
+ ok(unit.info&&unit.info.gps===true,"unit: info.gps notes that location was removed");
+ const rot=webpSetOri(src,6);const r6=IMGSAFE.check("image/webp",rot);ok(r6.ok&&webpExif(r6.buf)&&webpExif(r6.buf).orientation===6,"unit: orientation 6 (rotate 90) is kept, not dropped");
+ // XMP chunk should be removed, EXIF kept, VP8X XMP flag cleared
+ const total=src.readUInt32LE(4)+8;const xmp=Buffer.alloc(8+32);xmp.write("XMP ",0);xmp.writeUInt32LE(32,4);xmp.write("http://ns.adobe.com/xap/1.0/ pad-pad-pad",8);
+ const withX=Buffer.concat([src.subarray(0,total),xmp]);withX.writeUInt32LE(withX.length-8,4);withX[20]|=0x0c;
+ const rx=IMGSAFE.check("image/webp",withX);ok(rx.ok&&!webpChunks(rx.buf).some(c=>c.ty==="XMP ")&&webpChunks(rx.buf).some(c=>c.ty==="EXIF"),"unit: XMP is dropped and EXIF is kept");
+ ok((rx.buf[20]&0x04)===0&&(rx.buf[20]&0x08)===0x08,"unit: VP8X keeps the EXIF flag and clears the XMP flag (flags="+rx.buf[20]+")");
+ ok(webpExif(rx.buf)&&webpExif(rx.buf).orientation===1&&webpExif(rx.buf).camera,"unit: orientation and camera survive XMP removal");
+ const S=await signup("pro",{name:"Ori Webp",email:"v17-webp-"+run+"@sawyer.test",biz:"Ori Webp Electric",trade:"Electrical",zip:"78704",phone:"5125550180"});
+ const ck=S.cookie;ok(S.code===200&&ck,"throwaway pro signed up for WebP EXIF upload checks",S.code);
+ const u=await up(ck,"image/webp",src);ok(u.code===200&&u.j&&u.j.url,"upload: WebP with EXIF stores",u.t);
+ if(u.j&&u.j.url){const g=await req(u.j.url);const got=webpExif(g.buf);
+  ok(g.code===200&&got&&got.orientation===1&&got.camera,"stored WebP still has orientation and the camera name",JSON.stringify(got));
+  ok(got&&got.gpsCount===0,"stored WebP has no GPS tags left");
+  ok(webpChunks(g.buf).some(c=>c.ty==="EXIF"),"stored WebP still has an EXIF chunk (not dropped wholesale)")}
+ const u6=await up(ck,"image/webp",rot);ok(u6.code===200&&u6.j&&u6.j.url,"upload: WebP with orientation 6 stores");
+ if(u6.j&&u6.j.url){const g=await req(u6.j.url);ok(webpExif(g.buf)&&webpExif(g.buf).orientation===6,"stored WebP keeps orientation 6")}
+}
 if(fail){console.log(fail+" FAIL");process.exit(1)}else console.log("ZERO failures");
 })().catch(e=>{console.error(e);process.exit(1)});
