@@ -8,7 +8,7 @@ function assert(cond,msg){if(!cond){failed++;console.error("FAIL",msg)}else cons
 function start(port,extra){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),"sawyer-exposure-"));
  const env=Object.assign({},process.env,extra||{},{HOST:"127.0.0.1",PORT:String(port),DATA_DIR:dir});
- for(const k of ["NODE_ENV","RENDER","AUTH_TEST_MODE","STAFF_DEMO_PASSWORD","RESEND_API_KEY","SENDGRID_API_KEY","EMAIL_FROM","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_FROM"])if(!extra||!(k in extra))delete env[k];
+ for(const k of ["NODE_ENV","RENDER","AUTH_TEST_MODE","STAFF_DEMO_PASSWORD","RESEND_API_KEY","SENDGRID_API_KEY","EMAIL_FROM","MAIL_FROM","RESEND_API_URL","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_FROM"])if(!extra||!(k in extra))delete env[k];
  const child=spawn(process.execPath,[path.join(ROOT,"server.js")],{env,stdio:["ignore","pipe","pipe"]});
  let log="";child.stdout.on("data",d=>{log+=d});child.stderr.on("data",d=>{log+=d});
  return new Promise((ok,no)=>{
