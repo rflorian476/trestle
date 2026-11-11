@@ -119,12 +119,17 @@ for(const w of [390,320,1440]){const p=await mk(w);await p.goto(B+"/does-not-exi
  const srv=cp.spawn(process.execPath,[path.join(__dirname,"..","server.js")],{env:Object.assign({},process.env,{HOST:"127.0.0.1",PORT:String(port),DATA_DIR:dir,RATE_X:"1",NEW_THREAD_MAX:"2"}),stdio:"ignore"});
  try{let up=false;for(let i=0;i<60&&!up;i++){try{up=(await fetch(base+"/healthz")).ok}catch(e){await new Promise(r=>setTimeout(r,200))}}ok(up,"cap test server starts");
   const C=await signup("customer",{name:"Cap Test",email:"v14-cap-"+run+"@example.com",zip:"78704"},base);
-  const s1=await act(C.cookie,"send",["c1","Hi, can you look at a leak?"],base);ok(s1.code===200&&s1.j.res.ok!==false,"1st new conversation is allowed",JSON.stringify(s1.j));
+  const missing=m=>(m.j&&m.j.res&&m.j.res.msg)||(m.j&&m.j.error)||"";
+  const missBefore=await act(C.cookie,"send",["no-such-user","x"],base);
+  ok(missBefore.code!==429&&/doesn't exist/i.test(missing(missBefore)),"SW-041: a missing recipient under the cap returns the normal error, not 429",missBefore.code+" "+JSON.stringify(missBefore.j));
+  const s1=await act(C.cookie,"send",["c1","Hi, can you look at a leak?"],base);ok(s1.code===200&&s1.j.res.ok!==false,"1st new conversation is allowed (a failed missing-id send did not count)",JSON.stringify(s1.j));
   const s2=await act(C.cookie,"send",["c2","Hi, can you look at a leak?"],base);ok(s2.code===200&&s2.j.res.ok!==false,"2nd new conversation is allowed");
   const s3=await act(C.cookie,"send",["c3","Hi, can you look at a leak?"],base);ok(s3.code===429&&/new conversations today/.test(s3.j.error||""),"3rd new conversation in 24 h is refused with 429",s3.code+" "+JSON.stringify(s3.j&&s3.j.error));
   ok(!s3.j.state.msgs.some(m=>m.a==="c3"||m.b==="c3"),"no thread is created when refused");
   const s4=await act(C.cookie,"send",["c1","Following up on the leak"],base);ok(s4.code===200&&s4.j.res.ok!==false,"replies in an existing thread are never capped");
-  const bad=await act(C.cookie,"send",["no-such-user","x"],base);const s5=await act(C.cookie,"send",["c4","hello"],base);ok(s5.code===429,"refused sends don't free up a slot");
+  const missAfter=await act(C.cookie,"send",["no-such-user","x"],base);
+  ok(missAfter.code===missBefore.code&&missAfter.code!==429&&/doesn't exist/i.test(missing(missAfter)),"SW-041: over the cap, a missing recipient still returns the same normal error, not 429",missAfter.code+" "+JSON.stringify(missAfter.j));
+  const s5=await act(C.cookie,"send",["c4","hello"],base);ok(s5.code===429,"refused sends don't free up a slot");
  }finally{srv.kill();try{fs.rmSync(dir,{recursive:true,force:true})}catch(e){}}}
 
 ok(errs.length===0,"zero console/page errors"+(errs.length?" :: "+errs.slice(0,3).join(" | "):""));

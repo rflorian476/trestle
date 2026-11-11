@@ -353,7 +353,8 @@ const server=http.createServer(async(req,res)=>{
   allowAuto=(name==="send"&&isDemo(args[0]))||name==="inviteCrew"||(name==="crewSend"&&(()=>{const pr=(DB().projects||[]).find(x=>x.id===args[0]);return pr&&pr.demo})());
   // v14: first contact is capped (anyone may message a pro's public profile, so cold outreach is the spam path).
   // Up to NEW_THREAD_MAX new conversations per sender per 24 h; replies in existing threads are never limited.
-  let newThread=false;if(name==="send"){const to=String(args[0]||"");newThread=!!to&&to!==uid&&!DB().msgs.some(x=>(x.a===uid&&x.b===to)||(x.a===to&&x.b===uid));
+  // SW-041: a missing recipient is a normal "doesn't exist" error, not the cap. Check the account exists before counting or refusing a new thread.
+  let newThread=false;if(name==="send"){const to=String(args[0]||"");const exists=!!(to&&DB().users.find(u=>u.id===to));newThread=exists&&to!==uid&&!DB().msgs.some(x=>(x.a===uid&&x.b===to)||(x.a===to&&x.b===uid));
    if(newThread){const now=Date.now(),k="newthread:"+uid,a=(hits.get(k)||[]).filter(t=>now-t<864e5);hits.set(k,a);if(a.length>=NEW_THREAD_MAX*RATE_X)return send(res,429,{error:"You've started a lot of new conversations today. Reply in your existing threads, or try again tomorrow.",res:{ok:false,msg:"You've started a lot of new conversations today. Reply in your existing threads, or try again tomorrow."},state:snapshot(uid)})}}
   const r=run(uid,name,args);allowAuto=false;
   if(newThread&&r&&r.ok!==false&&DB().msgs.some(x=>x.from===uid&&(x.a===String(args[0])||x.b===String(args[0]))))hits.get("newthread:"+uid).push(Date.now());
