@@ -386,7 +386,11 @@ const server=http.createServer(async(req,res)=>{
  }catch(e){console.error(e);return send(res,400,{error:"Bad request"})}
 });
 // v10: recurring invoices and overdue reminders run on the server too, so they go out even when the pro doesn't open the app.
-function sweepAll(){try{const d=DB();for(const u of (d.users||[]).slice()){if(u.role!=="contractor")continue;const has=u.autoRem9||(d.bills||[]).some(b=>b.by===u.id&&b.rec9&&b.rec9.on);if(has)run(u.id,"sweep9",[])}}catch(e){console.error("sweep",e.message)}}
+// v16: expiry notices for licenses, policies, permits and vendor COIs go out for every account that has a dated record,
+// not only for pros with payment reminders on, so nobody has to open the app to hear their insurance is about to lapse.
+function sweepAll(){try{const d=DB();const dated=new Set((d.bdocs||[]).filter(x=>x&&x.exp).map(x=>x.by));
+ for(const u of (d.users||[]).slice()){const pro=u.role==="contractor"&&(u.autoRem9||(d.bills||[]).some(b=>b.by===u.id&&b.rec9&&b.rec9.on));
+  const has=pro||dated.has(u.id)||(u.cois||[]).some(c=>c&&c.exp);if(has)run(u.id,"sweep9",[])}}catch(e){console.error("sweep",e.message)}}
 setTimeout(sweepAll,5000).unref();setInterval(sweepAll,+process.env.SWEEP_MS||3600e3).unref();
 setInterval(()=>{db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());const now=Date.now();for(const[k,a]of hits)if(!a.some(t=>now-t<(k.startsWith("newthread:")?864e5:3600e3)))hits.delete(k)},3600e3).unref();
 server.listen(PORT,HOST,()=>{console.log(`${BRAND.name} live on http://${HOST}:${PORT} (data: ${DATA})`);

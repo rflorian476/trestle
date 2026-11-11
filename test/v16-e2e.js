@@ -57,11 +57,12 @@ function pngChunk(type,data){const d=Buffer.from(data,"latin1"),h=Buffer.alloc(8
  const H=await login("demo-homeowner@sawyer.test");const rs=await req("/p/c1",{cookie:H.cookie});ok(rs.code===200&&rs.t.indexOf("window.__ST=")<0,"signed-in visitors never get inline state");
  const br=await chromium.launch();
  for(const w of [1300,390]){const c=await br.newContext({viewport:{width:w,height:w<500?844:900}});const p=await c.newPage();const pe=[];p.on("pageerror",e=>pe.push(String(e).slice(0,200)));
+  let hold=true;await p.route("**/api/state*",async rt=>{while(hold)await new Promise(z=>setTimeout(z,50));await rt.continue()});// hold the background load until the first paint is checked
   await p.goto(B+"/p/c1",{waitUntil:"domcontentloaded"});await p.waitForFunction(()=>typeof DB!=="undefined"&&DB&&document.querySelector("#app .px-name"),null,{polling:10,timeout:15000});
   const a=await p.evaluate(()=>({part:__PART,n:DB.users.length,h1:(document.querySelector("#app h1")||{}).textContent,html:document.querySelector("#app").innerHTML}));
   ok(a.part==="c1"&&a.n<=x.st.users.length,w+": the profile paints from the slim state, and the browser doesn't seed demo data into it ("+a.n+" users)");
   ok(/Bluebonnet/.test(a.h1||""),w+": profile heading renders ("+a.h1+")");
-  await p.waitForFunction(()=>__PART===null,null,{timeout:8000}).catch(()=>{});
+  hold=false;await p.waitForFunction(()=>__PART===null,null,{timeout:8000}).catch(()=>{});
   const b=await p.evaluate(()=>({part:__PART,n:DB.users.length,html:document.querySelector("#app").innerHTML}));
   ok(b.part===null&&b.n===full.users.length,w+": the full public state loads in the background after paint ("+b.n+" users)");
   ok(a.html===b.html,w+": the page doesn't change when the full state arrives");
@@ -73,6 +74,51 @@ function pngChunk(type,data){const d=Buffer.from(data,"latin1"),h=Buffer.alloc(8
   const qn=await q.evaluate(()=>({part:__PART,n:DB.users.length,cards:document.querySelectorAll("#app .pcard, #app article.pc, #app .pc").length}));
   ok(qn.part===null&&qn.n===full.users.length&&qn.cards>=1,w+": leaving the profile right away loads the full state first ("+qn.n+" users, "+qn.cards+" cards)");
   ok(pe.length===0,w+": no page errors on the slim profile",pe.join(" | "));errs.push(...pe);await c.close()}
+ await br.close()}
+// ===================== 3) Records: expiry reminders + vendor COIs with real expiry dates =====================
+{const day=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
+ const P=await signup("pro",{name:"Cory Coi",email:"v16-coi-pro-"+run+"@sawyer.test",biz:"Cory Coi Electric",trade:"Electrical",zip:"78704",phone:"5125550122"});
+ const C=await signup("customer",{name:"Hana Homeowner",email:"v16-coi-cu-"+run+"@sawyer.test",zip:"78704"});
+ const pid=P.j&&P.j.state.me,cid=C.j&&C.j.state.me;ok(pid&&cid,"throwaway pro and customer for the COI flow");
+ // a pro with no liability policy on file: COI goes out, with a nudge
+ let r=await act(C.cookie,"requestCOI",[pid,"Kitchen"]);ok(r.j&&r.j.res&&r.j.res.ok,"customer asks the pro for a COI",r.t);
+ let ps=(await act(P.cookie,"sweep9",[])).j.state;let rq=(ps.users.find(u=>u.id===pid).coiReqs||[]).find(x=>x.from===cid&&x.status==="requested");
+ r=await act(P.cookie,"sendCOI",[rq&&rq.id]);ok(r.j.res.ok&&/general liability policy/.test(r.j.res.msg),"no policy on file: COI sent, pro told to add the policy and its expiry: "+r.j.res.msg);
+ let cs=(await act(C.cookie,"sweep9",[])).j.state;let mine=cs.users.find(u=>u.id===cid).cois.filter(c=>c.cid===pid);ok(mine.length===1&&mine[0].status==="received"&&!mine[0].exp,"customer's COI shows received, with no expiry to track");
+ // the pro adds the policy; the next COI carries carrier, number and expiry
+ r=await act(P.cookie,"saveDoc",[{scope:"biz",kind:"gl",name:"General liability, $1M/$2M",num:"GL-"+run,holder:"Acme Mutual (test)",exp:day(20)}]);ok(r.j.res.ok,"pro saves a liability policy expiring in 20 days");
+ r=await act(C.cookie,"requestCOI",[pid,""]);ok(r.j.res.ok,"customer asks for an updated COI");
+ ps=(await act(P.cookie,"sweep9",[])).j.state;rq=(ps.users.find(u=>u.id===pid).coiReqs||[]).find(x=>x.from===cid&&x.status==="requested");
+ ok(ps.notifs.some(n=>/General liability, \$1M\/\$2M expires in 20 days/.test(n.text)&&/verified badge/.test(n.text)),"pro gets the 30-day notice for the policy (no payment reminders needed)");
+ r=await act(P.cookie,"sendCOI",[rq&&rq.id]);ok(r.j.res.ok&&r.j.res.msg==="COI sent","COI sent");
+ cs=(await act(C.cookie,"sweep9",[])).j.state;const me=cs.users.find(u=>u.id===cid);const last=me.cois.filter(c=>c.cid===pid).sort((a,b)=>b.date-a.date)[0];
+ ok(last&&last.exp===day(20)&&last.carrier==="Acme Mutual (test)"&&last.num==="GL-"+run,"the customer's COI carries the policy's expiry, carrier and number",JSON.stringify(last));
+ const nt=cs.notifs.filter(n=>/certificate of insurance expires in 20 days/.test(n.text));ok(nt.length===1&&/Cory Coi Electric/.test(nt[0].text),"customer gets a 30-day COI notice: "+(nt[0]&&nt[0].text));
+ cs=(await act(C.cookie,"sweep9",[])).j.state;ok(cs.notifs.filter(n=>/certificate of insurance expires/.test(n.text)).length===1,"the same notice isn't sent twice");
+ const pub=(await req("/api/state",{cookie:P.cookie})).j.state;ok(!JSON.stringify(pub.users.find(u=>u.id===cid)).includes("cois"),"other accounts never see a customer's COI list");
+ // a renewal restarts the schedule
+ const gl=ps.bdocs.find(d=>d.by===pid&&d.kind==="gl");r=await act(P.cookie,"saveDoc",[Object.assign({},gl,{exp:day(400)})]);ps=(await act(P.cookie,"sweep9",[])).j.state;
+ ok((ps.bdocs.find(d=>d.id===gl.id).rem9||[]).length===0,"renewing a policy resets its reminder schedule");
+ r=await act(P.cookie,"saveDoc",[Object.assign({},gl,{exp:day(5)})]);ps=(await act(P.cookie,"sweep9",[])).j.state;
+ ok(ps.notifs.some(n=>/expires in 5 days/.test(n.text)),"…so the next expiry gets its own notice");
+ // the server sweep reaches accounts that never open the app (boot sweep runs 5 s after start; not a pro, no payment reminders)
+ let bn=[];for(let i=0;i<20&&!bn.length;i++){const L=await login("demo-business@sawyer.test");bn=(L.j.state.notifs||[]).filter(n=>/certificate of insurance expires/.test(n.text));if(!bn.length)await new Promise(z=>setTimeout(z,700))}
+ ok(bn.length===1&&/Bluebonnet/.test(bn[0].text),"server sweep sends the demo business its COI notice without the app open: "+(bn[0]&&bn[0].text));
+ const BL=await login("demo-business@sawyer.test");const b1=BL.j.state.users.find(u=>u.id===BL.j.state.me);ok((b1.cois||[]).some(c=>c.cid==="c1"&&c.exp&&c.carrier),"demo business holds Bluebonnet's COI with a real expiry");
+ const br=await chromium.launch();
+ for(const w of [1300,390]){const c=await br.newContext({viewport:{width:w,height:w<500?844:900},deviceScaleFactor:w<500?2:1});const p=await c.newPage();const pe=[];p.on("pageerror",e=>pe.push(String(e).slice(0,200)));p.on("dialog",d=>d.accept());
+  await p.goto(B+"/");await p.evaluate(async e=>{await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:"sawyer-demo-2026"})})},"demo-business@sawyer.test");
+  await p.goto(B+"/#/dash");await p.reload();await p.waitForSelector("#bizPanel",{timeout:10000});
+  const t=await p.$eval("#bizPanel",e=>e.innerText);ok(/Bluebonnet[\s\S]*Expires in \d+ days/.test(t)&&/Next Insurance/.test(t),w+": business dashboard lists the COI with carrier and days left");
+  ok(/INV-\d+/.test(t)&&!/Invoices appear here when jobs complete/.test(t),w+": the panel's Invoices list shows the real invoice to pay");
+  ok(await p.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),w+": no sideways scroll");
+  const el=await p.$("#bizPanel");await el.scrollIntoViewIfNeeded();if(OUT)await el.screenshot({path:OUT+"/v16-biz-coi-"+w+".png"});
+  if(w===390){await p.click("[data-coi16]");await p.waitForTimeout(700);const t2=await p.$eval(".coi16-l",e=>e.innerText);ok(/Requested/.test(t2),"one tap asks Bluebonnet for an updated COI ("+t2.replace(/\s+/g," ").slice(0,80)+")")}
+  ok(pe.length===0,w+": no page errors",pe.join(" | "));errs.push(...pe);await c.close()}
+ // Office copy now matches the schedule that actually runs
+ const c=await br.newContext({viewport:{width:1300,height:900}});const p=await c.newPage();await p.goto(B+"/");await p.evaluate(async e=>{await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:"sawyer-demo-2026"})})},"demo-pro@sawyer.test");
+ await p.goto(B+"/#/office/compliance");await p.reload();await p.waitForTimeout(900);const ot=await p.$eval("#app",e=>e.innerText);
+ ok(/60, 30 and 7 days/.test(ot)&&!/45 days/.test(ot),"Office states one reminder schedule (60, 30, 7 days and the day of)");
  await br.close()}
 //@@V16-NEXT@@
 if(errs.length)console.log("page errors:",errs.slice(0,5).join(" | "));ok(errs.length===0,"no page errors ("+errs.length+")");

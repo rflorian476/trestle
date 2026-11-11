@@ -1,1 +1,6 @@
 /* v16 */
+.coi16-l li.coi16{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 8px;padding:8px 0;border-top:1px solid var(--line)}.coi16-l li.coi16:first-child{border-top:0}
+.coi16 span{flex:1 1 calc(100% - 30px);min-width:0;display:flex;flex-direction:column}.coi16 small{color:var(--muted);overflow-wrap:anywhere}.coi16 em{font-style:normal;font-size:12.5px;font-weight:700;color:#1f6b45}
+.coi16-warn em{color:#8a4b00}.coi16-bad em{color:#b42318}.coi16-req em{color:var(--muted);font-weight:600}.coi16 .btn{flex:none;margin-left:22px}
+.inv16-l li{display:flex;gap:8px;align-items:flex-start}.inv16-l a{color:inherit;text-decoration:none;display:flex;flex-direction:column;min-width:0}.inv16-l a:hover b{text-decoration:underline}.inv16-l small{color:var(--muted)}
+.inv16-l span{font-size:13.5px}.inv16-all{display:inline-block;margin:2px 0 6px 30px;font-size:13px;font-weight:700}

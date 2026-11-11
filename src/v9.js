@@ -24,7 +24,8 @@ function v9Sweep(m){if(!m)return 0;let n=0;const today=v7Today();
    if(b.cuid)notify(b.cuid,`Friendly reminder from ${b.bizName}: invoice ${b.no} has ${v7$(c.bal)} due (was due ${fmtD(b.due)})`,"bill:"+b.id);n++})}
  (DB.bdocs||[]).filter(d=>d.by===m.id&&d.exp).forEach(d=>{const left=v7DaysTo(d.exp);const step=[0,7,30,60].find(x=>left<=x);if(step==null)return;d.rem9=d.rem9||[];if(d.rem9.includes(step))return;d.rem9.push(step);
   const nm=d.name||((d.scope==="biz"?BIZ_KINDS:WALLET_KINDS).find(k=>k[0]===d.kind)||[,"Document"])[1];
-  notify(m.id,left<0?`${nm} expired ${fmtD(d.exp)}. Upload the renewal so GCs and customers keep seeing your badge.`:`${nm} expires in ${left} day${left===1?"":"s"} (${fmtD(d.exp)}). Renew now to keep your verified badge.`,d.scope==="biz"?"office:compliance":"wallet");n++});
+  const badge=d.scope==="biz"&&["license","gl"].includes(d.kind),permit=/permit/.test(String(d.kind))||/permit/i.test(nm);/* v16: only a license or liability policy affects the badge */
+  notify(m.id,left<0?`${nm} expired ${fmtD(d.exp)}. ${badge?"Upload the renewal so GCs and customers keep seeing your badge.":permit?"Close it out or ask for an extension.":"Upload the renewal to keep your records current."}`:`${nm} expires in ${left} day${left===1?"":"s"} (${fmtD(d.exp)}). ${badge?"Renew now to keep your verified badge.":permit?"Close it out or ask for an extension before then.":"Renew it before it lapses."}`,d.scope==="biz"?"office:compliance":"wallet");n++});
  return n}
 Object.assign(A,{
  setRecurring(id,o){const m=me(),b=v7Bill(id);if(!b||!m||b.by!==m.id||b.type!=="inv")return{ok:false,msg:"Only your own invoices can repeat"};o=o||{};
