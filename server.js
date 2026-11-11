@@ -13,7 +13,8 @@ db.exec(`PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS accounts(uid TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,salt TEXT NOT NULL,hash TEXT NOT NULL,role TEXT NOT NULL,created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,uid TEXT NOT NULL,expires INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS appdata(k TEXT PRIMARY KEY,v TEXT NOT NULL,updated INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS uploads(name TEXT PRIMARY KEY,uid TEXT NOT NULL,type TEXT NOT NULL,size INTEGER NOT NULL,created INTEGER NOT NULL);`);
+CREATE TABLE IF NOT EXISTS uploads(name TEXT PRIMARY KEY,uid TEXT NOT NULL,type TEXT NOT NULL,size INTEGER NOT NULL,created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS pviews(pid TEXT NOT NULL,day TEXT NOT NULL,n INTEGER NOT NULL,PRIMARY KEY(pid,day));`);
 const getKV=db.prepare("SELECT v FROM appdata WHERE k=?"),setKV=db.prepare("INSERT INTO appdata(k,v,updated) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,updated=excluded.updated");
 const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs","estimates","tcalls","bills","bcust","bdocs","ledger","tsheets","lodging","creviews","visits","cases","crew","refs","consults","rreq12","reports12","rmrev12"];
 const BRAND=require("./brand.json");const APP_VERSION=require("./package.json").version+"-"+BRAND.slug;
@@ -96,6 +97,14 @@ function stripPriv(args){for(const a of args)if(a&&typeof a==="object"&&!Array.i
 
 const PRO_PRIVATE=["email","sharedWith","credits","coiReqs","cois","flags","favs","plan","planStatus","planEnds","paidThru","tsaved","talerts","trip","aprefs","focus8","crew8","nprefs11","home12","rrTpl12","locations","recurring","saved","autoRem9","needsSetup","verifyPending","emailHidden","staff","admin"];
 const PUBLIC_USER=["id","role","acct","name","biz","zip","bio","demo","joined","created","trav","avatar","photo"];
+/* ---- v16: real profile views (the pro dashboard used to show a made-up number). One view per visitor per pro per day,
+   counted when the profile actually renders in a browser (crawlers and the pro's own visits don't count). Kept in their own
+   table so a view never bumps the data version (no state refetch for everyone). ---- */
+const PV_SEEN=new Set();const pvAdd=db.prepare("INSERT INTO pviews(pid,day,n) VALUES(?,?,1) ON CONFLICT(pid,day) DO UPDATE SET n=n+1"),pvGet=db.prepare("SELECT day,n FROM pviews WHERE pid=? AND day>=?");
+const pvDay=t=>new Date(t).toISOString().slice(0,10);
+function pvOf(pid){const o={};for(const r of pvGet.all(pid,pvDay(Date.now()-62*864e5)))o[r.day]=r.n;return o}
+// demo pro sample: about 4 views a day for the last 60 days (fictional, like all seed data)
+if(!db.prepare("SELECT 1 FROM pviews LIMIT 1").get()&&DB().users.some(u=>u.id==="c1")){const ins=db.prepare("INSERT OR IGNORE INTO pviews(pid,day,n) VALUES(?,?,?)");for(let i=1;i<=60;i++)ins.run("c1",pvDay(Date.now()-i*864e5),2+((i*7)%5)+(i<=30?1:0))}
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
 function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===uid):[];const crewOf=p=>(p.roles||[]).flatMap(r=>r.filled||[]);
  const rc=ctx.__v2&&ctx.__v2.respCalc;const staff=!!(uid&&(d.users.find(u=>u.id===uid)||{}).staff);
@@ -103,7 +112,7 @@ function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===ui
  // Pros: business profile minus private/billing fields. Phone numbers only for signed-in viewers (pros' business line)
  // or when the person shared it with the viewer. Business locations (street addresses) never leave the owner.
  const viewer=uid&&d.users.find(u=>u.id===uid),isPro=!!(viewer&&viewer.role==="contractor");
- const users=d.users.map(u=>{if(u.id===uid){const c=Object.assign({},u);if(u.role==="contractor"&&rc){try{c.rs=rc(u.id)}catch(e){}}return c}
+ const users=d.users.map(u=>{if(u.id===uid){const c=Object.assign({},u);if(u.role==="contractor"&&rc){try{c.rs=rc(u.id)}catch(e){}}if(u.role==="contractor")c.pv16=pvOf(u.id);return c}
   let c;if(u.role==="contractor"){c=Object.assign({},u);for(const k of PRO_PRIVATE)delete c[k];if(!uid)delete c.phone;if(Array.isArray(c.busy))c.busy=c.busy.map(x=>({start:x&&x.start,end:x&&x.end}));if(rc){try{c.rs=rc(u.id)}catch(e){}}}
   else{c={};for(const k of PUBLIC_USER)if(u[k]!==undefined)c[k]=u[k];if(uid&&(u.sharedWith||[]).includes(uid)&&u.phone)c.phone=u.phone}
   return c});
@@ -294,6 +303,11 @@ const server=http.createServer(async(req,res)=>{
  if(limited("all:"+ip(req),600,60e3))return send(res,429,{error:"Too many requests, slow down."});
  const uid=sessionUid(req);
  if(req.method==="GET"&&p==="/api/state"){const v=+url.searchParams.get("v");if(v&&v===VER)return send(res,200,{same:true});return send(res,200,{state:snapshot(uid)})}
+ if(p==="/api/pview"&&req.method==="POST"){const b=clean(await body(req).catch(()=>({})));const pid=String(b.pid||"").slice(0,40);const u=DB().users.find(x=>x.id===pid&&x.role==="contractor");
+  if(!u)return send(res,404,{error:"Not found"});if(uid===pid||/bot|crawl|spider|slurp|lighthouse/i.test(req.headers["user-agent"]||""))return send(res,200,{ok:true,counted:false});
+  if(limited("pv:"+ip(req),60,60e3))return send(res,429,{error:"Too many requests, slow down."});
+  const day=pvDay(Date.now()),who=uid||"ip:"+crypto.createHash("sha256").update(String(ip(req))+"|"+String(req.headers["user-agent"]||"")).digest("base64url").slice(0,16),k=pid+"|"+who+"|"+day;
+  if(PV_SEEN.has(k))return send(res,200,{ok:true,counted:false});if(PV_SEEN.size>100000)PV_SEEN.clear();PV_SEEN.add(k);pvAdd.run(pid,day);return send(res,200,{ok:true,counted:true})}
  if(req.method==="GET"&&p==="/api/auth/methods")return send(res,200,AUTH.methods());
  if(req.method==="GET"&&p==="/api/account"){if(!uid)return send(res,401,{error:"Sign in first"});const a=db.prepare("SELECT email,phone,hash FROM accounts WHERE uid=?").get(uid)||{};return send(res,200,{email:/@phone\.invalid$/.test(a.email||"")?null:a.email,phone:a.phone||null,password:!!a.hash,passkeys:AUTH.pkList(uid),linked:AUTH.linked(uid),methods:AUTH.methods()})}
  if(req.method!=="POST")return send(res,405,{error:"Method not allowed"});
@@ -333,7 +347,7 @@ const server=http.createServer(async(req,res)=>{
   const r=run(uid,"__delete13",[]);if(!r||!r.ok)return send(res,400,{error:(r&&r.msg)||"Couldn't delete the account."});
   const a=db.prepare("SELECT email,phone FROM accounts WHERE uid=?").get(uid)||{};
   for(const up of db.prepare("SELECT name FROM uploads WHERE uid=?").all(uid)){try{fs.unlinkSync(path.join(UPLOADS,up.name))}catch(e){}}
-  db.prepare("DELETE FROM uploads WHERE uid=?").run(uid);db.prepare("DELETE FROM sessions WHERE uid=?").run(uid);db.prepare("DELETE FROM accounts WHERE uid=?").run(uid);
+  db.prepare("DELETE FROM uploads WHERE uid=?").run(uid);db.prepare("DELETE FROM pviews WHERE pid=?").run(uid);db.prepare("DELETE FROM sessions WHERE uid=?").run(uid);db.prepare("DELETE FROM accounts WHERE uid=?").run(uid);
   for(const t of ["passkeys","identities"])try{db.prepare("DELETE FROM "+t+" WHERE uid=?").run(uid)}catch(e){}
   for(const t of [a.email,a.phone].filter(Boolean))try{db.prepare("DELETE FROM codes WHERE target=?").run(String(t).toLowerCase())}catch(e){}
   setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}

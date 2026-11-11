@@ -120,6 +120,42 @@ function pngChunk(type,data){const d=Buffer.from(data,"latin1"),h=Buffer.alloc(8
  await p.goto(B+"/#/office/compliance");await p.reload();await p.waitForTimeout(900);const ot=await p.$eval("#app",e=>e.innerText);
  ok(/60, 30 and 7 days/.test(ot)&&!/45 days/.test(ot),"Office states one reminder schedule (60, 30, 7 days and the day of)");
  await br.close()}
+// ===================== 4) honest dashboard numbers + first-run guidance =====================
+{const P=await signup("pro",{name:"Vic Views",email:"v16-pv-"+run+"@sawyer.test",biz:"Vic Views Roofing",trade:"Roofing",zip:"78704",phone:"5125550133"});const pid=P.j&&P.j.state.me;
+ const C=await signup("customer",{name:"Wren Viewer",email:"v16-pv-cu-"+run+"@sawyer.test",zip:"78704"});
+ const M=await signup("pm",{name:"Pia Planner",email:"v16-pm-"+run+"@sawyer.test",biz:"Pia Build Co",zip:"78704"});
+ ok(pid&&C.cookie&&M.cookie,"throwaway pro, customer and PM");
+ ok((await req("/api/pview",{method:"POST",body:{pid:"nope"}})).code===404,"view of an unknown profile: 404");
+ const lh=await req("/api/pview",{method:"POST",body:{pid},headers:{"User-Agent":"Mozilla/5.0 Chrome-Lighthouse"}});ok(lh.j&&lh.j.counted===false,"crawlers and Lighthouse don't count as views");
+ const own=await req("/api/pview",{method:"POST",body:{pid},cookie:P.cookie});ok(own.j&&own.j.counted===false,"a pro viewing their own profile doesn't count");
+ const pubPro=(await req("/api/state",{cookie:C.cookie})).j.state.users.find(u=>u.id===pid);ok(pubPro&&pubPro.pv16===undefined,"view counts are private to the pro");
+ const br=await chromium.launch();const ctx=async(w,email,cookie)=>{const c=await br.newContext({viewport:{width:w,height:w<500?844:900},deviceScaleFactor:w<500?2:1});if(cookie)await c.addCookies([{name:"swsid",value:cookie.split("=")[1],url:B}]);const p=await c.newPage();const pe=[];p.on("pageerror",e=>pe.push(String(e).slice(0,200)));return{c,p,pe}};
+ const dash=async(o)=>{await o.p.goto(B+"/#/dash");await o.p.reload();await o.p.waitForSelector("#app .ukpis, #app .ud-grid",{timeout:10000});await o.p.waitForTimeout(400)};
+ // brand-new pro: zero, honestly
+ const pro=await ctx(1300,null,P.cookie);await dash(pro);let k=await pro.p.$eval(".ukpis",e=>e.innerText);
+ ok(/^0\s*profile views · 30d\s*Share your card to get seen/m.test(k)&&!/vs last month/.test(k),"new pro: 0 profile views and a nudge, not a made-up number",k.replace(/\s+/g," ").slice(0,90));
+ ok(await pro.p.evaluate(()=>[...document.querySelectorAll(".ukpi svg.spark")].every(s=>getComputedStyle(s).display==="none")),"no decorative trend lines on tiles with no real history");
+ // two real visitors (signed out, then a signed-in customer), each counted once
+ const v1=await ctx(1300);await v1.p.goto(B+"/p/"+pid,{waitUntil:"load"});await v1.p.waitForSelector("#app .px-name",{timeout:10000});await v1.p.waitForTimeout(500);await v1.p.reload({waitUntil:"load"});await v1.p.waitForTimeout(800);
+ const v2=await ctx(390,null,C.cookie);await v2.p.goto(B+"/#/pro/"+pid);await v2.p.waitForSelector("#app .px-name",{timeout:10000});await v2.p.waitForTimeout(800);
+ const ps=(await req("/api/state",{cookie:P.cookie})).j.state.users.find(u=>u.id===pid);const tot=Object.values(ps.pv16||{}).reduce((a,b)=>a+b,0);
+ ok(tot===2,"two visitors, one reload: 2 views counted ("+tot+")");
+ await dash(pro);k=await pro.p.$eval(".ukpis",e=>e.innerText);ok(/^2\s*profile views · 30d\s*Your first month of views/m.test(k),"pro dashboard shows the real count",k.replace(/\s+/g," ").slice(0,80));
+ ok(await pro.p.$(".ukpi svg.spark16"),"…with a real 30-day sparkline");
+ // demo pro: the tile is the sum of its daily counts
+ const D=await login("demo-pro@sawyer.test");const c1=D.j.state.users.find(u=>u.id==="c1");const d30=Object.entries(c1.pv16||{}).filter(([d])=>d>new Date(Date.now()-30*864e5).toISOString().slice(0,10)).reduce((a,[,n])=>a+n,0);
+ const dp=await ctx(1300,null,D.cookie);await dash(dp);const dk=await dp.p.$eval(".ukpis",e=>e.innerText);ok(new RegExp("^"+d30+"\\s*profile views").test(dk)&&/vs the 30 days before/.test(dk),"demo pro tile matches its view log ("+d30+")");
+ // new homeowner: no alarm on day one
+ for(const w of [1300,390]){const cu=await ctx(w,null,C.cookie);await dash(cu);const t=await cu.p.$eval("#app",e=>e.innerText);
+  ok(/Set up your maintenance plan/.test(t)&&!/maintenance tasks? due/.test(t),w+": new homeowner's home log card invites setup instead of '9 tasks due'");
+  if(w===390&&OUT)await cu.p.screenshot({path:OUT+"/v16-new-homeowner-390.png"});errs.push(...cu.pe);await cu.c.close()}
+ const H=await login("demo-homeowner@sawyer.test");const hd=await ctx(1300,null,H.cookie);await dash(hd);ok(!/Set up your maintenance plan/.test(await hd.p.$eval("#app",e=>e.innerText)),"a homeowner with job history keeps the real task count");
+ // new PM: how a crew comes together
+ for(const w of [1300,390]){const pm=await ctx(w,null,M.cookie);await dash(pm);const g=await pm.p.$(".pm16-guide");ok(!!g,w+": new PM sees 'How a crew comes together' next to the empty projects card");
+  if(g){const t=await g.innerText();ok(/Post the project[\s\S]*Fill each slot[\s\S]*Run it from one board/.test(t),w+": three steps, in order")}
+  ok(await pm.p.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),w+": no sideways scroll");if(OUT)await pm.p.screenshot({path:OUT+"/v16-new-pm-"+w+".png"});errs.push(...pm.pe);await pm.c.close()}
+ const dm=await login("demo-pm@sawyer.test");const dmc=await ctx(1300,null,dm.cookie);await dash(dmc);ok(!(await dmc.p.$(".pm16-guide")),"a PM with projects doesn't get the first-run guide");
+ for(const o of [pro,v1,v2,dp,hd,dmc])errs.push(...o.pe);await br.close()}
 //@@V16-NEXT@@
 if(errs.length)console.log("page errors:",errs.slice(0,5).join(" | "));ok(errs.length===0,"no page errors ("+errs.length+")");
 console.log(fail?`\n${fail} FAILED`:"\nALL PASS");process.exit(fail?1:0)})().catch(e=>{console.log("FAIL crashed:",e&&e.stack||e);process.exit(1)});

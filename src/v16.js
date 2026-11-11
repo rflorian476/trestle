@@ -34,3 +34,22 @@ function seedV16(){if(typeof DB==="undefined"||!DB||!DB.users)return;const b=U("
 if(typeof __liveLoad==="undefined"){try{seedV16()}catch(e){}{const os=seed;seed=function(){const r=os.apply(this,arguments);try{seedV16()}catch(e){}return r}}}
 // a renewed record starts its reminder schedule over (the old notices were for the old expiry date)
 if(typeof A!=="undefined"&&A.saveDoc){const osd=A.saveDoc;A.saveDoc=function(o){const m=me();const prev=o&&o.id&&m&&(DB.bdocs||[]).find(x=>x.id===o.id&&x.by===m.id);const was=prev?prev.exp:undefined;const r=osd.apply(this,arguments);try{if(r&&r.ok!==false&&prev&&prev.exp!==was)prev.rem9=[]}catch(e){}return r}}
+
+// (3) Honest dashboards and first-run guidance.
+// Pro dashboard: "profile views · 30d" was a made-up number with a fixed "+12% vs last month". It now counts real views
+// (server table, one per visitor per day) with a real 30-day sparkline. Decorative sparklines on the other tiles were
+// random squiggles, even on zeros, so they're gone.
+function v16Views(m){const pv=(m&&m.pv16)||{},D=864e5,now=Date.now(),day=t=>new Date(t).toISOString().slice(0,10);let a=0,b=0;const pts=[];
+ for(let i=29;i>=0;i--){const n=+pv[day(now-i*D)]||0;a+=n;pts.push(n)}for(let i=30;i<60;i++)b+=+pv[day(now-i*D)]||0;
+ const trend=a===0?"Share your card to get seen":b===0?"Your first month of views":a===b?"Same as the 30 days before":(a>b?"+":"−")+Math.round(Math.abs(a-b)/b*100)+"% vs the 30 days before";return{a,b,pts,trend}}
+function v16Spark(pts){const mx=Math.max(1,...pts);return`<svg class="spark spark16" viewBox="0 0 100 28" aria-hidden="true"><path d="${pts.map((n,i)=>(i?"L":"M")+Math.round(i*100/(pts.length-1))+" "+(25-Math.round(n/mx*20))).join(" ")}" fill="none" stroke="currentColor" stroke-width="2"/></svg>`}
+if(typeof VIEWS!=="undefined"&&VIEWS.dash){const od=VIEWS.dash;VIEWS.dash=function(){let h=od.apply(this,arguments);try{const m=me();if(!m)return h;
+ if(m.role==="contractor"){const v=v16Views(m);h=h.replace(/<b data-count>[^<]*<\/b><span>profile views · 30d<\/span>(?:<small>[^<]*<\/small>)?<svg class="spark"[\s\S]*?<\/svg>/,()=>`<b data-count>${v.a}</b><span>profile views · 30d</span><small>${esc(v.trend)}</small>${v.a?v16Spark(v.pts):""}`)}
+ // homeowner with nothing logged yet: "9 maintenance tasks due" read like an alarm on day one
+ if(m.role==="customer"&&typeof h12Jobs==="function"&&typeof h12Data==="function"){const d=h12Data(m)||{};const fresh=!h12Jobs(m).length&&!Object.keys(d.tasks||{}).length&&!(typeof h12Warranties==="function"&&h12Warranties(m).length);
+  if(fresh)h=h.replace(/(<a class="card h12-teaser"[^>]*>[\s\S]*?<b>Your home log<\/b>)<small>[\s\S]*?<\/small>/,(x,a)=>a+`<small>Jobs, warranties and seasonal upkeep in one place · <em class="h16-ok">Set up your maintenance plan</em></small>`)}
+ // project manager with no projects: say how a crew comes together, next to the empty card
+ if(m.role==="pm"&&!(DB.projects||[]).some(p=>p.pm===m.id))h=h.replace(/(<div class="upmgrid">[\s\S]*?<b>No projects yet<\/b>[\s\S]*?<\/div>)(<\/div>)/,(x,a,b)=>a+`<div class="pm16-guide"><b>How a crew comes together</b><ol><li><span>1</span><div><b>Post the project</b><small>Dates, location and how many of each trade, like 2 plumbers and 1 electrician for a pool build.</small></div></li><li><span>2</span><div><b>Fill each slot</b><small>Sawyer suggests licensed, insured pros who are free those dates. Invite them or book the whole crew.</small></div></li><li><span>3</span><div><b>Run it from one board</b><small>Crew chat, dates on a timeline, and milestone payments (test mode).</small></div></li></ol><a class="btn sm" href="${href("find")}">Browse pros by trade</a></div>`+b)
+ }catch(e){}return h}}
+if(typeof AFTER!=="undefined"&&typeof document!=="undefined"&&typeof fetch==="function"){const seen16={};const op=AFTER.pro;AFTER.pro=function(id){const r=op&&op.apply(this,arguments);
+ try{const u=U(id),m=me();if(u&&u.role==="contractor"&&!(m&&m.id===u.id)&&!seen16[id]){seen16[id]=1;fetch("/api/pview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pid:id}),credentials:"same-origin",keepalive:true}).catch(()=>{})}}catch(e){}return r}}
