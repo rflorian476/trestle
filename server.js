@@ -89,6 +89,20 @@ function overLimit(key,max,winMs){const now=Date.now();const a=(hits.get(key)||[
 function addHit(key){const a=hits.get(key)||[];a.push(Date.now());hits.set(key,a)}
 const ip=req=>(TRUST_PROXY&&(req.headers["cf-connecting-ip"]||(req.headers["x-forwarded-for"]||"").split(",")[0].trim()))||req.socket.remoteAddress;
 
+/* ---- v18: account data export ---- */
+function involves(x,uid,depth){if(depth>3||x==null)return false;if(typeof x==="string")return x===uid;if(Array.isArray(x))return x.some(v=>involves(v,uid,depth+1));
+ if(typeof x==="object"){for(const k of Object.keys(x)){if(k==="an"||k==="demo")continue;if(involves(x[k],uid,depth+1))return true}}return false}
+function exportData(uid){const st=snapshot(uid);const a=db.prepare("SELECT email,phone,created FROM accounts WHERE uid=?").get(uid)||{};
+ const me_=(st.users||[]).find(u=>u.id===uid)||null;const out={exported:new Date().toISOString(),app:"Sawyer",note:"Your Sawyer data. Records list other people only by id or short name, the way the app shows them to you.",
+  account:{id:uid,email:/@phone\.invalid$/.test(a.email||"")?null:(a.email||null),phone:a.phone||null,created:a.created?new Date(a.created).toISOString():null,
+   password:!!db.prepare("SELECT 1 FROM accounts WHERE uid=? AND hash<>''").get(uid),
+   passkeys:AUTH.pkList(uid).map(k=>({label:k.label||"Passkey",created:k.created?new Date(k.created).toISOString():null,lastUsed:k.last_used?new Date(k.last_used).toISOString():null})),
+   linkedSignIns:AUTH.linked(uid).map(l=>({provider:l.provider,created:l.created?new Date(l.created).toISOString():null}))},
+  profile:me_,
+  uploads:db.prepare("SELECT name,type,size,created FROM uploads WHERE uid=? ORDER BY created").all(uid).map(u=>({url:"/u/"+u.name,type:u.type,bytes:u.size,created:new Date(u.created).toISOString()}))};
+ for(const [k,v] of Object.entries(st)){if(k==="users"||!Array.isArray(v))continue;const mine=v.filter(x=>involves(x,uid,0));if(mine.length)out[k]=mine}
+ return out}
+
 /* ---- validation ---- */
 const EMAIL=/^[^\s@<>"']{1,64}@[^\s@<>"']{1,190}\.[a-z]{2,}$/i;
 function clean(v,depth=0){ // strings capped, control chars removed, structure bounded
@@ -349,6 +363,13 @@ const server=http.createServer(async(req,res)=>{
   const day=pvDay(Date.now()),who=uid||"ip:"+crypto.createHash("sha256").update(String(ip(req))).digest("base64url").slice(0,16),k=pid+"|"+who+"|"+day;
   if(PV_SEEN.has(k))return send(res,200,{ok:true,counted:false});if(PV_SEEN.size>100000)PV_SEEN.clear();PV_SEEN.add(k);pvAdd.run(pid,day);return send(res,200,{ok:true,counted:true})}
  if(req.method==="GET"&&p==="/api/auth/methods")return send(res,200,AUTH.methods());
+ // v18: "Download my data". A JSON copy of everything this account can see that involves it, built from the same
+ // privacy-filtered snapshot the app itself uses (other people's private fields never appear). No password hash, salt,
+ // session tokens, passkey keys or one-time codes are included.
+ if(req.method==="GET"&&p==="/api/account/export"){if(!uid)return send(res,401,{error:"Sign in first"});
+  if(limited("export:"+uid,10,3600e3))return send(res,429,{error:"You've downloaded your data a lot in the last hour. Try again later."});
+  const out=exportData(uid);const day=new Date().toISOString().slice(0,10);
+  return send(res,200,out,{"Content-Disposition":`attachment; filename="sawyer-data-${day}.json"`})}
  if(req.method==="GET"&&p==="/api/account"){if(!uid)return send(res,401,{error:"Sign in first"});const a=db.prepare("SELECT email,phone,hash FROM accounts WHERE uid=?").get(uid)||{};return send(res,200,{email:/@phone\.invalid$/.test(a.email||"")?null:a.email,phone:a.phone||null,password:!!a.hash,passkeys:AUTH.pkList(uid),linked:AUTH.linked(uid),methods:AUTH.methods()})}
  if(req.method!=="POST")return send(res,405,{error:"Method not allowed"});
  const b=clean(await body(req));

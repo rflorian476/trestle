@@ -17,3 +17,4 @@
 .mc8-i{max-width:100%}
 .mc8-i span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .mc8-i em{flex:none}
+#exportGo{display:inline-flex;gap:8px;align-items:center;margin-top:4px}

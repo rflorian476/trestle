@@ -3678,6 +3678,10 @@ if(typeof document!=="undefined"&&document.addEventListener&&typeof window!=="un
  const ok=el=>el&&(el.tagName==="TEXTAREA"||(el.tagName==="INPUT"&&/^(text|search|email|tel|url|)$/.test(el.type||"")));
  document.addEventListener("focusin",e=>{const el=e.target;if(!ok(el)||el.maxLength>0)return;const m=v18Max(el);if(m>0)el.maxLength=m});
  document.addEventListener("input",e=>{const el=e.target;if(ok(el)&&el.maxLength>0)v18Count(el)})}
+/* Account → Your data: download a JSON copy of your account (GET /api/account/export), next to Delete account. */
+if(typeof document!=="undefined"&&typeof VIEWS!=="undefined"){const ov=VIEWS.account;if(ov)VIEWS.account=function(){const h=ov.apply(this,arguments);const m=me();if(!m||!/id="delAcct"/.test(h))return h;
+ const card=`<div class="card ex18" id="dataExport"><h2 class="h-sub">${I("download",16)} Your data</h2><p class="muted small">Download a copy of your profile, jobs, quotes, messages, reviews, invoices and photo links as one JSON file. Passwords and sign-in keys are never included.</p><a class="btn" id="exportGo" href="/api/account/export" download>${I("download",15)}Download my data</a></div>`;
+ return h.replace('<div class="card del13" id="delAcct">',card+'<div class="card del13" id="delAcct">')}}
 
 /* ===== hotfix-sec layer (QA sweep 1) ===== */
 /* SW-003: no inline event handlers (the Content-Security-Policy blocks them). Buttons carry data-csp + data-arg instead. */
