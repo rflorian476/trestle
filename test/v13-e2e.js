@@ -109,8 +109,8 @@ ok(require("fs").readFileSync(__dirname+"/../app-logic.js","utf8").includes('fil
  await p.goto(B+"/#/account");await p.reload();await p.waitForSelector("#delGo",{timeout:8000});const uid=await p.evaluate(()=>DB.me);
  await p.click("#delGo");await p.waitForSelector("#delTxt");ok(await p.isDisabled("#delYes"),"delete stays disabled until you type DELETE (SW-034)");
  await p.fill("#delTxt","DELETE");await p.click("#delYes");await p.waitForTimeout(1500);
- const after=await p.evaluate(async id=>{const s=(await (await fetch("/api/state")).json()).state;const u=(s.users||[]).find(x=>x.id===id)||{};return{me:s.me||null,name:u.name,role:u.role,email:u.email||null}},uid);
- ok(!after.me&&after.name==="Former Sawyer member"&&after.role==="deleted"&&!after.email,"deleting signs you out and anonymizes the profile "+JSON.stringify(after));
+ const after=await p.evaluate(async id=>{const s=(await (await fetch("/api/state")).json()).state;const u=(s.users||[]).find(x=>x.id===id);return{me:s.me||null,present:!!u,name:u&&u.name,role:u&&u.role,former:(s.users||[]).filter(x=>x.role==="deleted"||x.name==="Former Sawyer member").map(x=>x.id)}},uid);
+ ok(!after.me&&!after.present&&!after.former.length,"deleting signs you out and drops the profile from the signed-out snapshot "+JSON.stringify(after));
  ok(!(await post(p,"/api/login",{email:em,password:"second-pass-456"})).ok,"a deleted account can't sign in");
  const dp=await as("demo-homeowner@sawyer.test");ok(/can't be deleted/.test((await post(dp,"/api/account/delete",{confirm:"DELETE"})).error||""),"shared demo accounts can't be deleted");
  ok(await dp.evaluate(()=>typeof A.__delete13==="function")&&/Unknown action/.test(JSON.stringify(await post(dp,"/api/act",{name:"__delete13",args:[]}))),"the delete action isn't reachable through /api/act");
