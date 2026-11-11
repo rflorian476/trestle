@@ -19,6 +19,8 @@ const getKV=db.prepare("SELECT v FROM appdata WHERE k=?"),setKV=db.prepare("INSE
 const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs","estimates","tcalls","bills","bcust","bdocs","ledger","tsheets","lodging","creviews","visits","cases","crew","refs","consults","rreq12","reports12","rmrev12"];
 const BRAND=require("./brand.json");const APP_VERSION=require("./package.json").version+"-"+BRAND.slug;
 const UPLOADS=path.join(DATA,"uploads");fs.mkdirSync(UPLOADS,{recursive:true});
+try{db.exec("ALTER TABLE uploads ADD COLUMN kind TEXT NOT NULL DEFAULT 'photo'")}catch(e){}
+
 const MAX_UPLOAD=5*1024*1024;
 const IMGSAFE=require("./lib/imgsafe.js");
 const LIMITS=require("./lib/limits.js");
@@ -35,6 +37,11 @@ const ctx={console,Date,Math,JSON,Object,Array,String,Number,Boolean,RegExp,Erro
  addEventListener(){},removeEventListener(){},getComputedStyle:()=>anyStub(),IntersectionObserver:function(){return anyStub()},ResizeObserver:function(){return anyStub()},MutationObserver:function(){return anyStub()},
  scrollTo(){},innerWidth:1280,innerHeight:800,performance:{now:()=>Date.now()},crypto:require("crypto").webcrypto,alert(){},confirm:()=>true,Image:function(){return anyStub()}};
 ctx.window=ctx;ctx.globalThis=ctx;ctx.self=ctx;
+/* SW-050: TEST_NOW is a test clock, ignored when NODE_ENV is production. */
+ctx.__now=function(){const env=String(process.env.NODE_ENV||"").toLowerCase();
+ if(env!=="production"&&env!=="prod"){const raw=String(process.env.TEST_NOW||"").trim();
+  if(raw){const n=/^\d{10,}$/.test(raw)?Number(raw):Date.parse(raw);if(isFinite(n)&&n>0)return n}}
+ return Date.now()};
 vm.createContext(ctx);
 try{vm.runInContext(fs.readFileSync(path.join(__dirname,"app-logic.js"),"utf8"),ctx,{filename:"app-logic.js"})}catch(e){console.error("logic load warning:",e.message)}
 const api=ctx.__api;if(!api)throw new Error("app logic failed to load");
@@ -101,7 +108,7 @@ function exportData(uid){const st=snapshot(uid);const a=db.prepare("SELECT email
    passkeys:AUTH.pkList(uid).map(k=>({label:k.label||"Passkey",created:k.created?new Date(k.created).toISOString():null,lastUsed:k.last_used?new Date(k.last_used).toISOString():null})),
    linkedSignIns:AUTH.linked(uid).map(l=>({provider:l.provider,created:l.created?new Date(l.created).toISOString():null}))},
   profile:me_,
-  uploads:db.prepare("SELECT name,type,size,created FROM uploads WHERE uid=? ORDER BY created").all(uid).map(u=>({url:"/u/"+u.name,type:u.type,bytes:u.size,created:new Date(u.created).toISOString()}))};
+  uploads:db.prepare("SELECT name,type,size,created,kind FROM uploads WHERE uid=? ORDER BY created").all(uid).map(u=>({url:(u.kind==="coi"?"/api/coi/":"/u/")+u.name,type:u.type,bytes:u.size,created:new Date(u.created).toISOString(),kind:u.kind||"photo"}))};
  for(const [k,v] of Object.entries(st)){if(k==="users"||!Array.isArray(v))continue;const mine=v.filter(x=>involves(x,uid,0));if(mine.length)out[k]=mine}
  return out}
 
@@ -124,6 +131,18 @@ function pickPro(o){const r={};if(!o||typeof o!=="object"||Array.isArray(o))retu
 function stripPriv(args){for(const a of args)if(a&&typeof a==="object"&&!Array.isArray(a))for(const k of ["staff","admin","verified","founding","bg","planStatus","planEnds","credits"])delete a[k];return args}
 
 const PRO_PRIVATE=["email","sharedWith","credits","coiReqs","cois","flags","favs","plan","planStatus","planEnds","paidThru","tsaved","talerts","trip","aprefs","focus8","crew8","nprefs11","home12","rrTpl12","locations","recurring","saved","autoRem9","needsSetup","emailHidden","staff","admin","verifyReject","verifyBy","verifyNote"];
+/* SW-049: license number, insurer, policy number and COI file are owner + staff only. */
+const PACKET_PRIVATE=["license","licState","insurance","coiNum","coiCarrier","coiFile","verifyReject","verifyBy","verifyNote","verifyPending","verifySubmitted","verifyDecided","verifyRem19"];
+function stripPacket(c){for(const k of PACKET_PRIVATE)delete c[k];
+ if(c.verifyChecked&&typeof c.verifyChecked==="object")c.verifyChecked={license:!!c.verifyChecked.license,coi:!!c.verifyChecked.coi,at:c.verifyChecked.at||null};
+ return c}
+const UPLOAD_NAME=/^\/(?:u|api\/coi)\/([a-f0-9]{32}\.(?:jpg|png|webp))$/;
+function uploadName(url){const m=UPLOAD_NAME.exec(String(url||""));return m?m[1]:null}
+function isCoiName(name){if(!name)return false;const r=db.prepare("SELECT kind FROM uploads WHERE name=?").get(name);return !!(r&&r.kind==="coi")}
+function markCoi(name){if(name)db.prepare("UPDATE uploads SET kind='coi' WHERE name=?").run(name)}
+function migrateCoi(){let n=0;for(const u of (DB().users||[])){const name=uploadName(u&&u.coiFile);if(!name)continue;markCoi(name);const next="/api/coi/"+name;if(u.coiFile!==next){u.coiFile=next;n++}}if(n)persist();return n}
+try{migrateCoi()}catch(e){console.error("coi migrate:",e.message)}
+
 const PUBLIC_USER=["id","role","acct","name","biz","zip","bio","demo","joined","created","trav","avatar","photo"];
 /* ---- v16: real profile views (the pro dashboard used to show a made-up number). One view per visitor per pro per day,
    counted when the profile actually renders in a browser (crawlers and the pro's own visits don't count). Kept in their own
@@ -156,7 +175,7 @@ function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===ui
   if((d.consults||[]).some(c=>(c.pro===a||c.cu===a)&&(c.pro===b||c.cu===b)))return true;
   return false};
  const users=d.users.filter(u=>u.role!=="deleted"||(uid&&(staff||linked(uid,u.id)))).map(u=>{if(u.id===uid){const c=Object.assign({},u);if(u.role==="contractor"&&rc){try{c.rs=rc(u.id)}catch(e){}}if(u.role==="contractor")c.pv16=pvOf(u.id);return c}
-  let c;if(u.role==="contractor"){c=Object.assign({},u);for(const k of PRO_PRIVATE)delete c[k];if(!uid)delete c.phone;if(Array.isArray(c.busy))c.busy=c.busy.map(x=>({start:x&&x.start,end:x&&x.end}));if(rc){try{c.rs=rc(u.id)}catch(e){}}}
+  let c;if(u.role==="contractor"){c=Object.assign({},u);for(const k of PRO_PRIVATE)delete c[k];if(!staff)stripPacket(c);if(!uid)delete c.phone;if(Array.isArray(c.busy))c.busy=c.busy.map(x=>({start:x&&x.start,end:x&&x.end}));if(rc){try{c.rs=rc(u.id)}catch(e){}}}
   else{c={};for(const k of PUBLIC_USER)if(u[k]!==undefined)c[k]=u[k];if(uid&&(u.sharedWith||[]).includes(uid)&&u.phone)c.phone=u.phone}
   return c});
  // Jobs: parties see everything. Signed-in pros see open requests to quote (no escrow, no customer contact).
@@ -284,8 +303,12 @@ function upload(req,res){
   // v16: full structure check. Refuses HTML/script hidden in or after the image (polyglots), trims trailing bytes, removes GPS.
   const sf=IMGSAFE.check(type,buf);if(!sf.ok)return send(res,415,{error:sf.error});buf=sf.buf;
   const name=crypto.randomBytes(16).toString("hex")+"."+t.ext;fs.writeFileSync(path.join(UPLOADS,name),buf);
-  db.prepare("INSERT INTO uploads VALUES(?,?,?,?,?)").run(name,uid,type,buf.length,Date.now());send(res,200,{ok:true,url:"/u/"+name})})}
-const ownsUpload=(uid,url)=>{const m=/^\/u\/([a-f0-9]{32}\.(?:jpg|png|webp))$/.exec(String(url||""));return !!(m&&db.prepare("SELECT 1 FROM uploads WHERE name=? AND uid=?").get(m[1],uid))};
+  const kind=(/\bkind=coi\b/.test(String(req.url||""))||String(req.headers["x-sawyer-upload"]||"")==="coi")?"coi":"photo";
+  db.prepare("INSERT INTO uploads(name,uid,type,size,created,kind) VALUES(?,?,?,?,?,?)").run(name,uid,type,buf.length,Date.now(),kind);send(res,200,{ok:true,url:(kind==="coi"?"/api/coi/":"/u/")+name})})}
+const ownsUpload=(uid,url)=>{const name=uploadName(url);return !!(name&&db.prepare("SELECT 1 FROM uploads WHERE name=? AND uid=?").get(name,uid))};
+function serveUpload(res,name,extra){const f=path.join(UPLOADS,path.basename(name));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});const ext=name.split(".").pop();
+ res.writeHead(200,Object.assign({"Content-Type":ext==="jpg"?"image/jpeg":"image/"+ext,"Content-Security-Policy":"default-src 'none'; sandbox"},extra||{}));return fs.createReadStream(f).pipe(res)}
+
 /* ---- passwordless, passkeys, OAuth (lib/auth.js) ---- */
 // SW-040: border-box sizing (the 100%-wide card plus its padding overflowed by 8px at 390px), long words wrap,
 // and the page carries the brand: house mark, Plus Jakarta Sans (self-hosted, font-src 'self'), linen + navy.
@@ -351,7 +374,12 @@ const server=http.createServer(async(req,res)=>{
  {const em=/^\/embed\/([A-Za-z0-9_-]{1,40})$/.exec(p);if(req.method==="GET"&&em)return embedPage(req,res,em[1],url)}
  if(req.method==="GET"&&p==="/favicon.ico"){res.writeHead(200,{"Content-Type":"image/png","Cache-Control":"public, max-age=86400"});return res.end(fs.readFileSync(path.join(__dirname,"public/icons/favicon-32.png")))}
  if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:APP_VERSION,app:BRAND.name,data:VER});
- if(req.method==="GET"&&/^\/u\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(p)){const f=path.join(UPLOADS,path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});const ext=p.split(".").pop();res.writeHead(200,{"Content-Type":ext==="jpg"?"image/jpeg":"image/"+ext,"Cache-Control":"public, max-age=31536000, immutable","Content-Security-Policy":"default-src 'none'; sandbox"});return fs.createReadStream(f).pipe(res)}
+ if(req.method==="GET"&&/^\/u\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(p)){const name=path.basename(p);if(isCoiName(name))return send(res,404,{error:"Not found"});return serveUpload(res,name,{"Cache-Control":"public, max-age=31536000, immutable"})}
+ if(req.method==="GET"&&/^\/api\/coi\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(p)){const name=path.basename(p);const who=sessionUid(req);if(!who)return send(res,401,{error:"Sign in first"});
+  const row=db.prepare("SELECT uid,kind FROM uploads WHERE name=?").get(name);if(!row||row.kind!=="coi")return send(res,404,{error:"Not found"});
+  const me_=DB().users.find(u=>u.id===who);if(row.uid!==who&&!(me_&&me_.staff))return send(res,404,{error:"Not found"});
+  return serveUpload(res,name,{"Cache-Control":"private, no-store"})}
+
  if(req.method==="GET"&&p==="/auth/magic")return AUTH.magic(req,res,url);
  {const m=/^\/auth\/oauth\/(google|apple|microsoft|facebook)\/(start|demo|callback)$/.exec(p);if(m){
   if(m[2]==="start"&&req.method==="GET")return AUTH.oauthStart(req,res,m[1],url);
@@ -450,7 +478,7 @@ const server=http.createServer(async(req,res)=>{
   if(!uid)return send(res,401,{error:"Sign in first",need:"login",state:snapshot(null)});
   if(limited("act:"+uid,120,60e3))return send(res,429,{error:"Too many actions, slow down."});
   if(name==="addLedger"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the receipt photo again"},state:snapshot(uid)});
- if(name==="addPhoto"&&!ownsUpload(uid,args[2]))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
+ if(name==="addPhoto"&&(!ownsUpload(uid,args[2])||isCoiName(uploadName(args[2]))))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
   if(name==="postJob"&&args[0]&&Array.isArray(args[0].photos))args[0].photos=args[0].photos.filter(u=>ownsUpload(uid,u));
   if(name==="saveDoc"&&args[0]&&args[0].file&&!ownsUpload(uid,args[0].file)){const prev=(DB().bdocs||[]).find(d=>d.id===args[0].id&&d.by===uid);if(!prev||prev.file!==args[0].file)args[0].file=""}
   if(name==="saveEstimate"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))return send(res,200,{res:{ok:false,msg:"Upload the photo again"},state:snapshot(uid)});
@@ -461,7 +489,9 @@ const server=http.createServer(async(req,res)=>{
   {const lim=LIMITS.check(name,args);if(lim)return send(res,400,{error:lim.msg,field:lim.field,max:lim.max,res:{ok:false,msg:lim.msg},state:snapshot(uid)})}
   if(name==="hire"){const cand=DB().users.find(u=>u.id===args[1]);if(!cand||cand.role!=="contractor")return send(res,400,{error:"Pick a pro who quoted",res:{ok:false,msg:"Pick a pro who quoted"},state:snapshot(uid)})}
   // v13 (QA SW-037): a portfolio is only cleared by an explicit empty list; if every submitted photo is rejected, nothing is written.
-  if(name==="setGal12"){if(!Array.isArray(args[0]))return send(res,200,{res:{ok:false,msg:"Send a list of photos"},state:snapshot(uid)});const gu=DB().users.find(u=>u.id===uid)||{};const prev=new Set((gu.gal12||[]).map(x=>x.src));const n=args[0].length;
+  if(name==="setGal12"){if(!Array.isArray(args[0]))return send(res,200,{res:{ok:false,msg:"Send a list of photos"},state:snapshot(uid)});
+   args[0]=(args[0]||[]).filter(x=>x&&!isCoiName(uploadName(x.src||x)));
+   const gu=DB().users.find(u=>u.id===uid)||{};const prev=new Set((gu.gal12||[]).map(x=>x.src));const n=args[0].length;
    args[0]=args[0].filter(x=>x&&typeof x.src==="string"&&(prev.has(x.src)||ownsUpload(uid,x.src)));
    if(n&&!args[0].length)return send(res,200,{res:{ok:false,msg:"Those photos couldn't be added. Upload them again from your device."},state:snapshot(uid)})}
   if(name==="homeItem12"&&args[0]&&args[0].photo&&!ownsUpload(uid,args[0].photo))args[0].photo="";
@@ -475,6 +505,7 @@ const server=http.createServer(async(req,res)=>{
    if(newThread){const now=Date.now(),k="newthread:"+uid,a=(hits.get(k)||[]).filter(t=>now-t<864e5);hits.set(k,a);if(a.length>=NEW_THREAD_MAX*RATE_X)return send(res,429,{error:"You've started a lot of new conversations today. Reply in your existing threads, or try again tomorrow.",res:{ok:false,msg:"You've started a lot of new conversations today. Reply in your existing threads, or try again tomorrow."},state:snapshot(uid)})}}
   const r=run(uid,name,args);allowAuto=false;
   if(newThread&&r&&r.ok!==false&&DB().msgs.some(x=>x.from===uid&&(x.a===String(args[0])||x.b===String(args[0]))))hits.get("newthread:"+uid).push(Date.now());
+  if(name==="submitVerify19"&&r&&r.ok!==false){const me_=DB().users.find(u=>u.id===uid);const nm=uploadName(me_&&me_.coiFile);if(nm){markCoi(nm);me_.coiFile="/api/coi/"+nm;persist()}}
   return send(res,200,{res:r===undefined?{ok:true}:r,state:snapshot(uid)})}
  return send(res,404,{error:"Not found"});
  }catch(e){console.error(e);return send(res,400,{error:"Bad request"})}
