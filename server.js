@@ -99,7 +99,9 @@ const PRO_PRIVATE=["email","sharedWith","credits","coiReqs","cois","flags","favs
 const PUBLIC_USER=["id","role","acct","name","biz","zip","bio","demo","joined","created","trav","avatar","photo"];
 /* ---- v16: real profile views (the pro dashboard used to show a made-up number). One view per visitor per pro per day,
    counted when the profile actually renders in a browser (crawlers and the pro's own visits don't count). Kept in their own
-   table so a view never bumps the data version (no state refetch for everyone). ---- */
+   table so a view never bumps the data version (no state refetch for everyone).
+   v17 (SW-042): signed-out views dedupe per IP and pro per day. The User-Agent is not part of the key, so rotating it
+   from the same address does not invent extra views. Signed-in viewers are still keyed by account. ---- */
 const PV_SEEN=new Set();const pvAdd=db.prepare("INSERT INTO pviews(pid,day,n) VALUES(?,?,1) ON CONFLICT(pid,day) DO UPDATE SET n=n+1"),pvGet=db.prepare("SELECT day,n FROM pviews WHERE pid=? AND day>=?");
 const pvDay=t=>new Date(t).toISOString().slice(0,10);
 function pvOf(pid){const o={};for(const r of pvGet.all(pid,pvDay(Date.now()-62*864e5)))o[r.day]=r.n;return o}
@@ -306,7 +308,7 @@ const server=http.createServer(async(req,res)=>{
  if(p==="/api/pview"&&req.method==="POST"){const b=clean(await body(req).catch(()=>({})));const pid=String(b.pid||"").slice(0,40);const u=DB().users.find(x=>x.id===pid&&x.role==="contractor");
   if(!u)return send(res,404,{error:"Not found"});if(uid===pid||/bot|crawl|spider|slurp|lighthouse/i.test(req.headers["user-agent"]||""))return send(res,200,{ok:true,counted:false});
   if(limited("pv:"+ip(req),60,60e3))return send(res,429,{error:"Too many requests, slow down."});
-  const day=pvDay(Date.now()),who=uid||"ip:"+crypto.createHash("sha256").update(String(ip(req))+"|"+String(req.headers["user-agent"]||"")).digest("base64url").slice(0,16),k=pid+"|"+who+"|"+day;
+  const day=pvDay(Date.now()),who=uid||"ip:"+crypto.createHash("sha256").update(String(ip(req))).digest("base64url").slice(0,16),k=pid+"|"+who+"|"+day;
   if(PV_SEEN.has(k))return send(res,200,{ok:true,counted:false});if(PV_SEEN.size>100000)PV_SEEN.clear();PV_SEEN.add(k);pvAdd.run(pid,day);return send(res,200,{ok:true,counted:true})}
  if(req.method==="GET"&&p==="/api/auth/methods")return send(res,200,AUTH.methods());
  if(req.method==="GET"&&p==="/api/account"){if(!uid)return send(res,401,{error:"Sign in first"});const a=db.prepare("SELECT email,phone,hash FROM accounts WHERE uid=?").get(uid)||{};return send(res,200,{email:/@phone\.invalid$/.test(a.email||"")?null:a.email,phone:a.phone||null,password:!!a.hash,passkeys:AUTH.pkList(uid),linked:AUTH.linked(uid),methods:AUTH.methods()})}

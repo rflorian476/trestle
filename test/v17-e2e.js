@@ -48,5 +48,27 @@ function webpVP8(src,w,h){const b=Buffer.from(src);let i=12,total=b.readUInt32LE
  const uOk=await up(ck,"image/png",png);ok(uOk.code===200&&uOk.j&&uOk.j.url,"upload: a normal PNG still stores",uOk.t);
  const uTiny=await up(ck,"image/png",okP);ok(uTiny.code===200&&uTiny.j&&uTiny.j.url,"upload: a 16×16 PNG still stores",uTiny.t);
 }
+// ===================== SW-042: signed-out /api/pview dedupes per IP and pro per day, not User-Agent =====================
+{const P=await signup("pro",{name:"Ira Views",email:"v17-pv-"+run+"@sawyer.test",biz:"Ira Views Roofing",trade:"Roofing",zip:"78704",phone:"5125550178"});
+ const pid=P.j&&P.j.state&&P.j.state.me;ok(pid,"throwaway pro for view-count checks",P.code);
+ const C=await signup("customer",{name:"Pat Viewer",email:"v17-pv-cu-"+run+"@sawyer.test",zip:"78704"});
+ const ua=s=>({method:"POST",body:{pid},headers:{"User-Agent":s}});
+ const a=await req("/api/pview",ua("Mozilla/5.0 (Windows NT 10.0; rv:128.0) Gecko/20100101 Firefox/128.0"));
+ ok(a.code===200&&a.j&&a.j.counted===true,"first signed-out view from this IP counts",a.t);
+ const b=await req("/api/pview",ua("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148"));
+ ok(b.code===200&&b.j&&b.j.counted===false,"the same IP with a different User-Agent does not count again",b.t);
+ const c=await req("/api/pview",ua("Mozilla/5.0 (Windows NT 10.0; rv:128.0) Gecko/20100101 Firefox/128.0"));
+ ok(c.code===200&&c.j&&c.j.counted===false,"a repeat with the original User-Agent still does not count",c.t);
+ const Q=await signup("pro",{name:"Other Pro",email:"v17-pv2-"+run+"@sawyer.test",biz:"Other Pro HVAC",trade:"HVAC",zip:"78704",phone:"5125550179"});
+ const pid2=Q.j&&Q.j.state&&Q.j.state.me;
+ const d=await req("/api/pview",{method:"POST",body:{pid:pid2},headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; rv:128.0) Gecko/20100101 Firefox/128.0"}});
+ ok(d.code===200&&d.j&&d.j.counted===true,"the same IP can still count a view of a different pro",d.t);
+ const e=await req("/api/pview",{method:"POST",body:{pid},cookie:C.cookie,headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; rv:128.0) Gecko/20100101 Firefox/128.0"}});
+ ok(e.code===200&&e.j&&e.j.counted===true,"a signed-in customer from the same IP still counts once as themselves",e.t);
+ const e2=await req("/api/pview",{method:"POST",body:{pid},cookie:C.cookie,headers:{"User-Agent":"Mozilla/5.0 totally-different"}});
+ ok(e2.code===200&&e2.j&&e2.j.counted===false,"that signed-in customer does not count twice by changing User-Agent",e2.t);
+ const st=(await req("/api/state",{cookie:P.cookie})).j.state.users.find(u=>u.id===pid);const tot=Object.values(st&&st.pv16||{}).reduce((a,n)=>a+n,0);
+ ok(tot===2,"the pro sees 2 views (one signed-out IP, one signed-in customer), not one per User-Agent ("+tot+")");
+}
 if(fail){console.log(fail+" FAIL");process.exit(1)}else console.log("ZERO failures");
 })().catch(e=>{console.error(e);process.exit(1)});
