@@ -19,6 +19,7 @@ const COLS=["users","jobs","reviews","msgs","quotes","notifs","projects","pmsgs"
 const BRAND=require("./brand.json");const APP_VERSION=require("./package.json").version+"-"+BRAND.slug;
 const UPLOADS=path.join(DATA,"uploads");fs.mkdirSync(UPLOADS,{recursive:true});
 const MAX_UPLOAD=5*1024*1024;
+const IMGSAFE=require("./lib/imgsafe.js");
 
 /* ---- shared business rules: the same A.* actions the UI was built on, run server-side ---- */
 let VER=Date.now(),allowAuto=false,dirty=false,PUB_ST={t:0,s:"",v:0};
@@ -192,7 +193,9 @@ function upload(req,res){
  if(limited("up:"+uid,30,60*60e3)){req.resume();return send(res,429,{error:"Upload limit reached, try again later"})}
  let n=0,c=[],dead=false;
  req.on("data",b=>{if(dead)return;n+=b.length;if(n>MAX_UPLOAD){dead=true;send(res,413,{error:"Photos must be 5 MB or smaller"});req.resume()}else c.push(b)});
- req.on("end",()=>{if(dead)return;const buf=Buffer.concat(c);if(buf.length<12||!t.ok(buf))return send(res,415,{error:"That file isn't a valid image"});
+ req.on("end",()=>{if(dead)return;let buf=Buffer.concat(c);if(buf.length<12||!t.ok(buf))return send(res,415,{error:"That file isn't a valid image"});
+  // v16: full structure check. Refuses HTML/script hidden in or after the image (polyglots), trims trailing bytes, removes GPS.
+  const sf=IMGSAFE.check(type,buf);if(!sf.ok)return send(res,415,{error:sf.error});buf=sf.buf;
   const name=crypto.randomBytes(16).toString("hex")+"."+t.ext;fs.writeFileSync(path.join(UPLOADS,name),buf);
   db.prepare("INSERT INTO uploads VALUES(?,?,?,?,?)").run(name,uid,type,buf.length,Date.now());send(res,200,{ok:true,url:"/u/"+name})})}
 const ownsUpload=(uid,url)=>{const m=/^\/u\/([a-f0-9]{32}\.(?:jpg|png|webp))$/.exec(String(url||""));return !!(m&&db.prepare("SELECT 1 FROM uploads WHERE name=? AND uid=?").get(m[1],uid))};
