@@ -21,6 +21,29 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+## v18: QA leftovers, field limits, Your data, a real Change password dialog
+Builds on v17 (SW-042, SW-043, SW-044; live as `23488d5`).
+- **SW-045:** no JSON-LD on any page while the host isn't indexable. The home page's Organization schema now appears only with `SAWYER_INDEXABLE=1`, the same as the profile and traveler-call schemas. Robots meta, `X-Robots-Tag` and `robots.txt` are unchanged.
+- **Sweep 1 leftovers rechecked on v17 code** (SW-011..016, SW-020..023, SW-025, SW-026 were fixed in v13 without their own commits). Three still had gaps and are now fixed:
+  - **SW-010:** contrast misses on Projects (filled crew slots faded to 60%), the pro Schedule (done visits faded) and muted "Done" badges. All pass axe AA now.
+  - **SW-011:** heading levels skipped on For pros, Projects, Job board, Saved pros, Per diem and every empty state. Lists get a visually hidden H2. Empty-state titles are H2 but look the same as before.
+  - **SW-024:** the last placeholder-style seed names are gone (Pat Homeowner → Pat Hollis, Dana Buildwell → Dana Castellano, Joe Framer → Joe Franco, and so on). Short names stay "Pat H.".
+- **Field limits enforced by the server (SW-036 follow-through):** `lib/limits.js` checks every `/api/act` call and sign-up. Over-long input gets HTTP 400 with "Keep the … under N characters." Nothing is cut silently.
+  - Names and business names: 80. Titles: 120 (job titles 90). Bio: 1,500. Descriptions, messages and reviews: 2,000. Notes, replies and quote notes: 1,000.
+  - Any other free-text argument is capped at 2,000.
+  - The browser gives fields without a `maxlength` the same limit the first time they're focused, including the chat composer. A "N characters left" counter appears at 80%.
+  - Long unbroken words and URLs wrap in cards, bubbles, tables and headings. The job chip in a conversation fits a 390 px phone.
+- **Account → Your data:** **Download my data** saves `sawyer-data-<date>.json` (`GET /api/account/export`). It contains your account (email, phone, sign-in methods), your profile, your upload links and every record that involves you.
+  - It's built from the same privacy-filtered snapshot the app uses, so other people appear only as the app shows them to you.
+  - It never includes password hashes, salts, session tokens, passkey keys or codes.
+  - Signed-out requests get 401. Rate limit: 10 an hour.
+- **A real Change password dialog:** fields for current password, new password and confirm.
+  - Show/Hide buttons (`aria-pressed`) and a live hint (characters to go, passwords don't match, new password is the same as the old one).
+  - Server errors show inline. Save stays disabled until the form is valid, and Enter submits.
+  - **Forgot your current password?** emails (or texts) a one-time code to the account. After the code you can set a new password without the old one (the SW-033 rule). On a public host with no email provider, the code request says codes aren't available, as on sign-in.
+- **Shared demo accounts can't change their password.** Changing it would lock out every tester and sign out their sessions. This is the same rule as Delete account. The dialog explains why.
+- Tests: `node test/v18-e2e.js http://localhost:8899 shots/v18` (needs `playwright` and `axe-core` on `NODE_PATH`). It's part of `test/run-all.sh`. `test/seo.js` now expects no JSON-LD while the host isn't indexable. `hotfix-e2e` and `v13-e2e` follow the new dialog.
+
 ## v16: uploads hardening, slim profile pages, records and honest dashboards
 Builds on v15 (SW-041: a missing recipient gets the normal "doesn't exist" error even when the first-contact cap is hit).
 - **Uploads hardening (QA sweep 2, B5):** `lib/imgsafe.js` walks the real structure of every JPEG, PNG and WebP, not just the magic bytes.
@@ -233,6 +256,7 @@ This repo is deploy-ready, and nothing has been pushed anywhere yet.
 
 - `GET /robots.txt` is `Disallow: /`.
 - Every response sends `X-Robots-Tag: noindex, nofollow`.
+- No page carries JSON-LD while indexing is off. That includes the home page's Organization schema (v18, SW-045).
 - Records labelled demo (`demo: true` or a name/title containing `(demo)`) are never in `/sitemap.xml`, and their pages stay `noindex` with no JSON-LD even after indexing is turned on.
 
 **Launch switch (one line):**
