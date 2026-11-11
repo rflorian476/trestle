@@ -19,7 +19,7 @@ let LZ12=T(fs.readFileSync(path.join(__dirname,"src/v12-lazy.js"),"utf8"));
 {let esb=null;try{esb=require("esbuild")}catch(e){}if(esb&&!process.env.NO_MINIFY)LZ12=esb.transformSync('"use strict";\n'+LZ12,{minifyWhitespace:true,minifySyntax:true,target:"es2022",legalComments:"none",loader:"js"}).code.trim();else LZ12='"use strict";\n'+LZ12}
 const LZ12_FILE="lz12."+require("crypto").createHash("sha256").update(LZ12).digest("hex").slice(0,10)+".js";
 c=rep(c,"__LZ12_SRC__","/js/"+LZ12_FILE);
-c=rep(c,"try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){DB=null}\nif(!DB||!DB.users||DB.v!==1)seed();","DB=__liveLoad();");
+c=rep(c,"try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){DB=null}\nif(!DB||!DB.users||DB.v!==1)seed();\nsanitizeUsers();","DB=__liveLoad();sanitizeUsers();");
 c=rep(c,"function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}}",fs.readFileSync(path.join(__dirname,"client-pre.js"),"utf8"));
 c=rep(c,'<p class="muted small">Demo only: no card is charged. In production this step opens a secure Stripe checkout.</p>','<div class="testmode" role="note"><b>Test mode, no real charge.</b> This beta never asks for or stores a card number. Picking a plan here is simulated.</div>');
 c=rep(c,'${F("phone","Phone",OB.phone,"tel","(231) 555-0100","tel")}</div>','${F("phone","Phone",OB.phone,"tel","(231) 555-0100","tel")}</div>${F("password","Password (8+ characters)",OB.password||"","password","","new-password")}');

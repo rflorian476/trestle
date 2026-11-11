@@ -1,5 +1,5 @@
 // v18 end-to-end: SW-045 (no JSON-LD while the host isn't indexable), SW-024 (realistic seed names), SW-010/SW-011
-// (contrast + heading order on the pages QA still flagged), SW-036 follow-through (server-side field limits, maxlength +
+// (contrast + heading order), SW-047 (sign-up after account deletion), SW-048 (H1 first on every page/role), SW-036 follow-through (server-side field limits, maxlength +
 // counter in the browser, long words wrap), Account → Your data (export), demo password lock, and the new
 // Change password dialog with the one-time-code "Forgot your current password?" path.
 // usage: node test/v18-e2e.js http://localhost:8899 [shotdir]   (NODE_PATH must include playwright and axe-core)
@@ -17,9 +17,10 @@ const act=(cookie,name,args)=>req("/api/act",{method:"POST",cookie,body:{name,ar
 const signup=(kind,data,pw)=>req("/api/signup",{method:"POST",body:{kind,password:pw||"v18-pass-"+run,data}});
 const shot=async(p,n)=>{if(OUT)await p.screenshot({path:OUT+"/"+n+".png"})};
 async function ctxFor(br,cookie,w){const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},bypassCSP:true});if(cookie)await c.addCookies([{name:"swsid",value:cookie.replace(/^swsid=/,""),url:B}]);return c}
-async function audit(pg){return pg.evaluate(()=>{const hs=[...document.querySelectorAll("h1,h2,h3,h4,h5,h6")].filter(h=>h.offsetParent||h.classList.contains("sr-only"));const skips=[];let prev=0;
+async function audit(pg){return pg.evaluate(()=>{const vis=h=>h.offsetParent||h.classList.contains("sr-only")||h.classList.contains("sr")||h.hasAttribute("data-h13");
+ const hs=[...document.querySelectorAll("h1,h2,h3,h4,h5,h6")].filter(vis);const skips=[];let prev=0;
  for(const h of hs){const l=+h.tagName[1];if(prev&&l>prev+1)skips.push(h.tagName+": "+h.textContent.trim().slice(0,40));prev=l}
- return{h1:hs.filter(h=>h.tagName==="H1").length,skips,over:document.documentElement.scrollWidth>document.documentElement.clientWidth}})}
+ return{h1:hs.filter(h=>h.tagName==="H1").length,first:hs[0]?hs[0].tagName:null,head:hs.slice(0,4).map(h=>h.tagName+" "+h.textContent.trim().slice(0,40)),skips,over:document.documentElement.scrollWidth>document.documentElement.clientWidth}})}
 async function contrast(pg){if(!AXE)return null;await pg.addScriptTag({content:AXE});return pg.evaluate(async()=>(await axe.run(document,{runOnly:["color-contrast"]})).violations.flatMap(v=>v.nodes.map(n=>n.html.slice(0,80))))}
 (async()=>{
 // ===== SW-045 =====
@@ -35,12 +36,49 @@ const br=await chromium.launch();
 // ===== SW-010 / SW-011 =====
 {const pages=[[null,"pros"],[null,"projects"],[null,"jobs"],["demo-pm@sawyer.test","projects"],["demo-pro@sawyer.test","schedule"],["demo-pro@sawyer.test","bills"],["demo-pro@sawyer.test","jobs"],["demo-homeowner@sawyer.test","saved"],["demo-traveler@sawyer.test","perdiem"]];
  const ck={};for(const [who,v] of pages){if(who&&!ck[who])ck[who]=(await login(who)).cookie;const c=await ctxFor(br,who&&ck[who]);const pg=await c.newPage();await pg.goto(B+"/#/"+v,{waitUntil:"networkidle"});await pg.waitForTimeout(300);
-  const a=await audit(pg);ok(a.h1===1&&!a.skips.length,`SW-011: ${who?who.split("@")[0]:"signed-out"} #/${v} has one H1 and no skipped heading levels`,JSON.stringify(a));
+  const a=await audit(pg);ok(a.h1===1&&a.first==="H1"&&!a.skips.length,`SW-011: ${who?who.split("@")[0]:"signed-out"} #/${v} has one H1 first and no skipped heading levels`,JSON.stringify(a));
   const cc=await contrast(pg);if(cc)ok(!cc.length,`SW-010: ${who?who.split("@")[0]:"signed-out"} #/${v} has no axe color-contrast failures`,cc.join(" | "));await c.close()}
  // empty state title is an H2 that keeps the H3 look
  const S=await signup("pro",{name:"Eli Empty",email:"v18-empty-"+run+"@sawyer.test",biz:"Eli Empty Electric",trade:"Electrical",zip:"78704"});
  const c=await ctxFor(br,S.cookie);const pg=await c.newPage();await pg.goto(B+"/#/bills",{waitUntil:"networkidle"});
  const e=await pg.evaluate(()=>{const h=document.querySelector(".empty .empty-h");return h&&{tag:h.tagName,fs:parseFloat(getComputedStyle(h).fontSize)}});ok(e&&e.tag==="H2"&&e.fs>17&&e.fs<20,"SW-011: empty-state title is an H2 at the old H3 size",JSON.stringify(e));await c.close()}
+// ===== SW-047: deleting a customer must not break later sign-ups =====
+{const em="v18-del-"+run+"@sawyer.test";const S=await signup("customer",{name:"Del Test",email:em,zip:"78704"},"delete-pass-123");
+ ok(S.code===200&&S.cookie,"SW-047: throwaway customer signs up",S.t.slice(0,160));
+ const del=await req("/api/account/delete",{method:"POST",cookie:S.cookie,body:{confirm:"DELETE"}});
+ ok(del.code===200&&!(del.j&&del.j.me),"SW-047: customer account deletes",del.t.slice(0,160));
+ ok((await req("/api/login",{method:"POST",body:{email:em,password:"delete-pass-123"}})).code===401,"SW-047: the deleted account cannot sign back in");
+ const C=await signup("customer",{name:"New After Del",email:"v18-del-cu-"+run+"@sawyer.test",zip:"78704"});
+ ok(C.code===200&&C.cookie&&C.j&&C.j.res&&C.j.res.ok!==false,"SW-047: a new customer can sign up after a delete",C.code+" "+C.t.slice(0,200));
+ const P=await signup("pro",{name:"New After Del Pro",email:"v18-del-pro-"+run+"@sawyer.test",biz:"After Del Plumbing",trade:"Plumbing",zip:"78704"});
+ ok(P.code===200&&P.cookie&&P.j&&P.j.res&&P.j.res.ok!==false,"SW-047: a new pro can sign up after a delete",P.code+" "+P.t.slice(0,200));
+ const M=await signup("pm",{name:"New After Del PM",email:"v18-del-pm-"+run+"@sawyer.test",biz:"After Del PM Co",zip:"78704"});
+ ok(M.code===200&&M.cookie&&M.j&&M.j.res&&M.j.res.ok!==false,"SW-047: a new PM can sign up after a delete",M.code+" "+M.t.slice(0,200))}
+// ===== SW-048: H1 must come first on every page, for every role =====
+{const roles=[["signed-out",null],["customer","demo-homeowner@sawyer.test"],["pro","demo-pro@sawyer.test"],["pm","demo-pm@sawyer.test"],["business","demo-business@sawyer.test"],["traveler","demo-traveler@sawyer.test"],["remodeler","demo-remodeler@sawyer.test"]];
+ const shared=["home","find","jobs","projects","pros","prices","pricing","faq","about","travel","lodging","perdiem","signup","join","post","credits","saved","map","pro/c1"];
+ const by={customer:["dash","account","saved","jobs","msgs","bills","consults","homelog","inbox","post","find"],
+  pro:["dash","account","office","schedule","consults","wallet","jobs","travel","perdiem","bills","office/invoices","office/estimates","office/customers","office/money","office/time","office/compliance","office/reports","office/grow"],
+  pm:["dash","account","projects","board","newproject"],
+  business:["dash","account","bills","saved","homelog","inbox","consults"],
+  traveler:["dash","account","travel","perdiem","wallet","lodging","traveler/tv1"],
+  remodeler:["dash","account","office","schedule","jobs","consults","wallet"]};
+ const ck={},pages=[];
+ for(const [role,who] of roles){if(who&&!ck[who]){const L=await login(who);ck[who]=L.cookie;ok(L.code===200&&L.cookie,"SW-048: signed in "+role,L.code)}
+  const extra=[];if(who){const st=((await req("/api/state",{cookie:ck[who]})).j||{}).state||{};
+   const job=(st.jobs||[]).find(j=>j&&j.id);if(job)extra.push("job/"+job.id);
+   const proj=(st.projects||[]).find(p=>p&&p.id);if(proj)extra.push("project/"+proj.id);
+   if(role==="pro"||role==="remodeler"){const me=(st.users||[]).find(u=>u.id===st.me);if(me)extra.push("pro/"+me.id)}
+   if(role==="traveler")extra.push("traveler/tv1")}
+  const seen=new Set();for(const v of shared.concat(by[role]||[],extra)){if(seen.has(v))continue;seen.add(v);pages.push([role,who,v])}}
+ for(const [role,who,v] of pages){const c=await ctxFor(br,who&&ck[who]);const pg=await c.newPage();await pg.goto(B+"/#/"+v,{waitUntil:"networkidle"});
+  await pg.waitForFunction(()=>{const app=document.getElementById("app");return app&&(app.querySelector("h1,h2,h3")||app.innerHTML.length>40)},null,{timeout:8000}).catch(()=>{});
+  await pg.waitForTimeout(200);
+  const a=await audit(pg);ok(a.h1===1&&a.first==="H1"&&!a.skips.length,`SW-048: ${role} #/${v} has one H1 first and no skipped levels`,JSON.stringify(a));
+  await c.close()}
+ // the two pages QA flagged, also at 390
+ for(const [who,v] of [["demo-traveler@sawyer.test","perdiem"],["demo-pro@sawyer.test","schedule"]]){const c=await ctxFor(br,ck[who],390);const pg=await c.newPage();await pg.goto(B+"/#/"+v,{waitUntil:"networkidle"});await pg.waitForTimeout(300);
+  const a=await audit(pg);ok(a.h1===1&&a.first==="H1"&&!a.skips.length,`SW-048: ${who.split("@")[0]} #/${v} at 390 has one H1 first`,JSON.stringify(a));await c.close()}}
 // ===== SW-036: server-side limits =====
 {const S=await signup("pro",{name:"Lena Limits",email:"v18-lim-"+run+"@sawyer.test",biz:"Lena Limits Plumbing",trade:"Plumbing",zip:"78704"});const ck=S.cookie;ok(S.code===200&&ck,"throwaway pro for field limits");
  const C=await signup("customer",{name:"Cal Customer",email:"v18-lim-cu-"+run+"@sawyer.test",zip:"78704"});

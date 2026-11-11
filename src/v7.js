@@ -55,7 +55,7 @@ const MILE_RATE=0.70;
 Object.assign(A,{
 saveCust(o){const m=me();if(!v7Pro(m))return{ok:false,msg:"The Office is for pro accounts"};o=o||{};const name=v7S(o.name,80);if(!name)return{ok:false,msg:"Add the customer's name"};
  let c=o.id&&v7Cust(o.id);if(c&&c.by!==m.id)return{ok:false,msg:"Not your customer record"};
- const link=(DB.users||[]).find(u=>u.role==="customer"&&o.email&&u.email&&u.email.toLowerCase()===String(o.email).toLowerCase());
+ const link=(DB.users||[]).find(u=>u.role==="customer"&&liveEmail(u)&&liveEmail(u)===emailKey(o.email));
  const f={name,email:v7S(o.email,120),phone:v7S(o.phone,30),addr:v7S(o.addr,160),site:v7S(o.site,160)};
  if(c)Object.assign(c,f);else{c=Object.assign({id:"bc"+uid(),by:m.id,uid:o.uid&&U(o.uid)?o.uid:(link?link.id:null),notes:[],photos:[],date:Date.now()},f);v7Col("bcust").push(c)}
  save();return{ok:true,msg:"Customer saved",id:c.id}},

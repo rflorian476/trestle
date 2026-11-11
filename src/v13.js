@@ -61,7 +61,7 @@ A.__delete13=function(){const m=me();if(!m)return{ok:false,msg:"Sign in first"};
  const gone=new Set((DB.jobs||[]).filter(j=>j.cust===m.id&&j.status==="posted"&&!j.hired).map(j=>j.id));
  DB.jobs=(DB.jobs||[]).filter(j=>!gone.has(j.id));DB.quotes=(DB.quotes||[]).filter(q=>!gone.has(q.job)&&!(q.cid===m.id&&q.status==="sent"));
  const keep={id:m.id,created:m.created};for(const k of Object.keys(m))delete m[k];
- Object.assign(m,keep,{name:"Former Sawyer member",role:"deleted",zip:"",deleted13:Date.now()});
+ Object.assign(m,keep,{name:"Former Sawyer member",role:"deleted",email:"",zip:"",deleted13:Date.now()});
  if(typeof save==="function")save();return{ok:true,msg:"Account deleted"}};
 if(typeof document!=="undefined"){
  {const ov=VIEWS.account;if(ov)VIEWS.account=function(){const h=ov.apply(this,arguments);const m=me();if(!m||!/id="signinMethods"/.test(h))return h;

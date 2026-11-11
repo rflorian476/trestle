@@ -64,6 +64,10 @@ function art(seed,trade,label){const h=hash(seed+trade),hue=[170,205,16,212,38,1
 /* ---------- storage ---------- */
 const KEY="sawyer_designs_v1";let DB;
 function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}}
+function emailKey(v){return String(v==null?"":v).trim().toLowerCase()}
+function liveEmail(u){return u&&u.role!=="deleted"?emailKey(u.email):""}
+function userByEmail(email){const k=emailKey(email);return k?(DB.users||[]).find(u=>liveEmail(u)===k):undefined}
+function sanitizeUsers(){let n=0;(DB.users||[]).forEach(u=>{if(!u||typeof u!=="object")return;if(u.role==="deleted"){if(u.email!==""){u.email="";n++}}else if(typeof u.email!=="string"){u.email="";n++}});if(n&&typeof save==="function")save();return n}
 function seed(){
  const P=(id,name,biz,trade,subs,zip,radius,rate,o)=>Object.assign({id,role:"contractor",name,email:id+"@example.test",phone:"(555) 555-01"+id.slice(1).padStart(2,"0"),biz,trade,subs,zip,radius,rate,verified:true,license:"DEMO-LIC-"+(200000+hash(id)%799999),insurance:"Hill Country Mutual (demo), $1M general liability",insExp:"2027-06-30",years:4+hash(id)%24,avail:["Weekdays"],availNow:false,bg:false,founding:false,resp:2,bio:"",paid:true,plan:"monthly",favs:[],portfolio:[],joined:Date.now()-(60+hash(id)%400)*DAY},o||{});
  const users=[
@@ -120,6 +124,7 @@ function seed(){
 function U0(us,id){return us.find(u=>u.id===id)}
 try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){DB=null}
 if(!DB||!DB.users||DB.v!==1)seed();
+sanitizeUsers();
 const me=()=>DB.users.find(u=>u.id===DB.me)||null;
 const U=id=>DB.users.find(u=>u.id===id);
 const PROS=()=>DB.users.filter(u=>u.role==="contractor");
@@ -160,8 +165,8 @@ function searchJobs(f){f=Object.assign({cat:"",q:"",zip:"78704",miles:100,urgent
 const A={
  login(id){DB.me=id;save();return{ok:true,msg:"Signed in as "+nameOf(U(id))}},
  logout(){DB.me=null;save();return{ok:true,msg:"Signed out"}},
- signupCustomer(name,email,zip){if(!name.trim()||!/^\S+@\S+\.\S+$/.test(email))return{ok:false,msg:"Enter your name and a valid email."};const ex=DB.users.find(u=>u.email.toLowerCase()===email.toLowerCase());if(ex){DB.me=ex.id;save();return{ok:true,msg:"Welcome back, "+nameOf(ex)}}const u={id:"u"+uid(),role:"customer",name:name.trim(),email:email.trim(),zip:ZIPS[zip]?zip:"78704",favs:[]};DB.users.push(u);DB.me=u.id;save();return{ok:true,msg:"Welcome to Sawyer, "+u.name.split(" ")[0]+"!"}},
- signupPro(o){const req=["name","email","biz","trade","zip"];for(const k of req)if(!String(o[k]||"").trim())return{ok:false,msg:"Missing "+k};if(!/^\S+@\S+\.\S+$/.test(o.email))return{ok:false,msg:"Enter a valid email."};
+ signupCustomer(name,email,zip){if(!name.trim()||!/^\S+@\S+\.\S+$/.test(email))return{ok:false,msg:"Enter your name and a valid email."};const ex=userByEmail(email);if(ex){DB.me=ex.id;save();return{ok:true,msg:"Welcome back, "+nameOf(ex)}}const u={id:"u"+uid(),role:"customer",name:name.trim(),email:email.trim(),zip:ZIPS[zip]?zip:"78704",favs:[]};DB.users.push(u);DB.me=u.id;save();return{ok:true,msg:"Welcome to Sawyer, "+u.name.split(" ")[0]+"!"}},
+ signupPro(o){const req=["name","email","biz","trade","zip"];for(const k of req)if(!String(o[k]||"").trim())return{ok:false,msg:"Missing "+k};if(!/^\S+@\S+\.\S+$/.test(o.email))return{ok:false,msg:"Enter a valid email."};if(userByEmail(o.email))return{ok:false,msg:"That email already has an account. Log in instead."};
   const u={id:"c"+uid(),role:"contractor",name:o.name.trim(),email:o.email.trim(),phone:o.phone||"",biz:o.biz.trim(),trade:o.trade,subs:o.subs&&o.subs.length?o.subs:[CATS[o.trade][0]],zip:o.zip,radius:+o.radius||40,rate:o.rate||"Quote per job",verified:false,verifyPending:!!(o.license&&o.insurance),license:o.license||"",insurance:o.insurance||"",years:+o.years||1,avail:o.avail&&o.avail.length?o.avail:["Weekdays"],availNow:!!o.availNow,bg:false,founding:true,resp:3,bio:o.bio||"",paid:true,plan:["founding","monthly","annual","yearly"].includes(o.plan)?o.plan:"founding",favs:[],portfolio:(o.portfolio||[]).map(t=>({id:uid(),title:t,cap:"Portfolio"})),joined:Date.now()};
   DB.users.push(u);DB.me=u.id;notify(u.id,"Welcome! Your 3 free founding months have started. Your profile is live.","profile:"+u.id);save();return{ok:true,msg:"Your profile is live",id:u.id}},
  updatePro(patch){const m=me();if(!m||m.role!=="contractor")return{ok:false,msg:"Only pro accounts have a pro profile"};patch=patch&&typeof patch==="object"?patch:{};const S=(v,n)=>String(v==null?"":v).trim().slice(0,n),was=[m.license||"",m.insurance||""];if("bio" in patch)m.bio=S(patch.bio,1500);if("rate" in patch)m.rate=S(patch.rate,60);if("phone" in patch)m.phone=S(patch.phone,20);if("license" in patch)m.license=S(patch.license,80);if("insurance" in patch)m.insurance=S(patch.insurance,120);if("availNow" in patch)m.availNow=!!patch.availNow;const rechk=(m.license||"")!==was[0]||(m.insurance||"")!==was[1];if(rechk&&m.verified){m.verified=false;m.verifyPending=true}else if(rechk&&m.license&&m.insurance)m.verifyPending=true;save();return{ok:true,msg:rechk&&m.license&&m.insurance?"Profile saved. We re-check license and insurance changes before the Verified badge shows.":"Profile saved"}},
@@ -380,7 +385,7 @@ const crewOf=p=>[...new Set(p.roles.flatMap(r=>r.filled))];
 const fmtD=s=>s?new Date(s+"T12:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}):"TBD";
 function myProjects(){const m=me();if(!m)return[];return DB.projects.filter(p=>p.pm===m.id||p.roles.some(r=>r.filled.includes(m.id)||r.apps.some(a=>a.cid===m.id))).sort((a,b)=>b.created-a.created)}
 Object.assign(A,{
- signupPM(o){if(!String(o.name||"").trim()||!String(o.biz||"").trim()||!/^\S+@\S+\.\S+$/.test(o.email||""))return{ok:false,msg:"Enter your name, company and a valid email."};const u={id:"m"+uid(),role:"pm",name:o.name.trim(),biz:o.biz.trim(),email:o.email.trim(),zip:ZIPS[o.zip]?o.zip:"78704",favs:[],bio:"",joined:Date.now(),plan:"founding"};DB.users.push(u);DB.me=u.id;notify(u.id,"Welcome! Post your first project and list the crew you need.","newproject");save();return{ok:true,msg:"Welcome, "+u.name.split(" ")[0]+"! Your 3 free months have started."}},
+ signupPM(o){if(!String(o.name||"").trim()||!String(o.biz||"").trim()||!/^\S+@\S+\.\S+$/.test(o.email||""))return{ok:false,msg:"Enter your name, company and a valid email."};if(userByEmail(o.email))return{ok:false,msg:"That email already has an account. Log in instead."};const u={id:"m"+uid(),role:"pm",name:o.name.trim(),biz:o.biz.trim(),email:o.email.trim(),zip:ZIPS[o.zip]?o.zip:"78704",favs:[],bio:"",joined:Date.now(),plan:"founding"};DB.users.push(u);DB.me=u.id;notify(u.id,"Welcome! Post your first project and list the crew you need.","newproject");save();return{ok:true,msg:"Welcome, "+u.name.split(" ")[0]+"! Your 3 free months have started."}},
  postProject(o){const m=me();if(!canPostProject(m))return{ok:false,need:"login",msg:"Sign in as a project manager or contractor to post a project"};if(!String(o.title||"").trim())return{ok:false,msg:"Give the project a title."};const roles=(o.roles||[]).filter(r=>r.trade&&+r.need>0);if(!roles.length)return{ok:false,msg:"Add at least one crew role."};
   const p={id:"p"+uid(),pm:m.id,type:o.type||"custom",title:o.title.trim(),zip:ZIPS[o.zip]?o.zip:m.zip,budget:o.budget||"Open",start:o.start||"",end:o.end||"",desc:o.desc||"",status:"open",phase:0,created:Date.now(),phases:(o.phases&&o.phases.length?o.phases:PTPL[o.type||"custom"].phases).slice(),roles:roles.map((r,i)=>({id:"r"+(i+1),trade:r.trade,label:String(r.label||r.trade).trim()||r.trade,need:Math.min(20,+r.need),filled:[],done:[],apps:[]}))};
   DB.projects.push(p);const tr=new Set(p.roles.map(r=>r.trade));PROS().filter(u=>tr.has(u.trade)&&dist(u.zip,p.zip)<=u.radius).forEach(u=>notify(u.id,`New crew opening near you: ${p.title}`,"project:"+p.id));save();return{ok:true,msg:"Project posted. Matching pros were notified.",id:p.id}},
@@ -1784,7 +1789,7 @@ const MILE_RATE=0.70;
 Object.assign(A,{
 saveCust(o){const m=me();if(!v7Pro(m))return{ok:false,msg:"The Office is for pro accounts"};o=o||{};const name=v7S(o.name,80);if(!name)return{ok:false,msg:"Add the customer's name"};
  let c=o.id&&v7Cust(o.id);if(c&&c.by!==m.id)return{ok:false,msg:"Not your customer record"};
- const link=(DB.users||[]).find(u=>u.role==="customer"&&o.email&&u.email&&u.email.toLowerCase()===String(o.email).toLowerCase());
+ const link=(DB.users||[]).find(u=>u.role==="customer"&&liveEmail(u)&&liveEmail(u)===emailKey(o.email));
  const f={name,email:v7S(o.email,120),phone:v7S(o.phone,30),addr:v7S(o.addr,160),site:v7S(o.site,160)};
  if(c)Object.assign(c,f);else{c=Object.assign({id:"bc"+uid(),by:m.id,uid:o.uid&&U(o.uid)?o.uid:(link?link.id:null),notes:[],photos:[],date:Date.now()},f);v7Col("bcust").push(c)}
  save();return{ok:true,msg:"Customer saved",id:c.id}},
@@ -2598,7 +2603,7 @@ function v9PdCard(){const f=(k,l,pre,suf,step)=>`<label class="o9-pdf"><span>${l
  return`<section class="card o9-pd" id="pdCalc"><div class="o9-pdh"><span class="o9-ic big">${I("calc",22)}</span><div><h2>Per diem calculator</h2><p class="muted small">What a call really puts in your pocket after lodging, food and fuel. Change any number.</p></div></div>
  <div class="o9-pdg"><form id="pdf9" class="o9-pdi" aria-label="Call details">${f("rate","Hourly rate","$","/hr","0.5")}${f("hrs","Hours per week","","hrs")}${f("pd","Per diem","$","/day")}<label class="o9-pdf"><span>Per diem paid</span><select name="pdDays"><option value="7" selected>7 days a week</option><option value="6">6 days (days worked)</option><option value="5">5 days (days worked)</option></select></label>${f("lodge","Lodging","$","/mo")}${f("food","Food","$","/day")}${f("fuel","Fuel and travel","$","/wk")}${f("tax","Tax on wages","","%")}${f("weeks","Call length","","weeks")}</form>
  <div class="o9-pdo" id="pdo9" aria-live="polite">${v9PdOut(V9PD)}</div></div><p class="small muted">GSA's standard rate for most of the U.S. is $110/night lodging and $68/day meals; big metros run higher. Per diem is only tax-free with a real tax home you keep paying for (see below). Estimates, not tax advice.</p></section>`}
-{const ov=VIEWS.perdiem;VIEWS.perdiem=(...a)=>{const h=ov(...a);const k=h.indexOf('<span class="eyebrow">');return k<0?h:h.slice(0,k)+v9PdCard()+h.slice(k)}}
+{const ov=VIEWS.perdiem;VIEWS.perdiem=(...a)=>{const h=ov(...a);const k=h.indexOf('</h1>');return k<0?h:h.slice(0,k+5)+v9PdCard()+h.slice(k+5)}}
 {const oa=AFTER.perdiem;AFTER.perdiem=(...a)=>{oa&&oa(...a);const f=document.getElementById("pdf9");if(!f)return;const up=()=>{const o={};f.querySelectorAll("input,select").forEach(x=>{const n=parseFloat(x.value);o[x.name]=Number.isFinite(n)&&n>=0?n:0});document.getElementById("pdo9").innerHTML=v9PdOut(o)};f.oninput=up;f.onchange=up}}
 
 /* ===== v10: e-signed estimates that turn into invoices, receipt photo capture (camera + compression, thumbnails, upload fix), traveler availability status + "Open to travel" badge, server-side recurring sweep ===== */
@@ -3412,7 +3417,7 @@ function v12DashCards(m){let h="";
  const first=am.querySelector("a");if(first)first.insertAdjacentHTML("afterend",x);else am.insertAdjacentHTML("afterbegin",x)}}
 {const oi=v8Index;v8Index=function(){const R=oi();const m=me();const P=(t,l,ic,k)=>R.unshift({g:"Go to",t,s:"",l,ic,k:(t+" "+(k||"")).toLowerCase()});
  if(m&&m.role==="customer")P("Home log",href("homelog"),"house","warranties maintenance receipts past jobs");if(m&&m.role==="pm")P("Project board",href("board"),"gantt","gantt staffing schedule crew");if(m&&m.role==="contractor"){P("Reviews & marketing",href("office","grow"),"megaphone","qr code review requests widget share");P("Consults",href("consults"),"cal","booking calendar")}if(v12Staff(m))P("Moderation queue",href("mod"),"shield","reports disputes");return R}}
-{const ov=VIEWS.schedule;VIEWS.schedule=(p,q)=>{const h=ov(p,q);const m=me();if(!m||m.role!=="contractor")return h;const x=cs12List(m,6);if(!x)return h;const k=h.indexOf('<div class="o7-wrap');return k>=0?h.slice(0,k)+x+h.slice(k):x+h}
+{const ov=VIEWS.schedule;VIEWS.schedule=(p,q)=>{const h=ov(p,q);const m=me();if(!m||m.role!=="contractor")return h;const x=cs12List(m,6);if(!x)return h;const k=h.indexOf('<div class="o7-wrap o7-body">');return k>=0?h.slice(0,k)+x+h.slice(k):h+x}
  const oa=AFTER.schedule;AFTER.schedule=(...a)=>{oa&&oa(...a);cs12Bind()}}
 
 /* ---- seed ---- */
@@ -3522,7 +3527,7 @@ A.__delete13=function(){const m=me();if(!m)return{ok:false,msg:"Sign in first"};
  const gone=new Set((DB.jobs||[]).filter(j=>j.cust===m.id&&j.status==="posted"&&!j.hired).map(j=>j.id));
  DB.jobs=(DB.jobs||[]).filter(j=>!gone.has(j.id));DB.quotes=(DB.quotes||[]).filter(q=>!gone.has(q.job)&&!(q.cid===m.id&&q.status==="sent"));
  const keep={id:m.id,created:m.created};for(const k of Object.keys(m))delete m[k];
- Object.assign(m,keep,{name:"Former Sawyer member",role:"deleted",zip:"",deleted13:Date.now()});
+ Object.assign(m,keep,{name:"Former Sawyer member",role:"deleted",email:"",zip:"",deleted13:Date.now()});
  if(typeof save==="function")save();return{ok:true,msg:"Account deleted"}};
 if(typeof document!=="undefined"){
  {const ov=VIEWS.account;if(ov)VIEWS.account=function(){const h=ov.apply(this,arguments);const m=me();if(!m||!/id="signinMethods"/.test(h))return h;

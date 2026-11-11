@@ -66,6 +66,8 @@ function demoSharedOk(uid){const u=DB().users.find(x=>x.id===uid);return !!(u&&u
 if(!getKV.get("tcalls")){if(!Array.isArray(DB().tcalls)&&ctx.__v5)ctx.__v5.seedTravel();persist();console.log("travel work seeded:",(DB().tcalls||[]).length,"calls")}
 // v12: consults, review requests, reports and the trust account added to existing databases
 if(!getKV.get("consults")){persist();console.log("v12 data seeded")}
+// SW-047: older deleted-account rows may have no email; empty-string them so sign-up lookups never throw.
+if(typeof ctx.sanitizeUsers==="function"&&ctx.sanitizeUsers())persist();
 // keep meta flag on later persists
 const _p=persist;persist=function(){_p();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now())};
 
@@ -290,9 +292,9 @@ function createUser({role,name,email,phone}){const d=DB();d.me=null;const nm=Str
 // v13 SW-033: sessions started by a one-time code in the last 15 minutes may set a new password without the old one (forgot password).
 const CODE_SESS=new Map();const codeFresh=req=>{const t=cookies(req).swsid,e=t&&CODE_SESS.get(t);return !!(e&&e>Date.now())};
 const makeAuth=require("./lib/auth.js");
-function emailIsReal(email){const em=String(email||"").trim().toLowerCase();const row=db.prepare("SELECT uid FROM accounts WHERE email=?").get(em);
+function emailIsReal(email){const em=String(email||"").trim().toLowerCase();if(!em)return false;const row=db.prepare("SELECT uid FROM accounts WHERE email=?").get(em);
  if(row){const u=DB().users.find(x=>x.id===row.uid);return !(u&&u.demo&&!u.staff)}
- const u=DB().users.find(x=>(x.email||"").toLowerCase()===em);return !!(u&&(!u.demo||u.staff))}
+ const u=DB().users.find(x=>x&&x.role!=="deleted"&&(x.email||"").toLowerCase()===em);return !!(u&&(!u.demo||u.staff))}
 function demoMayAdopt(uid){const u=DB().users.find(x=>x.id===uid);return !!(u&&u.demo&&!u.staff)}
 const AUTH=makeAuth({onCodeLogin:t=>{CODE_SESS.set(t,Date.now()+15*60e3);if(CODE_SESS.size>5000)for(const[k,v]of CODE_SESS)if(v<Date.now())CODE_SESS.delete(k)},db,limited,ip:r=>ip(r),newSession,setCookie,sessionUid,send,createUser,SESS_DAYS,brand:BRAND,html:htmlPage,emailIsReal,demoMayAdopt,markDemo:uid=>{const u=DB().users.find(x=>x.id===uid);if(u&&!u.demo){u.demo=true;persist()}}});
 function formBody(req){return new Promise((ok,no)=>{let n=0,c=[];req.on("data",b=>{n+=b.length;if(n>16e3){no(new Error("too big"));req.destroy()}else c.push(b)});req.on("end",()=>ok(Object.fromEntries(new URLSearchParams(Buffer.concat(c).toString()))))})}
@@ -425,7 +427,7 @@ const server=http.createServer(async(req,res)=>{
   if(pw.length<8||pw.length>200)return send(res,400,{error:"Password must be at least 8 characters."});
   if(pw===DEMO_PW)return send(res,400,{error:"Choose a different password."});
   if(!String(d.name||"").trim()||String(d.name).length>80)return send(res,400,{error:"Enter your name (80 characters max)."});
-  if(db.prepare("SELECT 1 FROM accounts WHERE email=?").get(email)||DB().users.some(u=>(u.email||"").toLowerCase()===email))return send(res,409,{error:"That email already has an account. Log in instead."});
+  if(db.prepare("SELECT 1 FROM accounts WHERE email=?").get(email)||(DB().users||[]).some(u=>u&&u.role!=="deleted"&&(u.email||"").toLowerCase()===email))return send(res,409,{error:"That email already has an account. Log in instead."});
   {const lim=LIMITS.check("signup",[d]);if(lim)return send(res,400,{error:lim.msg,field:lim.field,max:lim.max})}
   d.email=email;let r;DB().me=null;
   try{r=kind==="customer"?api.A.signupCustomer(String(d.name),email,String(d.zip||"")):kind==="pm"?api.A.signupPM(d):api.A.signupPro(d)}catch(e){r={ok:false,msg:"Sign-up failed, check the form."}}

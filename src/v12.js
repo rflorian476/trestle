@@ -339,7 +339,7 @@ function v12DashCards(m){let h="";
  const first=am.querySelector("a");if(first)first.insertAdjacentHTML("afterend",x);else am.insertAdjacentHTML("afterbegin",x)}}
 {const oi=v8Index;v8Index=function(){const R=oi();const m=me();const P=(t,l,ic,k)=>R.unshift({g:"Go to",t,s:"",l,ic,k:(t+" "+(k||"")).toLowerCase()});
  if(m&&m.role==="customer")P("Home log",href("homelog"),"house","warranties maintenance receipts past jobs");if(m&&m.role==="pm")P("Project board",href("board"),"gantt","gantt staffing schedule crew");if(m&&m.role==="contractor"){P("Reviews & marketing",href("office","grow"),"megaphone","qr code review requests widget share");P("Consults",href("consults"),"cal","booking calendar")}if(v12Staff(m))P("Moderation queue",href("mod"),"shield","reports disputes");return R}}
-{const ov=VIEWS.schedule;VIEWS.schedule=(p,q)=>{const h=ov(p,q);const m=me();if(!m||m.role!=="contractor")return h;const x=cs12List(m,6);if(!x)return h;const k=h.indexOf('<div class="o7-wrap');return k>=0?h.slice(0,k)+x+h.slice(k):x+h}
+{const ov=VIEWS.schedule;VIEWS.schedule=(p,q)=>{const h=ov(p,q);const m=me();if(!m||m.role!=="contractor")return h;const x=cs12List(m,6);if(!x)return h;const k=h.indexOf('<div class="o7-wrap o7-body">');return k>=0?h.slice(0,k)+x+h.slice(k):h+x}
  const oa=AFTER.schedule;AFTER.schedule=(...a)=>{oa&&oa(...a);cs12Bind()}}
 
 /* ---- seed ---- */
