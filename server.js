@@ -234,6 +234,19 @@ function prePro(req,h,id){if(sessionUid(req))return h;const c=proCover(id);if(!c
  h=h.replace(/<link rel="preload" href="\/js\/[^"]+" as="script">/g,"");
  return h.replace(re,()=>'<div id="pre11"><section class="px">'+c.html+'</section></div>')}
 // v13 (QA SW-018): the public snapshot is the same for every signed-out visitor, so build it at most every 3 s instead of per request
+// v20 perf: signed-out /prices gets the real price-guide H1 and cards inside <main> (plus the site
+// header), so the largest paint is the heading instead of waiting on app JS. That keeps the mobile
+// Lighthouse median at 90+; without it, LCP and a ~0.085 header shift swing the score into the 80s.
+let PRE_PRICES={v:-1,h:null};
+function pricesHtml(){if(PRE_PRICES.v===VER&&PRE_PRICES.h)return PRE_PRICES.h;const save=api.DB;let h=null;
+ try{if(api.VIEWS&&api.VIEWS.prices){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
+  const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
+  const out=String(api.VIEWS.prices(null,{})||"");if(out&&!/<script/i.test(out))h=out}}
+ catch(e){h=null}finally{api.DB=save}PRE_PRICES={v:VER,h};return h}
+function prePrices(req,h){if(sessionUid(req)||!PRE_TOP)return h;const body=pricesHtml();if(!body)return h;
+ const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;
+ h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
+ return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
 // v16 (QA SW-018): a signed-out /p/<id> page inlines only the data that profile needs (the pro, their reviews, quotes,
 // consults, the jobs and crew projects they're part of), about 10 KB instead of the whole
@@ -405,7 +418,7 @@ const server=http.createServer(async(req,res)=>{
   if(m[2]==="callback"){if(req.method==="POST"){if(!/x-www-form-urlencoded/.test(req.headers["content-type"]||""))return htmlPage(res,415,"Bad request","");const o=req.headers.origin;if(o&&o!=="null"&&new URL(o).host!==req.headers.host&&m[1]!=="apple")return htmlPage(res,403,"Blocked","<p>Cross-site form post refused.</p>");return AUTH.oauthCallback(req,res,m[1],url,await formBody(req))}return AUTH.oauthCallback(req,res,m[1],url,null)}
   return htmlPage(res,405,"Method not allowed","")}}
  if(!p.startsWith("/api/")){
-  if(req.method==="GET"){const v=viewRoute(p);if(v){const mm=VIEW_META[v];return sendHtml(res,req,200,withMeta(req,{title:mm?mm[0]+" · Sawyer":"Sawyer: hire pros you'd trust with your house",desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)}))}
+  if(req.method==="GET"){const v=viewRoute(p);if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:mm?mm[0]+" · Sawyer":"Sawyer: hire pros you'd trust with your house",desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="prices"?prePrices(req,html):html)}
    return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/\">Go to the home page</a></p>")}
   return send(res,404,{error:"Not found"})}
  if(req.method==="POST"&&p==="/api/upload")return upload(req,res);

@@ -126,6 +126,8 @@ function codeFrom(mail){
    assert(sms.status===503&&/text message codes aren't available yet/i.test(sms.json&&sms.json.error||"")&&/email/i.test(sms.json.error)&&!leak(sms.json,sms.body),"public host SMS: 503 says texts aren't available yet and to use email",sms.body.slice(0,180));
    const methods=(await req(port,"GET","/api/auth/methods")).json;
    assert(methods&&methods.email==="off"&&methods.sms==="off","public host without a provider reports email and sms as off");
+   const prices=await req(port,"GET","/prices");
+   assert(prices.status===200&&/What jobs really cost/.test(prices.body)&&/id="pre11"/.test(prices.body)&&!/class="sk11/.test(prices.body),"signed-out /prices prerenders the H1 instead of the skeleton");
   }finally{await stopApp(app)}
  }
 
