@@ -132,7 +132,7 @@ function seedV2(){if(DB.users.some(u=>u.id==="c25"))return;const H=36e5,now=Date
  DB.estimates.push({id:"e1",uid:"u1",cat:"Roofing",size:"small",urg:"urgent",zip:"78704",desc:"Missing shingles over the porch after a storm, small leak in the corner.",photo:"",low:0,high:0,date:now-2*DAY});{const e=DB.estimates[DB.estimates.length-1];const r=estimateRange(e);e.low=r.low;e.high=r.high}
  DB.notifs.push({id:uid(),to:"u1",text:"Barton Creek Remodeling asked you to sign off: Rough-in plumbing & tile",date:now-5*H,read:false,link:"job:j11"},{id:uid(),to:"u1",text:"You have 3 bids on \"Water heater leaking\". Compare them side by side.",date:now-6*H,read:false,link:"job:j1"});
 }
-if(!DB.users.some(u=>u.id==="c25")){seedV2();save()}
+if(!DB.partial&&!DB.users.some(u=>u.id==="c25")){seedV2();save()}/* v16: a slim /p/<id> state (SW-018) is never "seeded" */
 {const r=A.reset;A.reset=()=>{r();DB.estimates=[];seedV2();save()}}
 
 /* =====================  v2 UI  ===================== */

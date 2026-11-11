@@ -144,7 +144,7 @@ function preHome(req,h){if(!PRE_HOME||sessionUid(req))return h;const re=/<div cl
 // when the app mounts, so the profile's largest paint no longer waits for the app JS.
 let PRE_PRO={k:"",v:null};
 function proCover(id){const k=id+"|"+VER;if(PRE_PRO.k===k)return PRE_PRO.v;let v=null;const save=api.DB;
- try{if(api.VIEWS&&api.VIEWS.pro){const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
+ try{if(api.VIEWS&&api.VIEWS.pro){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}/* v16: same stock-cover order as the browser's first render */const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
   const out=String(api.VIEWS.pro(id,{})||"");const m=out.match(/<div class="px-cover[^"]*">[\s\S]*?<div class="px-shade"><\/div><a class="backlink"[^>]*>[\s\S]*?<\/a><\/div>/);
   if(m&&!/<script/i.test(m[0])){const img=(m[0].match(/<img[^>]*src="([^"]+)"/)||[])[1];v={html:m[0],img:img&&/^\/(img|u)\//.test(img)?img:null}}}}
  catch(e){v=null}finally{api.DB=save}PRE_PRO={k,v};return v}
@@ -156,14 +156,34 @@ function prePro(req,h,id){if(sessionUid(req))return h;const c=proCover(id);if(!c
  return h.replace(re,()=>'<div id="pre11"><section class="px">'+c.html+'</section></div>')}
 // v13 (QA SW-018): the public snapshot is the same for every signed-out visitor, so build it at most every 3 s instead of per request
 function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
+// v16 (QA SW-018): a signed-out /p/<id> page inlines only the data that profile needs (the pro, their reviews, quotes,
+// consults, the jobs and crew projects they're part of, and those projects' PMs), about 10 KB instead of the whole
+// public snapshot. The slim copy is used only if the profile renders byte-for-byte the same from it as from the full
+// public snapshot (checked once per pro per data version); otherwise the full snapshot is inlined as before. The
+// browser loads the rest right after first paint, and before any other page renders.
+let SLIM={v:-1,m:new Map()};
+function renderPro(st,id){const save=api.DB,mr=Math.random,dn=Date.now,t0=dn();let x=7;
+ try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
+ Math.random=()=>{x=(x*16807)%2147483647;return x/2147483647};Date.now=()=>t0;
+ try{const s=JSON.parse(JSON.stringify(st));s.me=null;s.theme="light";s.recent=[];api.DB=s;return String(api.VIEWS.pro(id,{})||"")}catch(e){return null}finally{api.DB=save;Math.random=mr;Date.now=dn}}
+function slimFor(full,id){const s={};for(const k of Object.keys(full))s[k]=Array.isArray(full[k])?[]:full[k];
+ const tok=JSON.stringify(id),has=o=>JSON.stringify(o).includes(tok);
+ const qj=new Set((full.quotes||[]).filter(q=>q.cid===id).map(q=>q.job));
+ s.reviews=(full.reviews||[]).filter(r=>r.cid===id);s.quotes=(full.quotes||[]).filter(q=>q.cid===id);s.consults=(full.consults||[]).filter(c=>c.pro===id);
+ s.jobs=(full.jobs||[]).filter(j=>j.hired===id||qj.has(j.id)||has([j.interested||[],j.invited||[]]));
+ s.projects=(full.projects||[]).filter(has);const pms=new Set(s.projects.map(p=>p.pm));
+ s.users=(full.users||[]).filter(u=>u.id===id||pms.has(u.id));s._v=0;s.partial=id;return s}
+function pubSlim(id){if(process.env.SLIM_P==="0")return null;if(SLIM.v!==VER)SLIM={v:VER,m:new Map()};if(SLIM.m.has(id))return SLIM.m.get(id);let out=null;
+ try{if(api.VIEWS&&api.VIEWS.pro){const full=snapshot(null),sl=slimFor(full,id);const a=renderPro(full,id),b=renderPro(sl,id);if(a&&a===b)out=sj(sl);else console.warn("slim /p/"+id+" differs from full; inlining the full public state")}}catch(e){out=null}
+ if(SLIM.m.size>500)SLIM.m.clear();SLIM.m.set(id,out);return out}
 function withMeta(req,m){let h=INDEX().toString();const o=ORIGIN(req);const og=`<meta property="og:type" content="${m.type||"website"}"><meta property="og:site_name" content="Sawyer"><meta property="og:title" content="${xe(m.title)}"><meta property="og:description" content="${xe(m.desc)}"><meta property="og:url" content="${xe(o+(m.path||"/"))}"><meta property="og:image" content="${xe(o+(m.img||"/img/hero.webp"))}"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${xe(o+(m.path||"/"))}">`+(m.ld?`<script type="application/ld+json">${sj(m.ld)}</script>`:"");
  h=h.replace(/<title>[^<]*<\/title>/,`<title>${xe(m.title)}</title>`).replace(/<meta name="description" content="[^"]*">/,`<meta name="description" content="${xe(m.desc)}">`+og);
  // v9 perf: inline the public snapshot for signed-out visitors so first paint skips the blocking /api/state round trip (never inline private state).
- if(!sessionUid(req)){const st=pubST();h=h.replace("</head>",`<script>window.__ST=${st}</script></head>`)}
+ if(!sessionUid(req)){const st=(m.slim&&pubSlim(m.slim))||pubST();h=h.replace("</head>",`<script>window.__ST=${st}</script></head>`)}
  if((m.path||"/")==="/")h=h.replace("</head>",`<link rel="preload" as="image" href="/img/hero-sm.webp" imagesrcset="/img/hero-sm.webp 800w, /img/hero.webp 1600w" imagesizes="(max-width: 900px) 100vw, 50vw" fetchpriority="high"></head>`);
  return h}
 function SEO_PAGE(req,k,id){const d=DB(),o=ORIGIN(req);if(k==="p"){const u=(d.users||[]).find(x=>x.id===id&&x.role==="contractor");if(!u)return null;const town=String(u.zip||"");const name=u.biz||u.name;
-  return prePro(req,withMeta(req,{title:`${name}: ${u.trade||"Contractor"} · Sawyer`,desc:`${name}, ${String(u.trade||"").toLowerCase()} pro. ${u.rating?(+u.rating).toFixed(1)+" stars from "+(u.reviews||0)+" verified reviews. ":""}Free quotes, no lead fees.`,path:"/p/"+id,type:"profile",img:u.cover||"/img/pro-1.webp",ld:Object.assign({"@context":"https://schema.org","@type":"HomeAndConstructionBusiness",name,url:o+"/p/"+id,address:{"@type":"PostalAddress",postalCode:town,addressCountry:"US"}},u.rating&&u.reviews?{aggregateRating:{"@type":"AggregateRating",ratingValue:(+u.rating).toFixed(1),reviewCount:u.reviews}}:{})}),id)}
+  return prePro(req,withMeta(req,{title:`${name}: ${u.trade||"Contractor"} · Sawyer`,desc:`${name}, ${String(u.trade||"").toLowerCase()} pro. ${u.rating?(+u.rating).toFixed(1)+" stars from "+(u.reviews||0)+" verified reviews. ":""}Free quotes, no lead fees.`,path:"/p/"+id,slim:id,type:"profile",img:u.cover||"/img/pro-1.webp",ld:Object.assign({"@context":"https://schema.org","@type":"HomeAndConstructionBusiness",name,url:o+"/p/"+id,address:{"@type":"PostalAddress",postalCode:town,addressCountry:"US"}},u.rating&&u.reviews?{aggregateRating:{"@type":"AggregateRating",ratingValue:(+u.rating).toFixed(1),reviewCount:u.reviews}}:{})}),id)}
  const c=(d.tcalls||[]).find(x=>x.id===id);if(!c)return null;const org=(d.users||[]).find(x=>x.id===c.by)||{};
  return withMeta(req,{title:`${c.title} · ${c.loc||""}${c.state?", "+c.state:""} · Sawyer`,desc:`$${c.rate}/hr${c.perDiem?" + $"+c.perDiem+"/day per diem":""}, about ${c.weeks} weeks. Rate, per diem and layoff risk up front.`,path:"/t/"+id,img:"/img/tr-wire.webp",ld:{"@context":"https://schema.org","@type":"JobPosting",title:c.title,description:c.desc||c.title,datePosted:new Date(c.date||Date.now()).toISOString().slice(0,10),employmentType:"CONTRACTOR",hiringOrganization:{"@type":"Organization",name:org.biz||"Sawyer contractor"},jobLocation:{"@type":"Place",address:{"@type":"PostalAddress",addressLocality:c.loc||"",addressRegion:c.state||"",addressCountry:"US"}},baseSalary:{"@type":"MonetaryAmount",currency:"USD",value:{"@type":"QuantitativeValue",value:c.rate,unitText:"HOUR"}}}})}
 // SW-007: pretty URLs for app views (/prices, /find, /job/j12 ...) serve the app; the client maps the path to its #/ route.

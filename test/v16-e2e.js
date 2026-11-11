@@ -16,6 +16,7 @@ const up=(cookie,type,buf)=>req("/api/upload",{method:"POST",cookie,headers:{"Co
 // GPS entry count inside a JPEG's EXIF block (-1 when there is no GPS block at all)
 function gpsCount(b){const x=b.indexOf("Exif\0\0","latin1");if(x<0)return -1;const t=x+6,le=b.toString("latin1",t,t+2)==="II";const u16=o=>le?b.readUInt16LE(o):b.readUInt16BE(o),u32=o=>le?b.readUInt32LE(o):b.readUInt32BE(o);
  const i0=t+u32(t+4),n=u16(i0);for(let k=0;k<n;k++){const e=i0+2+k*12;if(u16(e)===0x8825)return u16(t+u32(e+8))}return -1}
+const shot=async(p,n)=>{if(OUT)await p.screenshot({path:OUT+"/"+n+".png"})};
 function pngChunk(type,data){const d=Buffer.from(data,"latin1"),h=Buffer.alloc(8);h.writeUInt32BE(d.length,0);h.write(type,4,"latin1");const c=Buffer.alloc(4);c.writeUInt32BE(zlib.crc32(Buffer.concat([h.subarray(4),d]))>>>0,0);return Buffer.concat([h,d,c])}
 (async()=>{
 // ===================== 1) uploads hardening =====================
@@ -41,6 +42,38 @@ function pngChunk(type,data){const d=Buffer.from(data,"latin1"),h=Buffer.alloc(8
  if(rz.j&&rz.j.url){const g=await req(rz.j.url);ok(g.buf.length<tz.length&&g.buf.slice(-2).equals(Buffer.from([0xff,0xd9]))&&g.buf.indexOf("PK\x03\x04","latin1")<0,"trailing bytes are cut off at the end marker ("+tz.length+" -> "+g.buf.length+" bytes)")}
  const rp=await up(ck,"image/png",Buffer.concat([png,Buffer.from("trailing")]));if(rp.j&&rp.j.url){const g=await req(rp.j.url);ok(g.buf.length===png.length,"PNG trailing bytes trimmed after IEND")}
 }
+// ===================== 2) SW-018: signed-out /p/:id inlines only that profile's data =====================
+{const inl=t=>{const i=t.indexOf("window.__ST=");if(i<0)return null;const e=t.indexOf("</script>",i);try{return{len:e-i-12,st:JSON.parse(t.slice(i+12,e))}}catch(x){return null}};
+ const full=(await req("/api/state")).j.state;const fullLen=JSON.stringify(full).length;
+ const r=await req("/p/c1");const x=inl(r.t);
+ ok(x&&x.st.partial==="c1","signed-out /p/c1 inlines a slim state marked partial for c1");
+ ok(x&&x.len<Math.min(20000,fullLen/4),"inline state is small: "+(x&&x.len)+" bytes vs "+fullLen+" for the full public state");
+ ok(x&&x.st._v===0,"slim state carries no data version, so the client never treats it as current");
+ ok(x&&x.st.users.some(u=>u.id==="c1")&&x.st.users.every(u=>u.id==="c1"||u.role==="pm"),"only the pro (and PMs of their crew projects) are inlined ("+(x&&x.st.users.length)+" users)");
+ ok(x&&x.st.reviews.length>0&&x.st.reviews.every(r=>r.cid==="c1"&&/^rv-/.test(r.uid)),"inlined reviews are this pro's, still tokenized (SW-039)");
+ ok(x&&!/"(email|phone|password|hash|salt)":"[^"]/.test(JSON.stringify(x.st.users.filter(u=>u.id!=="c1")))&&!x.st.users.some(u=>u.id==="c1"&&u.phone),"no contact details in the slim state");
+ const pros=full.users.filter(u=>u.role==="contractor").slice(0,8);let n=0;for(const u of pros){const y=inl((await req("/p/"+u.id)).t);if(y&&y.st.partial===u.id&&y.len<20000)n++}
+ ok(n===pros.length,"every sampled profile gets its slim state ("+n+"/"+pros.length+")");
+ const H=await login("demo-homeowner@sawyer.test");const rs=await req("/p/c1",{cookie:H.cookie});ok(rs.code===200&&rs.t.indexOf("window.__ST=")<0,"signed-in visitors never get inline state");
+ const br=await chromium.launch();
+ for(const w of [1300,390]){const c=await br.newContext({viewport:{width:w,height:w<500?844:900}});const p=await c.newPage();const pe=[];p.on("pageerror",e=>pe.push(String(e).slice(0,200)));
+  await p.goto(B+"/p/c1",{waitUntil:"domcontentloaded"});await p.waitForFunction(()=>typeof DB!=="undefined"&&DB&&document.querySelector("#app .px-name"),null,{polling:10,timeout:15000});
+  const a=await p.evaluate(()=>({part:__PART,n:DB.users.length,h1:(document.querySelector("#app h1")||{}).textContent,html:document.querySelector("#app").innerHTML}));
+  ok(a.part==="c1"&&a.n<=x.st.users.length,w+": the profile paints from the slim state, and the browser doesn't seed demo data into it ("+a.n+" users)");
+  ok(/Bluebonnet/.test(a.h1||""),w+": profile heading renders ("+a.h1+")");
+  await p.waitForFunction(()=>__PART===null,null,{timeout:8000}).catch(()=>{});
+  const b=await p.evaluate(()=>({part:__PART,n:DB.users.length,html:document.querySelector("#app").innerHTML}));
+  ok(b.part===null&&b.n===full.users.length,w+": the full public state loads in the background after paint ("+b.n+" users)");
+  ok(a.html===b.html,w+": the page doesn't change when the full state arrives");
+  if(w===1300)await shot(p,"v16-p-c1-slim-1300");
+  await p.click("a.backlink");await p.waitForTimeout(900);const cards=await p.$$eval("#app .pcard, #app article.pc, #app .pc",e=>e.length).catch(()=>0);
+  ok(/#\/find/.test(p.url())&&cards>=3,w+": Find opens with the full list after leaving the profile ("+cards+" cards)");
+  const q=await c.newPage();q.on("pageerror",e=>pe.push(String(e).slice(0,200)));await q.goto(B+"/p/c1",{waitUntil:"domcontentloaded"});await q.waitForFunction(()=>typeof __PART!=="undefined"&&typeof DB!=="undefined"&&DB,null,{polling:5,timeout:15000});
+  await q.evaluate(()=>{location.hash="#/find?cat=Electrical"});await q.waitForTimeout(700);
+  const qn=await q.evaluate(()=>({part:__PART,n:DB.users.length,cards:document.querySelectorAll("#app .pcard, #app article.pc, #app .pc").length}));
+  ok(qn.part===null&&qn.n===full.users.length&&qn.cards>=1,w+": leaving the profile right away loads the full state first ("+qn.n+" users, "+qn.cards+" cards)");
+  ok(pe.length===0,w+": no page errors on the slim profile",pe.join(" | "));errs.push(...pe);await c.close()}
+ await br.close()}
 //@@V16-NEXT@@
 if(errs.length)console.log("page errors:",errs.slice(0,5).join(" | "));ok(errs.length===0,"no page errors ("+errs.length+")");
 console.log(fail?`\n${fail} FAILED`:"\nALL PASS");process.exit(fail?1:0)})().catch(e=>{console.log("FAIL crashed:",e&&e.stack||e);process.exit(1)});

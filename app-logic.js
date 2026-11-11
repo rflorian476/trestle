@@ -922,7 +922,7 @@ function seedV2(){if(DB.users.some(u=>u.id==="c25"))return;const H=36e5,now=Date
  DB.estimates.push({id:"e1",uid:"u1",cat:"Roofing",size:"small",urg:"urgent",zip:"78704",desc:"Missing shingles over the porch after a storm, small leak in the corner.",photo:"",low:0,high:0,date:now-2*DAY});{const e=DB.estimates[DB.estimates.length-1];const r=estimateRange(e);e.low=r.low;e.high=r.high}
  DB.notifs.push({id:uid(),to:"u1",text:"Barton Creek Remodeling asked you to sign off: Rough-in plumbing & tile",date:now-5*H,read:false,link:"job:j11"},{id:uid(),to:"u1",text:"You have 3 bids on \"Water heater leaking\". Compare them side by side.",date:now-6*H,read:false,link:"job:j1"});
 }
-if(!DB.users.some(u=>u.id==="c25")){seedV2();save()}
+if(!DB.partial&&!DB.users.some(u=>u.id==="c25")){seedV2();save()}/* v16: a slim /p/<id> state (SW-018) is never "seeded" */
 {const r=A.reset;A.reset=()=>{r();DB.estimates=[];seedV2();save()}}
 
 /* =====================  v2 UI  ===================== */
@@ -3602,6 +3602,12 @@ const v14IsTrav=m=>!!(m&&m.trav&&m.role!=="contractor"&&m.role!=="pm");
   const k=h.indexOf("</header>");if(k<0)return h;
   return h.slice(0,k+9)+v14TravBlock(m)+`<div class="wrap tv14-home"><h2>Your home</h2></div>`+h.slice(k+9);
  }catch(e){}return h}}
+
+/* v16: (1) SW-018 partial profile state guard, (2) expiry reminders on one schedule, (3) honest dashboard numbers and first-run guidance. */
+// (1) A signed-out /p/<id> page starts with only that profile's data (see client-pre.js). Any other page waits for the
+// full public state first (one quick synchronous load), so search, other profiles and the home page never render from
+// the slim copy.
+if(typeof document!=="undefined"&&typeof render==="function"&&typeof __fullSync==="function"){const r16=render;render=function(){try{if(!__partOk())__fullSync()}catch(e){}return r16.apply(this,arguments)}}
 
 /* ===== hotfix-sec layer (QA sweep 1) ===== */
 /* SW-003: no inline event handlers (the Content-Security-Policy blocks them). Buttons carry data-csp + data-arg instead. */
