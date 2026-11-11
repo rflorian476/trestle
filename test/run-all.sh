@@ -4,7 +4,7 @@
 cd "$(dirname "$0")/.."
 PORT=${1:-8961}; B="http://localhost:$PORT"; export ADMIN_TOKEN="${ADMIN_TOKEN:-$(node -e 'process.stdout.write(require("crypto").randomBytes(18).toString("hex"))')}"
 LOG=${LOG_DIR:-/tmp/sawyer-tests}; mkdir -p "$LOG"; rc=0
-SUITES=${SUITES:-"e2e v7-e2e v8-e2e v9-e2e v10-e2e v11-e2e v12-e2e v13-e2e hotfix-e2e v14-e2e v16-e2e v17-e2e v18-e2e"}
+SUITES=${SUITES:-"e2e v7-e2e v8-e2e v9-e2e v10-e2e v11-e2e v12-e2e v13-e2e hotfix-e2e v14-e2e v16-e2e v17-e2e v18-e2e v19-e2e"}
 for s in $SUITES; do
   [ -f "test/$s.js" ] || continue
   if curl -s -o /dev/null --max-time 1 "$B/healthz"; then echo "FAIL $s (port $PORT is already serving something; pick another: bash test/run-all.sh <port>)"; rc=1; continue; fi

@@ -36,23 +36,23 @@ await pub.goto(B+"/p/c9",{waitUntil:"networkidle"});await pub.waitForTimeout(800
 await pub.goto(B+"/",{waitUntil:"networkidle"});await pub.waitForTimeout(3000);ok(pub.lz.length===0,"home page doesn't download the lazy code either");
 // ---- 2. pros without their own photos ----
 await pub.goto(B+"/p/c3",{waitUntil:"networkidle"});await pub.waitForTimeout(800);
-ok(await pub.$(".g12-soon")!==null&&/Job photos coming soon/.test(await txt(pub,".g12-soon")),"pro without a portfolio shows 'Job photos coming soon'");
-ok(await pub.$(".g12-soon a[href*='post']")!==null,"empty state offers 'Request a quote'");
+ok(await pub.$(".v19-exgal")!==null&&/Example of .+ work/.test(await txt(pub,".v19-exgal")),"pro without a portfolio shows labeled example trade photos, not a coming-soon placeholder");
+ok(await pub.$(".v19-exgal a[href*='post']")!==null,"example gallery offers 'Request a quote'");
 ok(await pub.$(".gallery")===null&&await pub.$("section.v2pro")===null,"no stock 'Recent work' or before/after photos");
 ok((await pub.$$eval(".px-cover img",x=>x.map(i=>i.alt))).every(a=>a===""),"stock cover photos carry no made-up captions");
 const fr=await pub.evaluate(()=>({f:(document.body.innerText.match(/Fast responder/g)||[]).length,r:(document.body.innerText.match(/Rapid responder/g)||[]).length}));ok(!(fr.f&&fr.r),"no 'Fast responder' + 'Rapid responder' double badge");
 ok(!/undefined|NaN/.test(await txt(pub,"main")),"c3 profile text is clean");
 await shot(pub,"desktop-photos-coming-soon");
 // search cards: own photo with its caption, or a plain trade image with no caption
-await nav(pub,"/find");const cards=await pub.$$eval(".pc-img",x=>x.map(d=>{const i=d.querySelector("img");return{img:!!i,s:i?i.getAttribute("src")||"":"",a:i?i.alt:"",tile:!!d.querySelector(".pc13-tile")}}));
-ok(cards.length>=4&&cards.every(c=>c.img?/^\/u\//.test(c.s):c.tile),"search cards: the pro's own uploaded photos (decorative alt), otherwise a 'photos coming soon' tile ("+cards.length+")");
-ok(cards.some(c=>c.tile)&&cards.some(c=>c.img),"search mixes real portfolios and honest placeholders, no repeated stock photos");
+await nav(pub,"/find");const cards=await pub.$$eval(".pc-img",x=>x.map(d=>{const i=d.querySelector("img");const ex=(d.querySelector(".v19-ex")||{}).textContent||"";return{img:!!i,s:i?i.getAttribute("src")||"":"",a:i?i.alt:"",ex,tile:!!d.querySelector(".pc13-tile")}}));
+ok(cards.length>=4&&cards.every(c=>c.img&&(/^\/u\//.test(c.s)||(/^\/img\//.test(c.s)&&/^Example of .+ work$/.test(c.ex)))),"search cards: the pro's own uploaded photos, otherwise a labeled example of the trade ("+cards.length+")");
+ok(cards.some(c=>/^\/u\//.test(c.s))&&cards.some(c=>c.ex),"search mixes real portfolios and honestly labeled example photos");
 await shot(pub,"desktop-search");
 // ---- 3. mobile ----
 const mob=await mk(390);await mob.goto(B+"/p/c2",{waitUntil:"networkidle"});await mob.waitForTimeout(800);
 m=await labelsClear(mob);ok(m.bad===0,"mobile c2 map: "+m.n+" town names, none overlap");ok(await noX(mob),"mobile profile fits the screen");
 await (await mob.$(".usmap")).scrollIntoViewIfNeeded();await mob.waitForTimeout(200);await shot(mob,"mobile-map-c2");
-await mob.goto(B+"/p/c3",{waitUntil:"networkidle"});await mob.waitForTimeout(800);ok(await noX(mob),"mobile c3 fits");await mob.$eval(".g12-soon",e=>e.scrollIntoView({block:"center"}));await shot(mob,"mobile-photos-coming-soon");
+await mob.goto(B+"/p/c3",{waitUntil:"networkidle"});await mob.waitForTimeout(800);ok(await noX(mob),"mobile c3 fits");await mob.$eval(".v19-exgal",e=>e.scrollIntoView({block:"center"}));await shot(mob,"mobile-example-photos");
 // ---- 4. lazy pages load when opened, as each role ----
 const lazy=async(email,route,sel,name,w=1300)=>{const p=await as(email,w);await nav(p,route);await p.waitForSelector(sel,{timeout:8000}).catch(()=>{});
  ok(await p.$(sel)!==null,route+" loads its code on demand and renders ("+email.split("@")[0]+", "+w+"px)");ok(p.lz.length>=1,route+" fetched the lazy bundle");

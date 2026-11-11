@@ -17,9 +17,20 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Project manager (Dana, Copperline Build Group) | `demo-pm@sawyer.test` | **Crew builder** on the Tampa deck & seawall project: dated slots, available-pro suggestions, invite or book the whole crew. |
 | Business (Lakeway Dental Group) | `demo-business@sawyer.test` | Invoices to pay, multi-location requests, COIs. |
 | Traveling electrician (Marcus Delgado) | `demo-traveler@sawyer.test` | References from foremen, "Ask for a reference", status picker, saved calls and alerts with live match counts. |
-| Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, with job signals; keep, remove (rating updates everywhere) or ask for proof. |
+| Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+## v19: a real Verified badge, honest job photos, and a clearer path to hire
+Builds on v18 (live as `b184c44`).
+- **Public snapshot:** signed-out `/api/state` no longer lists deleted "Former Sawyer member" rows, so throwaway account deletes don't accumulate in the public payload. People who share a job, review, message thread or consult (and staff) still see the anonymized card.
+- **Signup errors:** validation still returns HTTP 400 with the real form message (bad email, short password, and so on). Unexpected throws are logged server-side and return HTTP 500 with a stable "something went wrong on our side" message, instead of a generic 400 "Sign-up failed, check the form" that hid bugs.
+- **Verified is a real Trust-team review.** Pros submit a license number, issuing state, expiry date, insurer, and a photo of a current certificate of insurance (`submitVerify19`). A person on Sawyer's Trust team reviews the packet on `/mod?t=verify` and approves or rejects it with a reason the pro can see (`modVerify19`). The badge then shows what was checked and the date of the review. It comes off automatically the day the license or certificate expires, with reminders 60, 30 and 7 days ahead. `verified` is still never taken from the client; `POST /api/staff/verify` (admin token) still works for staff tooling. The FAQ no longer says this is "simulated in this demo," and the profile trust panel no longer claims a photo-ID match we don't do.
+- **Example job photos on every Find card and profile.** When a pro has no photos of their own jobs, Sawyer shows real Pexels trade-work photos labeled **Example of {trade} work** — never as that pro's portfolio. "Job photos coming soon" is gone. A pro's own uploads and customer-confirmed job photos still take priority. New photos are credited in `docs/photo-credits.md` and on `/credits`.
+- **Price guide → compare → hire** is the default path on a posted job. Owners see a next-step strip: typical local range and a link to the price guide, then invite matches, then **Compare N quotes side by side**, then hire from the comparison page. The demo homeowner's "Water heater leaking" job (j1) already has three bids to try this.
+- **Pretty URLs (SW-016) deferred.** Typed or shared `/prices`, `/find`, `/job/j1` and `/p/:id` still open the right view (existing hash rewrite). In-app links stay `#/` for now so current suites and CSP stay intact. Indexing stays off until `SAWYER_INDEXABLE=1` on the custom domain.
+- Email and SMS provider setup is still out of scope (needs the owner). Forgot-password and sign-in codes correctly return 503 on a public host until a provider is configured.
+- Tests: `node test/v19-e2e.js http://localhost:8899 shots/v19` (needs `playwright` on `NODE_PATH`). It's part of `test/run-all.sh`.
 
 ## v18: QA leftovers, field limits, Your data, a real Change password dialog
 Builds on v17 (SW-042, SW-043, SW-044; live as `23488d5`).
