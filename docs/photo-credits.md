@@ -29,3 +29,19 @@ Each photo also ships as a 360 px `-sm.webp` thumbnail. Cropped to 4:3 and re-en
 | public/img/g-wall-pipes.webp | Old metal pipes on a wall | Kindel Media | https://www.pexels.com/photo/metal-pipes-on-wall-8488035/ | Pexels License |
 | public/img/g-copper.webp | Copper pipes on a black background | Magda Ehlers | https://www.pexels.com/photo/copper-pipes-on-black-background-3721272/ | Pexels License |
 | public/img/g-drain.webp | Stainless steel sink drain | icon0.com | https://www.pexels.com/photo/220612/ | Pexels License |
+
+### v19: example trade photos
+Used only as labeled “Example of {trade} work” when a pro has no photos of their own jobs. Cropped to 4:3 at 800×600 and re-encoded to WebP.
+
+| File | Subject | Photographer | Source | License |
+|---|---|---|---|---|
+| public/img/x-hvac-2.webp | Repairman repairing an outdoor air conditioner | José Andrés Pacheco Cortes | https://www.pexels.com/photo/repairman-repairing-a-air-conditioner-5463587/ | Pexels License |
+| public/img/x-roof-2.webp | Workers installing terra cotta roof tiles | Jim McLain | https://www.pexels.com/photo/workers-installing-roof-11467876/ | Pexels License |
+| public/img/x-paint-2.webp | Person painting a wall | Ksenia Chernaya | https://www.pexels.com/photo/person-painting-on-wall-6474471/ | Pexels License |
+| public/img/x-carpentry.webp | Carpenter working on a house's wooden structure | Ron Lach | https://www.pexels.com/photo/a-man-working-at-a-construction-site-8830265/ | Pexels License |
+| public/img/x-flooring.webp | Installing laminate flooring | K | https://www.pexels.com/photo/crop-man-installing-laminate-flooring-4263067/ | Pexels License |
+| public/img/x-drywall.webp | Builder applying joint compound | Tima Miroshnichenko | https://www.pexels.com/photo/unrecognizable-male-builder-installing-laminate-floor-5691594/ | Pexels License |
+| public/img/x-concrete.webp | Construction workers pouring concrete on site | Sài Gòn Production-Trading JSC | https://www.pexels.com/photo/construction-workers-pouring-concrete-on-site-37121400/ | Pexels License |
+| public/img/x-fence.webp | Carpenter working on a wooden fence | Los Muertos Crew | https://www.pexels.com/photo/woman-repairing-wood-fence-8447799/ | Pexels License |
+| public/img/x-deck.webp | Wooden deck with table and chairs | Curtis Adams | https://www.pexels.com/photo/wooden-deck-with-table-and-chairs-12700434/ | Pexels License |
+| public/img/x-windows.webp | Man installing a window | Ksenia Chernaya | https://www.pexels.com/photo/man-installing-window-in-room-5691516/ | Pexels License |
