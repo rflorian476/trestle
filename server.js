@@ -258,6 +258,29 @@ function prePrices(req,h){if(sessionUid(req)||!PRE_TOP)return h;const body=price
  const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
+// v22 perf: signed-out /find gets the same treatment as /prices: the real search results (rendered by the same VIEWS.find
+// the browser runs, from the public snapshot, with the same query) and the site header inside <main>, so the page paints
+// before the app JS. Cached per query string and data version; the app re-renders it in place when it mounts.
+let PRE_FIND={v:-1,m:new Map()};const FIND_KEYS=new Set(["cat","sub","q","zip","miles","min","ver","now","sort","view","emerg","rapid"]);
+function findHtml(search){if(PRE_FIND.v!==VER)PRE_FIND={v:VER,m:new Map()};const key=String(search||"");if(PRE_FIND.m.has(key))return PRE_FIND.m.get(key);
+ const save=api.DB;let h=null;
+ try{if(api.VIEWS&&api.VIEWS.find){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
+  const q={};for(const [k,v] of new URLSearchParams(key)){if(!FIND_KEYS.has(k)||k in q||v.length>80)throw new Error("not prerendered");q[k]=String(v)}
+  const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
+  const out=String(api.VIEWS.find(null,q)||"");if(out&&!/<script/i.test(out)){h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out);
+   // the first result photo is usually the largest paint on a phone: fetch it now instead of lazily
+   h=h.replace(/<img\b[^>]*>/,x=>/\sloading="lazy"/.test(x)?x.replace(/\sloading="lazy"/,' fetchpriority="high"'):x);
+   // the results are real, so the brief loading skeleton the app shows over them starts hidden
+   h=h.split('class="skel-ov"').join('class="skel-ov gone"')}}}
+ catch(e){h=null}finally{api.DB=save}if(PRE_FIND.m.size>100)PRE_FIND.m.clear();PRE_FIND.m.set(key,h);return h}
+// The header, filters and cards use four more font files than other pages start with. Loading them up front keeps the
+// first paint in its final layout (a late font swap nudged the first card photo by a pixel, which restarted LCP).
+const FIND_FONTS=["plus-jakarta-sans-500","plus-jakarta-sans-600","plus-jakarta-sans-700","sawyer-wm-800"].filter(n=>fs.existsSync(path.join(__dirname,"public/fonts",n+".woff2"))).map(n=>`<link rel="preload" href="/fonts/${n}.woff2" as="font" type="font/woff2" crossorigin>`).join("");
+function preFind(req,h,search){if(sessionUid(req)||!PRE_TOP)return h;const body=findHtml(search);if(!body)return h;
+ const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
+ h=h.replace(/(<link rel="preload" href="\/fonts\/plus-jakarta-sans-800\.woff2"[^>]*>)/,x=>x+FIND_FONTS);
+ h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
+ return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
 // v16 (QA SW-018): a signed-out /p/<id> page inlines only the data that profile needs (the pro, their reviews, quotes,
 // consults, the jobs and crew projects they're part of), about 10 KB instead of the whole
@@ -447,7 +470,7 @@ const server=http.createServer(async(req,res)=>{
    if(v==="pro"){const pm=/^\/pro\/([A-Za-z0-9_-]{1,40})\/?$/.exec(p);if(pm){const html=SEO_PAGE(req,"p",pm[1]);if(html)return sendHtml(res,req,200,html)}}
    if(v==="job"||v==="compare"){const jm=/^\/(?:job|compare)\/([\w.%~@+-]{1,120})\/?$/.exec(p);let jid=null;try{jid=jm&&decodeURIComponent(jm[1])}catch(e){}
     const j=jid&&(DB().jobs||[]).find(x=>x.id===jid);if(j){const html=withMeta(req,{title:jobTitle(v,j),desc:v==="compare"?"Compare bids side by side: price, timing, reviews and license, on Sawyer.":`${j.cat?j.cat+" job":"Job"} on Sawyer. Local pros quote free, and the customer compares bids side by side.`,path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,html)}}
-   if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:mm?mm[0]+" · Sawyer":"Sawyer: hire pros you'd trust with your house",desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="prices"?prePrices(req,html):html)}
+   if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:mm?mm[0]+" · Sawyer":"Sawyer: hire pros you'd trust with your house",desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="prices"?prePrices(req,html):v==="find"&&/^\/find\/?$/.test(p)?preFind(req,html,url.search):html)}
    return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/\">Go to the home page</a></p>")}
   return send(res,404,{error:"Not found"})}
  if(req.method==="POST"&&p==="/api/upload")return upload(req,res);
