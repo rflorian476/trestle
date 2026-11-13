@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.7.0
+# Sawyer (beta) — v2.8.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.7.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.8.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,15 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v25: budget next to the guide, traveler calls paint first, reply times on Find
+Builds on v24 (live as `7985ff7`).
+- **SW-058.** The public job page's pro pitch reads "No lead fees. One flat $20/mo. Founding pros get their first 3 months free.", the same promise as the FAQ, signup, pricing and /pros (it used to offer 3 free months to every pro).
+- **Posted budget next to the price guide (`/job/<id>`, signed out).** The homeowner card shows the customer's posted budget beside the typical range, plus one plain line on where the budget sits (within, under or above the usual range). The guide now uses the sub-trade's own range when Sawyer has one (`V25SUB` in `src/v25.js`: water heaters, ice dam removal, EV chargers, fences and about 70 more), with the same urgency and regional cost index as before; other sub-trades keep the trade-wide guide. Per-unit budgets ("$150 per turn") and "TBD" aren't compared. Public job facts only.
+- **Traveler calls paint first (`/t/<id>`, signed out).** The real call page and the site header are in the first HTML, rendered by the same `VIEWS.tcall` from the signed-out public snapshot: rate, per diem, hours, location, license, dates and open spots. Applications, notes, invites, emails and phones are never in it. The page hydrates in place (one H1, same title, no layout shift; the chip-row font weights are preloaded). Signed-in visitors get the normal app page. `/compare/<id>` is still never prerendered.
+- **Reply times on Find cards.** A pro card on `/find` shows "Replies in 22 min · median" once Sawyer has measured 2+ first replies for that pro (the same rule and number as the profile stat). It reads the server-measured stats in the public snapshot, so the prerendered cards and the app agree.
+- Tests: `node test/v25-e2e.js` (self-contained) is part of `test/run-all.sh`. `v24-e2e` now accepts any Sawyer version / SW cache name and the sub-trade guide wording.
 
 
 ## v24: job pages that work for both sides, honest reply times

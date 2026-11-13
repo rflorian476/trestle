@@ -1,6 +1,6 @@
 {
   "name": "sawyer-live",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "private": true,
   "description": "Sawyer beta: multi-user contractor marketplace (Node + node:sqlite, no dependencies)",
   "main": "server.js",

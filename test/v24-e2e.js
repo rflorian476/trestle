@@ -37,8 +37,8 @@ const login=async(port,email)=>{const r=await req(port,"POST","/api/login",JH,J(
  const page=async(w,js,cookie)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},javaScriptEnabled:js!==false});
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:LOCAL.B}])}
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.7.0-sawyer","healthz reports 2.7.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v24"/.test(sw.body),"service worker cache is sawyer-v24");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
 
  // ===== 1. SW-057: the signup divider reads as separate words =====
  for(const w of [1440,390]){const p=await page(w);await p.goto(LOCAL.B+"/signup");await p.waitForSelector(".v3or span");await p.evaluate(()=>document.fonts.ready);await p.waitForTimeout(300);
