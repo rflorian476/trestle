@@ -53,7 +53,7 @@ const led=await pro.evaluate(()=>(DB.ledger||[]).filter(l=>l.vendor==="Home Depo
 ok(await pro.$("a.r10-th img"),"receipt thumbnail in the expense list");
 const forged=await pro.evaluate(()=>A.addLedger({kind:"exp",amt:"5",vendor:"x",photo:"/u/0123456789abcdef0123456789abcdef.jpg"}));ok(forged&&!forged.ok,"server refuses a receipt photo the user didn't upload");
 // --- traveler status + open to travel
-let tv=await as("demo-remodeler@sawyer.test");await tv.waitForFunction(()=>typeof A!=="undefined"&&typeof A.saveTravel==="function");await tv.evaluate(()=>A.saveTravel({trade:"Electrical",headline:"Journeyman, commercial + industrial",home:"Ludington, MI",lic:[{type:"Journeyman",state:"MI"}],states:["MI","OH","IN"],availNow:true,yrs:9,osha:"OSHA 30"}));
+let tv=await as("demo-remodeler@sawyer.test");await tv.reload();await tv.waitForFunction(()=>typeof A!=="undefined"&&typeof A.saveTravel==="function"&&typeof me==="function"&&!!me());await tv.evaluate(()=>A.saveTravel({trade:"Electrical",headline:"Journeyman, commercial + industrial",home:"Ludington, MI",lic:[{type:"Journeyman",state:"MI"}],states:["MI","OH","IN"],availNow:true,yrs:9,osha:"OSHA 30"}));
 await nav(tv,"/travel?tab=travelers");ok(await tv.$("#t10St .t10seg"),"traveler sees 4-way status picker");
 await tv.click("#t10St label:has(input[value=onjob])");const d=new Date(Date.now()+20*864e5).toISOString().slice(0,10);await tv.fill("#t10d",d);await tv.click("#t10save");await tv.waitForTimeout(900);
 ok(await tv.evaluate(()=>me().trav.st10==="onjob"&&!me().trav.availNow),"status saved: on a call until date");ok(await tv.$("#t10St .b10-open"),"on a call ending within 45 days still shows Open to travel");
