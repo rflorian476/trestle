@@ -78,11 +78,12 @@ let LOCAL=null,PUB=null,br=null;
   ok(forged.json&&/Challenge expired/.test(forged.json.error),"known friendly server messages (Challenge expired) are kept",forged.body)}
 
  // ===== 3. First-paint performance: external CSS, no inlined snapshot, fewer preloads, smaller photos, caching =====
- {const H={};for(const u of ["/","/prices","/p/c1","/find"])H[u]=await req(LOCAL.port,"GET",u,{"Accept-Encoding":"br"});
+ {const H={};for(const u of ["/","/prices","/p/c1","/find","/faq"])H[u]=await req(LOCAL.port,"GET",u,{"Accept-Encoding":"br"});
   for(const u of ["/","/prices","/p/c1"]){const t=H[u].body;const st=[...t.matchAll(/<style>([\s\S]*?)<\/style>/g)].reduce((n,m)=>n+m[1].length,0);
    ok(st<2048,u+": no big inline <style> (was ~311 KB)",st);ok(t.length<45000,u+": first HTML is small ("+t.length+" bytes, was ~415 KB)",t.length);
    ok(!/<link rel="preload" href="\/js\//.test(t),u+": no app-script preloads compete with the prerendered first paint")}
-  ok(/<link rel="preload" href="\/js\/a0\.[0-9a-f]{10}\.js" as="script">/.test(H["/find"].body),"app-rendered pages (/find) still preload the app scripts they need to paint");
+  // v22: signed-out /find is prerendered now (no script preloads, see v22-e2e), so /faq is the app-rendered example
+  ok(/<link rel="preload" href="\/js\/a0\.[0-9a-f]{10}\.js" as="script">/.test(H["/faq"].body),"app-rendered pages (/faq) still preload the app scripts they need to paint");
   for(const u of ["/","/prices"])ok(!/<script>window\.__ST=/.test(H[u].body)&&/window\.__STP=fetch\("\/api\/state"/.test(H[u].body),u+": the ~92 KB public snapshot is fetched, not inlined");
   {const m=H["/p/c1"].body.match(/<script>window\.__ST=([\s\S]*?)<\/script>/);let st=null;try{st=JSON.parse(m[1])}catch(e){}ok(st&&st.partial==="c1"&&m[1].length<30000,"/p/c1 keeps its slim inline state ("+(m?m[1].length:0)+" bytes)")}
   const home=H["/"].body;ok(home.indexOf('rel="preload" as="image" href="/img/hero-sm.webp"')>home.indexOf('<meta name="viewport"'),"hero preload sits after the viewport meta (so phones pick the 800w file)");
