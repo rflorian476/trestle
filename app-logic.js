@@ -215,17 +215,25 @@ function mapSVG(W,H,pins,opt){opt=opt||{};const pts=SHORE.map(([a,b])=>proj(a,b,
 
 /* ===== shared UI plumbing: router, toast, modal, typeahead, stars ===== */
 let ROUTE={v:"home",p:null,q:{}};
-function parseHash(){const h=(location.hash||"#/home").slice(2);const[path,qs]=h.split("?");const[v,...rest]=path.split("/");const q={};(qs||"").split("&").filter(Boolean).forEach(kv=>{const[k,val]=kv.split("=");q[decodeURIComponent(k)]=decodeURIComponent(val||"")});return{v:v||"home",p:rest.length?decodeURIComponent(rest.join("/")):null,q}}
+/* v21 SW-016: pretty URLs (/find, /pro/c1, /prices?zip=…) are the real addresses. Old #/ links still work: routeStr() reads a
+   legacy #/ hash first, render() swaps it for the pretty path (replaceState), and the server serves the app for every view path.
+   Templates still build "#/…" strings internally; links are rewritten to the pretty form when they reach the page (v21.js). */
+function routeStr(){const h=location.hash||"";if(h.startsWith("#/"))return h;let p=String(location.pathname||"/").replace(/\/+$/,"");if(!p||p==="/index.html")p="/home";
+ const m=/^\/([pt])\/([^/]+)$/.exec(p);if(m)p="/"+(m[1]==="p"?"pro":"tcall")+"/"+m[2];return "#"+p+(location.search||"")}
+function prettyOf(h){h=String(h||"");if(!h.startsWith("#/"))return h;const r=h.slice(1);if(r==="/home"||r==="/home/")return "/";if(r.startsWith("/home?"))return "/"+r.slice(5);return r}
+function nav(h,replace){const u=prettyOf(h);if(!location.hash&&location.pathname+location.search===u){render();return}try{history[replace?"replaceState":"pushState"](null,"",u)}catch(e){location.hash=h;return}
+ try{window.dispatchEvent(new HashChangeEvent("hashchange"))}catch(e){render()}}
+function parseHash(){const h=routeStr().slice(2);const[path,qs]=h.split("?");const[v,...rest]=path.split("/");const q={};(qs||"").split("&").filter(Boolean).forEach(kv=>{const[k,val]=kv.split("=");q[decodeURIComponent(k)]=decodeURIComponent(val||"")});return{v:v||"home",p:rest.length?decodeURIComponent(rest.join("/")):null,q}}
 const href=(v,p,q)=>"#/"+v+(p!=null&&p!==""?"/"+encodeURIComponent(p):"")+(q&&Object.keys(q).length?"?"+Object.entries(q).filter(([k,x])=>x!==""&&x!=null&&x!==false).map(([k,x])=>encodeURIComponent(k)+"="+encodeURIComponent(x)).join("&"):"");
-function go(v,p,q){const h=href(v,p,q);if(location.hash===h)render();else location.hash=h}
+function go(v,p,q){const h=href(v,p,q);if(routeStr()===h)render();else nav(h)}
 function linkTo(l){if(!l)return go("dash");const[a,b]=String(l).split(":");if(a==="job")go("job",b);else if(a==="profile")go("pro",b);else if(a==="chat")go("msgs",b);else if(a==="review")go("job",b,{review:1});else go(a)}
 let lastV=null;
 window.addEventListener("hashchange",()=>render());
-function render(){ROUTE=parseHash();document.documentElement.dataset.theme=DB.theme;const sameView=lastV===ROUTE.v+"|"+ROUTE.p;try{SHELL()}catch(e){console.error(e)}const app=document.getElementById("app");const fn=VIEWS[ROUTE.v]||VIEWS.notfound;app.innerHTML=fn(ROUTE.p,ROUTE.q);(AFTER[ROUTE.v]||(()=>{}))(ROUTE.p,ROUTE.q);if(!sameView){window.scrollTo(0,0);const h=app.querySelector("h1,h2");if(h&&window.__navd){h.setAttribute("tabindex","-1");h.focus({preventScroll:true})}}window.__navd=1;lastV=ROUTE.v+"|"+ROUTE.p;document.title=(TITLES[ROUTE.v]?TITLES[ROUTE.v]+" · ":"")+"Sawyer — "+TAGLINE}
+function render(){if((location.hash||"").startsWith("#/")){try{history.replaceState(history.state,"",prettyOf(location.hash))}catch(e){}}ROUTE=parseHash();document.documentElement.dataset.theme=DB.theme;const sameView=lastV===ROUTE.v+"|"+ROUTE.p;try{SHELL()}catch(e){console.error(e)}const app=document.getElementById("app");const fn=VIEWS[ROUTE.v]||VIEWS.notfound;app.innerHTML=(typeof IMGSET==="function"?IMGSET:String)(fn(ROUTE.p,ROUTE.q));(AFTER[ROUTE.v]||(()=>{}))(ROUTE.p,ROUTE.q);if(!sameView){window.scrollTo(0,0);const h=app.querySelector("h1,h2");if(h&&window.__navd){h.setAttribute("tabindex","-1");h.focus({preventScroll:true})}}window.__navd=1;lastV=ROUTE.v+"|"+ROUTE.p;document.title=(TITLES[ROUTE.v]?TITLES[ROUTE.v]+" · ":"")+"Sawyer — "+TAGLINE}
 const TITLES={find:"Find pros",pro:"Pro profile",jobs:"Job board",job:"Job",post:"Post a job",msgs:"Messages",dash:"Dashboard",signup:"Sign up",join:"Pro signup",pricing:"Pricing",faq:"FAQ",about:"About",pros:"For pros",map:"Map",saved:"Saved",account:"Account"};
 window.onData=()=>{if(["msgs","dash","job"].includes(ROUTE.v)){const ae=document.activeElement,id=ae&&ae.id,val=ae&&ae.value;render();if(id){const n=document.getElementById(id);if(n){n.focus();if(val!=null&&"value"in n)n.value=val}}}else SHELL()};
 function toast(t,kind){let r=document.getElementById("toasts");const d=document.createElement("div");d.className="toast "+(kind||"");d.setAttribute("role","status");d.innerHTML=`${I(kind==="err"?"info":"check",16)}<span>${esc(t)}</span>`;r.appendChild(d);setTimeout(()=>{d.classList.add("out");setTimeout(()=>d.remove(),350)},2800)}
-function act(res,then){if(!res)return;if(res.ok){if(res.msg)toast(res.msg);then&&then(res);}else{toast(res.msg||"Something went wrong","err");if(res.need==="login")go("signup",null,{next:location.hash.slice(1)})}if(window.onData)window.onData();return res}
+function act(res,then){if(!res)return;if(res.ok){if(res.msg)toast(res.msg);then&&then(res);}else{toast(res.msg||"Something went wrong","err");if(res.need==="login")go("signup",null,{next:routeStr().slice(1)})}if(window.onData)window.onData();return res}
 let modalReturn=null;
 function modal(html,cls){modalReturn=document.activeElement;const m=document.getElementById("modal");m.innerHTML=`<div class="mback" data-close></div><div class="mbox ${cls||""}" role="dialog" aria-modal="true" aria-labelledby="mtitle"><button class="mclose" data-close aria-label="Close">${I("x",20)}</button>${html}</div>`;m.hidden=false;document.body.classList.add("noscroll");requestAnimationFrame(()=>{m.classList.add("on");if(m.contains(document.activeElement)&&document.activeElement!==m)return;const f=m.querySelector(".mbox input:not([type=hidden]),.mbox textarea,.mbox select,.mbox button:not(.mclose)");(f||m.querySelector(".mclose")).focus()});m.querySelectorAll("[data-close]").forEach(b=>b.onclick=closeModal)}
 function closeModal(){const m=document.getElementById("modal");if(m.hidden)return;m.classList.remove("on");document.body.classList.remove("noscroll");setTimeout(()=>{m.hidden=true;m.innerHTML=""},180);if(modalReturn&&modalReturn.focus)try{modalReturn.focus()}catch(e){}}
@@ -242,7 +250,7 @@ function typeahead(inp,onPick,onEnter){if(!inp)return;const box=inp.closest(".ta
 function starInput(name,label){return`<fieldset class="starin" data-name="${name}"><legend>${label}</legend><div class="stars-r">${[5,4,3,2,1].map(n=>`<input type="radio" id="${name}${n}" name="${name}" value="${n}"><label for="${name}${n}" title="${n} star${n>1?"s":""}"><span class="sr">${n} star${n>1?"s":""}</span>★</label>`).join("")}</div></fieldset>`}
 const starStr=n=>`<span class="stars" aria-label="${n.toFixed(1)} out of 5 stars"><span aria-hidden="true">${"★".repeat(Math.round(n))}<span class="off">${"★".repeat(5-Math.round(n))}</span></span></span>`;
 function readForm(root){const o={};root.querySelectorAll("input,select,textarea").forEach(e=>{if(!e.name)return;if(e.type==="checkbox"){if(e.dataset.multi!=null){(o[e.name]=o[e.name]||[]);if(e.checked)o[e.name].push(e.value)}else o[e.name]=e.checked}else if(e.type==="radio"){if(e.checked)o[e.name]=e.value}else o[e.name]=e.value});return o}
-function shareLink(cid){const u=U(cid);const url=location.href.split("#")[0]+"#/pro/"+cid;try{navigator.clipboard&&navigator.clipboard.writeText(url).catch(()=>{})}catch(e){}toast("Profile link copied: "+u.biz)}
+function shareLink(cid){const u=U(cid);const url=location.origin+"/p/"+cid;try{navigator.clipboard&&navigator.clipboard.writeText(url).catch(()=>{})}catch(e){}toast("Profile link copied: "+u.biz)}
 window.addEventListener("hashchange",()=>{const m=document.getElementById("modal");if(m&&!m.hidden)closeModal()});
 
 /* ===== shared views & flows (each design styles/overrides) ===== */
@@ -350,7 +358,7 @@ VIEWS.saved=()=>{const m=me();if(!m)return`<section class="page narrow">${empty(
 function calcWidget(){return`<div class="calc card"><h2 class="h-sub">${I("calc",20)} How much would you save?</h2><div class="two"><div class="fld"><label for="cl">Leads you buy per month: <b id="clv">8</b></label><input id="cl" type="range" min="1" max="40" value="8"></div><div class="fld"><label for="cc">Average cost per lead: <b id="ccv">$45</b></label><input id="cc" type="range" min="10" max="150" step="5" value="45"></div></div><div class="calcout" id="calcOut" aria-live="polite"></div></div>`}
 function wireCalc(){const cl=document.getElementById("cl"),cc=document.getElementById("cc");if(!cl)return;const u=()=>{document.getElementById("clv").textContent=cl.value;document.getElementById("ccv").textContent="$"+cc.value;const s=savings(+cl.value,+cc.value);document.getElementById("calcOut").innerHTML=`<div><span>Pay-per-lead sites</span><b class="bad">${money(s.lead)}/yr</b></div><div><span>Sawyer (first year)</span><b>${money(s.ours)}/yr</b></div><div class="win"><span>You keep</span><b>${money(Math.max(0,s.saved))}</b></div>`};cl.oninput=cc.oninput=u;u()}
 function compareTable(){return`<div class="tablewrap"><table class="compare"><caption class="sr">How Sawyer compares</caption><thead><tr><th scope="col">Platform</th><th scope="col">Membership</th><th scope="col">Lead fees</th><th scope="col">Who can review</th></tr></thead><tbody>${COMPETE.map((r,i)=>`<tr class="${i?"":"us"}"><th scope="row">${r[0]}</th><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join("")}</tbody></table><p class="muted small">Competitor prices are publicly reported figures (FTC, press, vendor sites) and may change.</p></div>`}
-function boot(){document.documentElement.dataset.theme=DB.theme;if(!location.hash)history.replaceState(null,"","#/home");render()}
+function boot(){document.documentElement.dataset.theme=DB.theme;render()}
 
 /* ===== Multi-trade PROJECTS (shared by all designs) ===== */
 const PTPL={pool:{t:"Inground pool build",icon:"drop",roles:[["Excavation","Excavator operators",2],["Electrical","Electrician (bonding & pump circuit)",1],["Plumbing","Pool plumber",1],["Concrete & Masonry","Concrete finishers",3],["Fencing","Pool-code fence installer",1]],phases:["Permits & layout","Excavation","Plumbing & electrical rough-in","Shell & concrete deck","Fence, landscape & inspection"]},
@@ -1248,25 +1256,33 @@ function bizPanel(m){const done=DB.jobs.filter(j=>j.cust===m.id&&j.status==="com
 const b64uE=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const b64uD=s=>Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((s.length+3)%4)),c=>c.charCodeAt(0));
 async function jpost(u,b){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(b||{})});return r.json().catch(()=>({error:"Server error"}))}
-async function addPasskey(){if(!window.PublicKeyCredential)throw Error("This browser doesn't support passkeys");const o=await jpost("/api/passkey/register/options");if(o.error)throw Error(o.error);
+async function addPasskey(){if(!window.PublicKeyCredential||!navigator.credentials)throw Object.assign(Error("no PublicKeyCredential"),{name:"NotSupportedError"});const o=await jpost("/api/passkey/register/options");if(o.error)throw pkSrvErr(o.error);
  const c=await navigator.credentials.create({publicKey:Object.assign({},o,{challenge:b64uD(o.challenge),user:Object.assign({},o.user,{id:b64uD(o.user.id)}),excludeCredentials:o.excludeCredentials.map(x=>({type:"public-key",id:b64uD(x.id)}))})});
- const r=await jpost("/api/passkey/register/verify",{id:c.id,clientDataJSON:b64uE(c.response.clientDataJSON),attestationObject:b64uE(c.response.attestationObject),label:/Mac|iPhone|iPad/.test(navigator.userAgent)?"Apple device":/Android/.test(navigator.userAgent)?"Android device":/Windows/.test(navigator.userAgent)?"Windows Hello":"This device"});if(r.error)throw Error(r.error);return r}
-async function passkeyLogin(){if(!window.PublicKeyCredential)throw Error("This browser doesn't support passkeys");const o=await jpost("/api/passkey/login/options");if(o.error)throw Error(o.error);
+ const r=await jpost("/api/passkey/register/verify",{id:c.id,clientDataJSON:b64uE(c.response.clientDataJSON),attestationObject:b64uE(c.response.attestationObject),label:/Mac|iPhone|iPad/.test(navigator.userAgent)?"Apple device":/Android/.test(navigator.userAgent)?"Android device":/Windows/.test(navigator.userAgent)?"Windows Hello":"This device"});if(r.error)throw pkSrvErr(r.error);return r}
+async function passkeyLogin(){if(!window.PublicKeyCredential||!navigator.credentials)throw Object.assign(Error("no PublicKeyCredential"),{name:"NotSupportedError"});const o=await jpost("/api/passkey/login/options");if(o.error)throw pkSrvErr(o.error);
  const c=await navigator.credentials.get({publicKey:{challenge:b64uD(o.challenge),rpId:o.rpId,timeout:o.timeout,userVerification:o.userVerification,allowCredentials:[]}});
- const r=await jpost("/api/passkey/login/verify",{id:c.id,clientDataJSON:b64uE(c.response.clientDataJSON),authenticatorData:b64uE(c.response.authenticatorData),signature:b64uE(c.response.signature),userHandle:c.response.userHandle?b64uE(c.response.userHandle):null});if(r.error)throw Error(r.error);return r}
+ const r=await jpost("/api/passkey/login/verify",{id:c.id,clientDataJSON:b64uE(c.response.clientDataJSON),authenticatorData:b64uE(c.response.authenticatorData),signature:b64uE(c.response.signature),userHandle:c.response.userHandle?b64uE(c.response.userHandle):null});if(r.error)throw pkSrvErr(r.error);return r}
 const OAUTH_P=[["google","Google"],["apple","Apple"],["microsoft","Microsoft"],["facebook","Facebook"]];
 const OAUTH_ICON={google:`<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.7z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z"/></svg>`,
  apple:`<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9a4.8 4.8 0 0 0-3.8-2c-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9a5 5 0 0 0-4.2 2.6c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5a11 11 0 0 0 1.4-2.9 4.5 4.5 0 0 1-2.6-4.1zM13.8 5a4.5 4.5 0 0 0 1-3.3 4.6 4.6 0 0 0-3 1.6 4.3 4.3 0 0 0-1.1 3.2c1.2.1 2.3-.6 3.1-1.5z"/></svg>`,
  microsoft:`<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#F25022" d="M1 1h10.5v10.5H1z"/><path fill="#7FBA00" d="M12.5 1H23v10.5H12.5z"/><path fill="#00A4EF" d="M1 12.5h10.5V23H1z"/><path fill="#FFB900" d="M12.5 12.5H23V23H12.5z"/></svg>`,
  facebook:`<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#1877F2" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>`};
 let AUTHM=null;function authMethods(){if(AUTHM)return AUTHM;try{const x=new XMLHttpRequest();x.open("GET","/api/auth/methods",false);x.send();AUTHM=JSON.parse(x.responseText)}catch(e){AUTHM={email:"test",sms:"test",passkey:"live",oauth:{}}}return AUTHM}
+/* v21 SW-053: offer only the sign-in options this server can complete. A provider reported "off" by /api/auth/methods gets no
+   button (it used to link to a 404 page), and the Phone tab is hidden while text-message codes are off. Email codes always stay. */
+const oauthOn=(M,k)=>!!(M&&M.oauth&&M.oauth[k]&&M.oauth[k]!=="off");
+/* v21 SW-054: every WebAuthn/passkey failure becomes short fixed copy. The raw name/message goes to the console only. */
+const PK_MSG={cancel:"Passkey sign-in was cancelled or timed out. Try again, or use email or a password.",none:"Passkeys aren't available in this browser, or none is set up. Use email or a password.",addCancel:"Passkey setup was cancelled. You can add one any time.",addNone:"This browser can't save a passkey right now. Try another browser or device, or keep using email or a password.",server:"That passkey didn't work. Try again, or use email or a password."};
+function pkFriendly(e,add){try{console.warn("passkey error",e&&e.name,e&&e.message)}catch(x){}
+ if(e&&e.sawyer)return e.message;const n=e&&e.name;if(n==="NotAllowedError"||n==="AbortError")return add?PK_MSG.addCancel:PK_MSG.cancel;return add?PK_MSG.addNone:PK_MSG.none}
+function pkSrvErr(msg){const e=Error(/^(Challenge expired, try again|This passkey isn't registered here|Too many attempts|Sign in first)/.test(String(msg||""))?String(msg):PK_MSG.server);e.sawyer=true;return e}
 const ROLE_OPTS=[["homeowner","home","Homeowner"],["business","brief","Business owner"],["pro","wrench","Pro / contractor"],["pm","users","Property or project manager"]];
 function authBox(q){const M=authMethods();q=q||{};const role=ROLE_OPTS.some(r=>r[0]===q.role)?q.role:"homeowner";
  return`<div class="card v3auth" id="authBox"><h2>Sign in or create an account</h2><p class="muted small">One step. No password needed. New here? We'll create your account.</p>
  <fieldset class="v3roles" id="roleSet"><legend>I'm a…</legend>${ROLE_OPTS.map(([v,ic,t])=>`<label class="v3role"><input type="radio" name="au-role" value="${v}" ${v===role?"checked":""}><span>${I(ic,16)}${t}</span></label>`).join("")}</fieldset>
- <div class="v3oauth">${OAUTH_P.map(([k,t])=>`<a class="btn v3o" id="oa-${k}" data-p="${k}" href="/auth/oauth/${k}/start?role=${role}">${OAUTH_ICON[k]}<span>Continue with ${t}</span>${M.oauth&&M.oauth[k]==="demo"?`<em class="v3demo">demo</em>`:""}</a>`).join("")}<button class="btn v3o" id="au-passkey" type="button">${I("key",18)}<span>Sign in with a passkey</span></button></div>
- <div class="v3or"><span>or get a one-time code</span></div>
- <div class="v3tabs" role="tablist"><button role="tab" type="button" class="on" aria-selected="true" data-ch="email" id="tab-email">Email</button><button role="tab" type="button" aria-selected="false" data-ch="sms" id="tab-sms">Phone</button></div>
+ <div class="v3oauth">${OAUTH_P.filter(([k])=>oauthOn(M,k)).map(([k,t])=>`<a class="btn v3o" id="oa-${k}" data-p="${k}" href="/auth/oauth/${k}/start?role=${role}">${OAUTH_ICON[k]}<span>Continue with ${t}</span>${M.oauth&&M.oauth[k]==="demo"?`<em class="v3demo">demo</em>`:""}</a>`).join("")}<button class="btn v3o" id="au-passkey" type="button">${I("key",18)}<span>Sign in with a passkey</span></button></div>
+ <div class="v3or"><span>or get a one-time code${M.sms==="off"?" by email":""}</span></div>
+ ${M.sms==="off"?"":`<div class="v3tabs" role="tablist"><button role="tab" type="button" class="on" aria-selected="true" data-ch="email" id="tab-email">Email</button><button role="tab" type="button" aria-selected="false" data-ch="sms" id="tab-sms">Phone</button></div>`}
  <form id="codeF" class="v3code"><div class="fld" id="toWrap"><label for="au-to">Email</label><input id="au-to" name="to" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com"></div>
  <button class="btn primary block" id="au-send">Send code${M.email==="test"?"":""}</button></form>
  <form id="verF" class="v3code" hidden><div id="testBox"></div><div class="fld"><label for="au-code">6-digit code</label><input id="au-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required></div><div class="fld" id="nameWrap" hidden><label for="au-name">Your name (optional)</label><input id="au-name" autocomplete="name"></div><button class="btn primary block" id="au-verify">Continue</button><button type="button" class="linkbtn" id="au-back">Use a different ${"email or phone"}</button></form>
@@ -1284,7 +1300,7 @@ function authBox(q){const M=authMethods();q=q||{};const role=ROLE_OPTS.some(r=>r
   $("testBox").innerHTML=r.test?`<div class="testmode v3test" id="testCode" role="note"><b>Test mode · ${ch==="sms"?"SMS":"email"} not sent.</b> Your code is <code id="tcVal">${esc(r.code)}</code>${r.link?` · or <a id="au-magic" href="${esc(r.link)}">open the magic link</a>`:""}</div>`:`<p class="muted small">We sent a code to <b>${esc(to)}</b>${ch==="email"?" with a one-tap sign-in link":""}.</p>`;$("au-code").focus()};
  $("verF").onsubmit=async e=>{e.preventDefault();const r=await jpost("/api/auth/verify",{channel:ch,to,code:$("au-code").value,role:role(),name:$("au-name").value});if(r.error){toast(r.error,"err");return}if(r.needRole){toast("Pick how you'll use Sawyer above","err");return}done(r)};
  $("au-back").onclick=()=>{$("codeF").hidden=false;$("verF").hidden=true};
- $("au-passkey").onclick=async()=>{try{await passkeyLogin();done({})}catch(e){toast(e.name==="NotAllowedError"?"Passkey sign-in was cancelled":e.message,"err")}}}}
+ $("au-passkey").onclick=async()=>{try{await passkeyLogin();done({})}catch(e){toast(pkFriendly(e,false),"err")}}}}
 VIEWS.account=(p,q)=>{const m=me();if(!m)return VIEWS.signup(null,{next:"/account"});q=q||{};let info={};try{const x=new XMLHttpRequest();x.open("GET","/api/account",false);x.send();info=JSON.parse(x.responseText)}catch(e){}
  const pro=m.role==="contractor",biz=m.acct==="business"||m.role==="pm";const ph=n=>/^New (member|pro)$/.test(n||"")?"":n;
  const ds=t=>t?new Date(t).toISOString().slice(0,10):"";
@@ -1299,11 +1315,11 @@ VIEWS.account=(p,q)=>{const m=me();if(!m)return VIEWS.signup(null,{next:"/accoun
  <li>${I("lock",14)} Password ${info.password?"set":"not set"} <button class="linkbtn" id="setPw">${info.password?"Change":"Add one"}</button></li>
  ${(info.passkeys||[]).map(k=>`<li class="pk">${I("key",14)} Passkey · ${esc(k.label)} <small>added ${fmtD(k.created)}${k.last_used?" · used "+fmtD(k.last_used):""}</small> <button class="linkbtn" data-delpk="${esc(k.cred_id)}">Remove</button></li>`).join("")}
  ${(info.linked||[]).map(l=>`<li>${I("check",14)} ${esc(l.provider.replace("-demo"," (demo)"))} linked</li>`).join("")}</ul>
- <div class="v3oauth sm"><button class="btn" id="addPasskey" type="button">${I("key",16)} Add a passkey</button>${OAUTH_P.filter(([k])=>!(info.linked||[]).some(l=>l.provider.startsWith(k))).map(([k,t])=>`<a class="btn v3o" href="/auth/oauth/${k}/start">${OAUTH_ICON[k]}<span>Link ${t}</span></a>`).join("")}</div></div>
+ <div class="v3oauth sm"><button class="btn" id="addPasskey" type="button">${I("key",16)} Add a passkey</button>${OAUTH_P.filter(([k])=>oauthOn(info.methods||authMethods(),k)&&!(info.linked||[]).some(l=>l.provider.startsWith(k))).map(([k,t])=>`<a class="btn v3o" href="/auth/oauth/${k}/start">${OAUTH_ICON[k]}<span>Link ${t}</span></a>`).join("")}</div></div>
  <div class="card v3privacy"><h2 class="h-sub">${I("shield",16)} Privacy</h2><p>We never sell or share your contact info. Pros reach you through ${"Sawyer"} messages, and your number stays hidden unless you share it with a specific pro.</p></div></section>`};
 AFTER.account=()=>{const $=s=>document.getElementById(s);if(!$("acctForm"))return;
- $("acctForm").onsubmit=e=>{e.preventDefault();act(A.updateMe(readForm($("acctForm"))),()=>{if(location.hash.includes("welcome"))go("dash");else render()})};
- $("addPasskey").onclick=async()=>{try{await addPasskey();toast("Passkey added. Next time, sign in with one tap.");render()}catch(e){toast(e.name==="NotAllowedError"?"Passkey setup was cancelled":e.message,"err")}};
+ $("acctForm").onsubmit=e=>{e.preventDefault();act(A.updateMe(readForm($("acctForm"))),()=>{if(routeStr().includes("welcome"))go("dash");else render()})};
+ $("addPasskey").onclick=async()=>{try{await addPasskey();toast("Passkey added. Next time, sign in with one tap.");render()}catch(e){toast(pkFriendly(e,true),"err")}};
  $("setPw").onclick=()=>openModal(`<h2>${/Change/.test($("setPw").textContent)?"Change your password":"Add a password"}</h2>${/Change/.test($("setPw").textContent)?`<div class="fld"><label for="cpw">Current password</label><input id="cpw" type="password" autocomplete="current-password"></div>`:""}<div class="fld"><label for="npw">New password (8+ characters)</label><input id="npw" type="password" autocomplete="new-password" minlength="8"></div>${/Change/.test($("setPw").textContent)?`<p class="muted small">Other devices signed in to this account are signed out.</p>`:""}<button class="btn primary block" id="npwGo">Save password</button>`,()=>{$("npwGo").onclick=async()=>{const r=await jpost("/api/account/password",{password:$("npw").value,current:$("cpw")?$("cpw").value:""});if(r.error)toast(r.error,"err");else{closeModal();toast("Password saved");render()}}});
  document.querySelectorAll("[data-delpk]").forEach(b=>b.onclick=async()=>{if(!confirm("Remove this passkey?"))return;await jpost("/api/passkey/delete",{id:b.dataset.delpk});render()})};
 
@@ -1621,7 +1637,7 @@ AFTER.travel=(p,q)=>{tFilterBind();tBind();const a=document.getElementById("tAva
  const sh=v=>{T_SHEET=v;const s=document.querySelector(".t6board");s&&s.classList.toggle("sheet-open",v);document.body.classList.toggle("noscroll",v&&innerWidth<=900);const b=document.getElementById("tfOpen");b&&b.setAttribute("aria-expanded",v);if(v){const f=document.querySelector("#tff select");f&&f.focus({preventScroll:true})}};
  const o=document.getElementById("tfOpen");o&&(o.onclick=()=>sh(true));["tfClose","tfDone","tfScrim"].forEach(id=>{const e=document.getElementById(id);e&&(e.onclick=()=>sh(false))});if(T_SHEET&&innerWidth<=900)document.body.classList.add("noscroll");else document.body.classList.remove("noscroll");
  const al=document.getElementById("tAlertBtn");al&&(al.onclick=()=>{if(!me()){toast("Sign in to create alerts","err");return go("signup",null,{next:"/travel"})}act(A.setAlert({state:q.state,type:q.type,minRate:q.rate}),()=>{const y=scrollY;render();scrollTo(0,y)})})};
-{const ob=tBind;tBind=function(){ob();document.querySelectorAll("[data-tsave]").forEach(b=>b.onclick=e=>{e.preventDefault();if(!me()){toast("Sign in to save calls","err");return go("signup",null,{next:location.hash.slice(1)})}act(A.saveCall(b.dataset.tsave),()=>{const y=scrollY;render();scrollTo(0,y)})})}}
+{const ob=tBind;tBind=function(){ob();document.querySelectorAll("[data-tsave]").forEach(b=>b.onclick=e=>{e.preventDefault();if(!me()){toast("Sign in to save calls","err");return go("signup",null,{next:routeStr().slice(1)})}act(A.saveCall(b.dataset.tsave),()=>{const y=scrollY;render();scrollTo(0,y)})})}}
 /* ---- call detail ---- */
 const T_RECIP=`<p>Most states license electricians themselves, so a journeyman card from one state does not automatically let you work in another. <b>Reciprocity</b> agreements let some states accept each other's licenses, usually after you apply and pay a fee. Some states license the electrical company rather than each electrician.</p><ul><li>Check the state board's current reciprocity list before you travel. Rules change.</li><li>Bring proof of hours and a copy of your current license.</li><li>Apprentices usually need to register in the new state before they start.</li></ul><p class="small muted">General information, not legal advice. Confirm with the contractor and the state licensing board.</p>`;
 VIEWS.tcall=id=>{const c=TC(id);if(!c)return VIEWS.notfound();const m=me(),owner=m&&m.id===c.by,p=U(c.by),hired=c.apps.filter(a=>a.status==="hired"),pend=c.apps.filter(a=>a.status==="pending"||a.status==="short"),open=Math.max(0,c.need-hired.length),h=tHrs(c.hours),pay=tPay(c.rate,c.perDiem,h),rv=tCRev(p),mine=tMyApp(c,m);
@@ -1730,7 +1746,7 @@ T_VIEWS.push("tdash","traveling");
 if(typeof V4CRED!=="undefined")V4CRED.push(["tr-wire","Electrician installing cables on a site","Mikael Blomkvist","https://www.pexels.com/photo/man-in-black-t-shirt-holding-a-wire-8961695/"],["tr-panel","Workers installing an electrical panel","Nelson Axigoth","https://www.pexels.com/photo/workers-on-street-5667685/"],["tr-solar","Technicians installing solar panels","Hoan Ngọc","https://www.pexels.com/photo/solar-technicians-installing-solar-panels-6961088/"],["tr-solar2","Solar technician installing a panel","Gustavo Fring","https://www.pexels.com/photo/solar-technician-installing-solar-panel-4254168/"],["tr-road","Pickup truck on an open highway","Owen.outdoors","https://www.pexels.com/photo/silver-pickup-truck-driving-on-open-highway-31560765/"]);
 if(typeof USK!=="undefined")["tdash","traveling","newtravel","travme"].forEach(v=>USK.add(v));
 {const oa=AFTER.travel;AFTER.travel=(...a)=>{oa&&oa(...a);const m=document.getElementById("tMap");if(m&&innerWidth>900&&!sessionStorage.tMapX)m.open=true;m&&m.addEventListener("toggle",()=>{if(!m.open)sessionStorage.tMapX=1})}}
-if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("hashchange",()=>{if(!/^#\/travel(\?|$)/.test(location.hash)){T_SHEET=false;document.body.classList.remove("noscroll")}});
+if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("hashchange",()=>{if(!/^#\/travel(\?|$)/.test(routeStr())){T_SHEET=false;document.body.classList.remove("noscroll")}});
 
 //@@SPLIT@@
 /* ===== v7: traveler toolkit (honest call details, pay guarantee, contractor score, lodging board, document wallet, per diem guide, crews, pre-trip checklist) + Office hub (estimates, invoices, pay, records, expenses, mileage, timesheets, compliance, templates, reports) ===== */
@@ -2045,7 +2061,7 @@ AFTER.invedit=(id,q)=>{const f=document.getElementById("bedF");if(!f||!BED)retur
  f.querySelectorAll("[data-rml]").forEach(x=>x.onclick=()=>{sync();b.lines.splice(+x.dataset.rml,1);if(!b.lines.length)b.lines.push({d:"",q:1,r:0,opt:false,on:true});const y=scrollY;render();scrollTo(0,y)});
  const doSave=send=>{sync();const o=Object.assign({},b,{id:id!=="new"?id:null});const r=A.saveBill(o);if(!r||!r.ok)return act(r);BED=null;if(send){act(A.sendBill(r.id),()=>go("invoice",r.id))}else act(r,()=>go("invoice",r.id))};
  document.getElementById("bedSave").onclick=()=>doSave(false);f.onsubmit=e=>{e.preventDefault();doSave(true)}};
-{const oh=window.onhashchange;window.addEventListener&&window.addEventListener("hashchange",()=>{if(!/^#\/(invedit)/.test(location.hash))BED=null})}
+{const oh=window.onhashchange;window.addEventListener&&window.addEventListener("hashchange",()=>{if(!/^#\/(invedit)/.test(routeStr()))BED=null})}
 /* ---- invoice / estimate document: pro + customer views ---- */
 function billDoc(b,forCust){const c=billCalc(b),p=U(b.by);return`<article class="o7-paper o7-inv" id="paper"><header><div><span class="o7-logo">${I("wrench",20)}</span><b>${esc(b.bizName)}</b>${p&&p.license?`<small class="muted">Lic. ${esc(p.license)}</small>`:""}${p&&p.phone?`<small class="muted">${esc(p.phone)}</small>`:""}</div><div class="o7-ih"><h2>${esc(b.type==="inv"?KINDNAME[b.kind]||"Invoice":BILLNAME[b.type])}</h2><b>${esc(b.no)}</b>${v7Badge(c.st)}</div></header>
  <div class="o7-meta"><div><small>Bill to</small><b>${esc(b.cname)}</b><span>${esc(b.caddr||"")}</span></div><div><small>Job</small><b>${esc(b.title)}</b><span>${esc(b.site||"")}</span></div><div><small>Issued</small><b>${fmtDate(b.sent||b.date)}</b>${b.type==="inv"?`<small>Due</small><b>${b.due?fmtD(b.due):"On receipt"}</b>`:`<small>Valid until</small><b>${b.valid?fmtD(b.valid):"–"}</b>`}${b.po?`<small>P.O.</small><b>${esc(b.po)}</b>`:""}</div></div>
@@ -2064,7 +2080,7 @@ VIEWS.invoice=id=>{const m=me(),b=v7Bill(id);if(!m)return VIEWS.signup(null,{nex
  <div class="card"><div class="o7-pro">${avatar(U(b.by)||{id:b.by},"")}<div><b>${esc(b.bizName)}</b><small class="muted">Questions about this ${BILLNAME[b.type].toLowerCase()}?</small></div></div><a class="btn sm" href="${href("msgs",b.by)}">${I("chat",14)}Message</a></div></aside></div></div></section>`};
 AFTER.invoice=id=>{const b=v7Bill(id);if(!b)return;const $=s=>document.getElementById(s),R=()=>render();
  if($("bSend"))$("bSend").onclick=()=>act(A.sendBill(id),R);if($("bRemind"))$("bRemind").onclick=()=>act(A.remindBill(id),R);if($("bConv"))$("bConv").onclick=()=>act(A.convertEst(id),r=>go("invedit",r.id));if($("bVoid"))$("bVoid").onclick=()=>{if(confirm("Void "+b.no+"? It stays in your records, marked void."))act(A.voidBill(id),R)};
- if($("bCopy"))$("bCopy").onclick=()=>{const u=location.origin+"/#/invoice/"+id;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast("Link copied"),()=>toast(u))};
+ if($("bCopy"))$("bCopy").onclick=()=>{const u=location.origin+"/invoice/"+id;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast("Link copied"),()=>toast(u))};
  if($("bRec"))$("bRec").onclick=()=>{const c=billCalc(b);modal(`<h2 id="mtitle">Record a payment</h2><form id="rpF" class="form"><div class="row2"><div class="fld"><label for="rp-a">Amount</label><input id="rp-a" name="amt" inputmode="decimal" value="${c.bal.toFixed(2)}"></div><div class="fld"><label for="rp-m">Method</label><select id="rp-m" name="method"><option value="check">Check</option><option value="cash">Cash</option><option value="zelle">Zelle</option><option value="other">Other</option></select></div></div><div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary">Record</button></div></form>`);document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);$("rpF").onsubmit=e=>{e.preventDefault();const o=readForm(e.target);act(A.recordPay(id,o.amt,o.method),()=>{closeModal();R()})}};
  document.querySelectorAll("[data-print]").forEach(x=>x.onclick=()=>window.print());
  const picks=document.querySelectorAll("[data-pick]");picks.forEach(p=>p.onchange=()=>{b.lines[+p.dataset.pick].on=p.checked;const c=billCalc(b);document.querySelectorAll("[data-ctot],[data-ctot2]").forEach(e=>e.textContent=v7$(c.total));const s=document.querySelector("[data-csub]");if(s)s.textContent=v7$(c.sub);const t=document.querySelector("[data-ctax]");if(t)t.textContent=v7$(c.tax);const d=document.querySelector("[data-cdep]");if(d)d.textContent=v7$(c.total*b.deposit/100)});
@@ -2186,7 +2202,7 @@ const v7Compare=(id)=>`<section class="v7cmp" id="${id||"compare"}"><div class="
 /* ---- nav: Office, Invoices, Wallet ---- */
 {const os=SHELL;SHELL=function(){os.apply(this,arguments);if(typeof document==="undefined"||!document.getElementById)return;const m=me();if(!m)return;
  const am=document.getElementById("acctMenu");const L=v7Pro(m)?[["office","brief","The Office"],["wallet","wallet","Document wallet"],["lodging","bed","Lodging board"]]:[["bills","receipt","My invoices"],["wallet","wallet","Document wallet"]];
- if(am){const d=am.querySelector('a[href="#/dash"]');const html=L.map(([v,ic,t])=>`<a href="${href(v)}" data-v7>${I(ic,16)}${t}</a>`).join("");if(d)d.insertAdjacentHTML("afterend",html);else am.insertAdjacentHTML("beforeend",html)}
+ if(am){const d=am.querySelector('a[href="#/dash"],a[href="/dash"]');const html=L.map(([v,ic,t])=>`<a href="${href(v)}" data-v7>${I(ic,16)}${t}</a>`).join("");if(d)d.insertAdjacentHTML("afterend",html);else am.insertAdjacentHTML("beforeend",html)}
  const mm=document.querySelector("#top .mmenu");if(mm&&!mm.querySelector("[data-v7]")){mm.insertAdjacentHTML("beforeend",L.map(([v,ic,t])=>`<a href="${href(v)}" data-v7>${t}</a>`).join(""))}
  const nav=document.querySelector("#top .mainnav");if(nav&&v7Pro(m)&&!nav.querySelector("[data-v7]"))nav.insertAdjacentHTML("beforeend",`<a href="${href("office")}" data-v7 class="${["office","invedit","bcust"].includes(ROUTE.v)||(ROUTE.v==="invoice"&&v7Bill(ROUTE.p)&&v7Bill(ROUTE.p).by===m.id)?"on":""}">Office</a>`);
  const ft=document.querySelector("#foot .footin");if(ft&&!ft.querySelector("[data-v7]")){const col=[...ft.querySelectorAll("h4")].find(h=>/Pros/.test(h.textContent));if(col)col.parentElement.insertAdjacentHTML("beforeend",`<a href="${href("office")}" data-v7>The Office</a><a href="${href("lodging")}" data-v7>Traveler lodging</a><a href="${href("perdiem")}" data-v7>Per diem guide</a>`)}}}
@@ -2369,7 +2385,7 @@ if(typeof document!=="undefined"&&document.addEventListener)document.addEventLis
 /* ---- header: search button + schedule link; role-aware mobile tabs ---- */
 {const os=SHELL;SHELL=function(){os.apply(this,arguments);if(typeof document==="undefined"||!document.getElementById)return;const m=me();const ta=document.querySelector("#top .topact");
  if(ta&&!ta.querySelector("#sk8"))ta.insertAdjacentHTML("afterbegin",`<button class="sk8" id="sk8" type="button" aria-label="Search (${/Mac/.test(navigator.platform||"")?"Command":"Control"} K)">${I("search",17)}<span>Search</span><kbd>${/Mac/.test(navigator.platform||"")?"⌘":"Ctrl "}K</kbd></button>`);const sb=document.getElementById("sk8");if(sb)sb.onclick=v8Palette;
- const am=document.getElementById("acctMenu");if(am&&m&&!am.querySelector("[data-v8]")){const o=am.querySelector('a[href="#/office"]');const x=(v7Pro(m)?`<a href="${href("schedule")}" data-v8>${I("cal",16)}Schedule</a>`:"")+`<a href="${href("welcome")}" data-v8>${I("target",16)}Change what I see</a>`+(window.__bip?`<button type="button" data-v8 id="inst8">${I("download",16)}Install the app</button>`:"");if(o)o.insertAdjacentHTML("afterend",x);else am.insertAdjacentHTML("beforeend",x);const ib=document.getElementById("inst8");if(ib)ib.onclick=v8Install}
+ const am=document.getElementById("acctMenu");if(am&&m&&!am.querySelector("[data-v8]")){const o=am.querySelector('a[href="#/office"],a[href="/office"]');const x=(v7Pro(m)?`<a href="${href("schedule")}" data-v8>${I("cal",16)}Schedule</a>`:"")+`<a href="${href("welcome")}" data-v8>${I("target",16)}Change what I see</a>`+(window.__bip?`<button type="button" data-v8 id="inst8">${I("download",16)}Install the app</button>`:"");if(o)o.insertAdjacentHTML("afterend",x);else am.insertAdjacentHTML("beforeend",x);const ib=document.getElementById("inst8");if(ib)ib.onclick=v8Install}
  const nav=document.querySelector("#top .mainnav a[data-v7]");if(nav&&["schedule"].includes(ROUTE.v))nav.classList.add("on")}}
 function v8Unread(m){if(!m)return 0;return(DB.msgs||[]).filter(x=>(x.a===m.id||x.b===m.id)&&x.from!==m.id&&!x.read).length}
 natTabs=function(){if(typeof document==="undefined")return;let t=document.getElementById("mtabs");const m=me();const f=v8Focus(m);
@@ -2417,9 +2433,9 @@ function v8Meta(){if(typeof document==="undefined")return;const v=ROUTE.v,p=ROUT
  document.querySelectorAll("script#ld8").forEach(s=>s.remove());
  if(demo)document.querySelectorAll('script[type="application/ld+json"]').forEach(s=>{if(/HomeAndConstructionBusiness|JobPosting/.test(s.textContent||""))s.remove()});}
 if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener("hashchange",()=>setTimeout(v8Meta,0));setTimeout(v8Meta,0);
- if(/^\/[pt]\/[\w-]+$/.test(location.pathname)&&!location.hash){const[,k,id]=location.pathname.split("/");history.replaceState(null,"","/#/"+(k==="p"?"pro":"tcall")+"/"+id);setTimeout(()=>{render();v8Meta()},0)}}
+ /* v21 SW-016: /p/<id> and /t/<id> stay in the address bar; routeStr() maps them to the profile / call view */}
 /* ---- images: lazy by default below the fold ---- */
-if(typeof document!=="undefined"&&window.MutationObserver){const lz=()=>document.querySelectorAll("#app img:not([loading])").forEach((im,i)=>{if(im.getBoundingClientRect().top>innerHeight){im.loading="lazy";im.decoding="async"}});new MutationObserver(lz).observe(document.getElementById("app")||document.body,{childList:true,subtree:true})}
+if(typeof document!=="undefined"&&window.MutationObserver){const lz=()=>document.querySelectorAll("#app img:not([loading]):not([fetchpriority=high])").forEach((im,i)=>{if(im.getBoundingClientRect().top>innerHeight){im.loading="lazy";im.decoding="async"}});new MutationObserver(lz).observe(document.getElementById("app")||document.body,{childList:true,subtree:true})}
 /* v8: de-duplicate the legacy hero greeting under Next actions; label business accounts correctly */
 {const oa=AFTER.dash;AFTER.dash=(...a)=>{oa&&oa(...a);const m=me();if(!m||!document.querySelector(".na8"))return;
  const app=document.getElementById("app");const h1=[...app.querySelectorAll("h1")].find(h=>/^Good (morning|afternoon|evening)/.test(h.textContent.trim()));
@@ -3340,7 +3356,7 @@ AFTER.board=()=>{document.querySelectorAll("[data-b12r]").forEach(b=>{const open
 /* ------------------------------------------------------------------ */
 function rr12Eligible(m){return(DB.jobs||[]).filter(j=>j.hired===m.id&&j.status==="completed"&&!(DB.reviews||[]).some(r=>r.job===j.id)).map(j=>({j,c:U(j.cust),rq:(DB.rreq12||[]).find(x=>x.job===j.id&&x.by===m.id)}))}
 const RR12TPL="Hi {first}, thanks for choosing {biz} for \"{job}\". Would you leave a quick review on Sawyer? It takes a minute and helps your neighbors find honest pros. {link}";
-const rr12Fill=(t,m,c,j)=>String(t||RR12TPL).replace(/\{first\}/g,String(nameOf(c)).split(" ")[0]).replace(/\{biz\}/g,v12Nm(m)).replace(/\{job\}/g,j.archived||j.title==="Past job"?(j.sub||j.cat):j.title).replace(/\{link\}/g,v12Origin()+"/#/job/"+j.id+"?review=1");
+const rr12Fill=(t,m,c,j)=>String(t||RR12TPL).replace(/\{first\}/g,String(nameOf(c)).split(" ")[0]).replace(/\{biz\}/g,v12Nm(m)).replace(/\{job\}/g,j.archived||j.title==="Past job"?(j.sub||j.cat):j.title).replace(/\{link\}/g,v12Origin()+"/job/"+j.id+"?review=1");
 Object.assign(A,{
  rreqSend12(ids,text,ch){const m=me();if(!m||m.role!=="contractor")return{ok:false,msg:"Pro accounts only"};const el=rr12Eligible(m);const pick=(Array.isArray(ids)?ids:[]).slice(0,40).map(id=>el.find(x=>x.j.id===id)).filter(Boolean);
   if(!pick.length)return{ok:false,msg:"Pick at least one finished job"};const t=v7S(text,600)||RR12TPL;if(!/\{link\}/.test(t))return{ok:false,msg:"Keep {link} in the message so they can find the review form"};const chan=["email","text","both"].includes(ch)?ch:"email";let n=0,skip=0;
@@ -3387,7 +3403,7 @@ Object.assign(A,{
   return{ok:true,msg:what==="remove"?"Review removed. The pro's rating updates everywhere.":"Review kept. Everyone involved has been told."}}});
 /* "Report" link on every review (not your own, not your business: pros use Dispute) */
 {const orv=reviewItem;reviewItem=function(r,canReply){const h=orv(r,canReply);const m=me();if(m&&(r.uid===m.id||r.cid===m.id))return h;const k=h.lastIndexOf("</article>");if(k<0)return h;return h.slice(0,k)+`<button type="button" class="linkbtn rp12" data-rp12="${esc(r.id)}">${I("flag",13)}Report</button>`+h.slice(k)}}
-function rp12Modal(rid){const m=me();if(!m){go("signup",null,{next:location.hash.slice(1)});return}
+function rp12Modal(rid){const m=me();if(!m){go("signup",null,{next:routeStr().slice(1)});return}
  modal(`<h2>Report this review</h2><p class="muted small">Reviews on Sawyer come only from finished, hired jobs, but tell us if something looks off. A person checks every report.</p><form id="rp12F"><fieldset class="rp12-r"><legend class="sr-only">Reason</legend>${Object.entries(RP12).map(([k,t],i)=>`<label class="chk"><input type="radio" name="reason" value="${k}" ${i?"":"required"}> ${t}</label>`).join("")}</fieldset>
  <div class="fld"><label for="rp12n">Anything we should know? <span class="muted">(optional)</span></label><textarea id="rp12n" name="note" rows="3" maxlength="600"></textarea></div><div class="row end"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary">${I("flag",14)}Send report</button></div></form>`);
  document.querySelectorAll("#modal [data-close]").forEach(b=>b.onclick=closeModal);document.getElementById("rp12F").onsubmit=e=>{e.preventDefault();act(A.reportReview12(rid,readForm(e.target)),()=>closeModal())}}
@@ -3739,7 +3755,7 @@ if(typeof document!=="undefined"&&document.addEventListener&&typeof window!=="un
  document.addEventListener("click",e=>{const b=e.target&&e.target.closest&&e.target.closest("[data-csp]");if(!b)return;const f=CSP_FN[b.dataset.csp];if(!f)return;e.preventDefault();try{f(b.dataset.arg,b)}catch(x){console.warn(x)}});
  document.addEventListener("submit",e=>{const f=e.target;if(!f||!f.matches||!f.matches("form[data-reply]"))return;e.preventDefault();act(A.reply(f.dataset.reply,(f.t&&f.t.value)||""))})}
 /* SW-007: typed or shared pretty URLs (/prices, /find?cat=Roofing, /job/j12) open the same view as the #/ route */
-if(typeof location!=="undefined"&&typeof history!=="undefined"&&typeof window!=="undefined"&&window.addEventListener){try{const pn=location.pathname;if(pn&&pn!=="/"&&pn!=="/index.html"&&!/^\/[pt]\/[\w-]+$/.test(pn)&&(!location.hash||location.hash.length<3)&&/^\/[a-z0-9]+(\/[\w.-]+)?\/?$/.test(pn))history.replaceState(null,"","/#"+pn.replace(/\/$/,"")+location.search)}catch(x){}}
+/* v21 SW-016: the pretty path is now the real address (routeStr() reads it), so it is no longer rewritten to /#/… */
 /* SW-005: one light Linen & Navy theme. Anything saved from the old dark toggle is ignored. */
 if(typeof document!=="undefined"&&document.documentElement){try{document.documentElement.dataset.theme="light";if(typeof DB==="object"&&DB)DB.theme="light"}catch(x){}}
 /* SW-008: stock photos are never shown as a pro's own work. Profiles without the pro's own uploaded job photos get an
@@ -3805,17 +3821,21 @@ function v19Expire(u){if(!u||u.role!=="contractor"||!u.verified)return false;
  notify(u.id,"Your Verified badge came off because your "+which+" expired. Submit the renewal so the Trust team can put it back on.","verify");
  return true}
 
+// v21: when the license and the insurance certificate share an expiry date, each reminder step (60, 30, 7 days and the
+// expiry date) sends ONE notice (and so one email) covering both, as the FAQ promises, instead of two identical ones.
 function v19Remind(u){if(!u||u.role!=="contractor")return 0;let n=0;
- [["licExp","license"],["insExp","insurance certificate"]].forEach(([k,label])=>{const left=v19Left(u[k]);if(left==null)return;
+ const due=[];[["licExp","license"],["insExp","insurance certificate"]].forEach(([k,label])=>{const left=v19Left(u[k]);if(left==null)return;
   const step=[0,7,30,60].find(x=>left<=x);if(step==null)return;
   u.verifyRem19=u.verifyRem19||{};const key=k+":"+(v19Day(u[k])||"") +":"+step;if(u.verifyRem19[key])return;
-  u.verifyRem19[key]=v19Now();
-  const badge=u.verified;
-  const when=left<0?`Your ${label} expired ${v19Day(u[k])}. ${badge?"Your Verified badge comes off until the Trust team reviews the renewal.":"Upload the renewal and resubmit for review."}`
-   :left===0?`Your ${label} expires today (${v19Day(u[k])}). ${badge?"The Verified badge stays on through today and comes off at the end of the day. Renew it and resubmit so the badge can stay on.":"Renew it today and resubmit for review."}`
-   :`Your ${label} expires in ${left} day${left===1?"":"s"} (${v19Day(u[k])}). ${badge?"Renew it and resubmit so your Verified badge stays on.":"Renew it before it lapses."}`;
+  due.push({k,label,left,step,key,day:v19Day(u[k])})});
+ const groups=[];for(const d of due){const g=groups.find(x=>x[0].day===d.day&&x[0].step===d.step&&x[0].left===d.left);if(g)g.push(d);else groups.push([d])}
+ for(const g of groups){const d=g[0],both=g.length>1,label=both?"license and insurance certificate":d.label,left=d.left,badge=u.verified;
+  g.forEach(x=>{u.verifyRem19[x.key]=v19Now()});
+  const when=left<0?`Your ${label} expired ${d.day}. ${badge?"Your Verified badge comes off until the Trust team reviews the renewal.":"Upload the renewal and resubmit for review."}`
+   :left===0?`Your ${label} ${both?"expire":"expires"} today (${d.day}). ${badge?"The Verified badge stays on through today and comes off at the end of the day. Renew "+(both?"them":"it")+" and resubmit so the badge can stay on.":"Renew "+(both?"them":"it")+" today and resubmit for review."}`
+   :`Your ${label} ${both?"expire":"expires"} in ${left} day${left===1?"":"s"} (${d.day}). ${badge?"Renew "+(both?"them":"it")+" and resubmit so your Verified badge stays on.":"Renew "+(both?"them":"it")+" before "+(both?"they lapse":"it lapses")+"."}`;
   notify(u.id,when,"verify");
-  n++});
+  n++}
  return n}
 
 Object.assign(A,{
@@ -4042,7 +4062,7 @@ function v19Gallery(u,own){const mine=v19OwnPhotos(u);
  const trade=u.trade||"trade";
  const label=own?`These are example ${trade} photos until you add pictures of your own jobs.`:`Example of ${trade} work — not photos from this pro. Ask for pictures of similar jobs when you request a quote.`;
  return`<div class="v19-exgal" aria-label="Example ${esc(trade)} photos"><div class="v19-exh"><span class="badge">${I("camera",12)}Example photos</span><small>${esc(label)}</small></div>
-  <div class="v19-g">${photos.map((p,i)=>`<figure><img class="art v4art" src="${esc(p.src)}" alt="Example of ${esc(trade)} work" ${i?'loading="lazy" decoding="async"':'fetchpriority="high"' }><figcaption>Example of ${esc(trade)} work</figcaption></figure>`).join("")}</div>
+  <div class="v19-g">${photos.map((p,i)=>`<figure><img class="art v4art" src="${esc(p.src)}" alt="Example of ${esc(trade)} work" loading="lazy" decoding="async"><figcaption>Example of ${esc(trade)} work</figcaption></figure>`).join("")}</div>
   ${own?`<a class="btn sm" href="${href("pro",u.id)}#photos">Add photos of your work</a>`:`<a class="btn sm ghost" href="${href("post",null,{invite:u.id})}">Request a quote</a>`}</div>`}
 
 function v19ReplaceSoon(h,html){const re=/<div class="(?:g12-soon )?sec-soon">/g;let m,out="",last=0;
@@ -4103,6 +4123,46 @@ function v19Next(j,m){if(!j||!m||m.id!==j.cust)return"";
   const k=h.indexOf('<section class="na8"');return k>=0?h.slice(0,k)+cue+h.slice(k):cue+h}}
 
 /* Pretty in-app URLs (SW-016) are deferred so existing #/ links and tests keep working. Typed /prices and /p/:id still open via the existing hash rewrite. Indexing stays off. */
+
+/* ===== v21 ===== */
+/* Perf: responsive photos. Every built-in photo under /img/ that has smaller copies (NAME-sm 400w, NAME-md 640/800w,
+   generated from the same Pexels originals) gets a srcset and a sizes hint for where it sits, so a 184 px trade tile
+   no longer downloads an 800 px photo. Below-the-fold photos must not also ask for high fetch priority. */
+const V21IMGW={"g-copper":[["g-copper-sm",360],["g-copper-md",640],["g-copper",960]],"g-drain":[["g-drain-sm",360],["g-drain-md",640],["g-drain",960]],"g-pipe-wrench":[["g-pipe-wrench-sm",360],["g-pipe-wrench-md",640],["g-pipe-wrench",960]],"g-radiator":[["g-radiator-sm",360],["g-radiator-md",640],["g-radiator",960]],"g-shower":[["g-shower-sm",360],["g-shower-md",640],["g-shower",960]],"g-wall-pipes":[["g-wall-pipes-sm",360],["g-wall-pipes-md",640],["g-wall-pipes",960]],"g-water-heater":[["g-water-heater-sm",360],["g-water-heater-md",640],["g-water-heater",960]],"home-ext":[["home-ext-sm",400],["home-ext",800]],"t-electrical":[["t-electrical-sm",400],["t-electrical",800]],"t-hvac":[["t-hvac-sm",400],["t-hvac",800]],"t-painting":[["t-painting-sm",400],["t-painting",800]],"t-plumbing":[["t-plumbing-sm",400],["t-plumbing",800]],"t-remodel":[["t-remodel-sm",400],["t-remodel",800]],"t-roofing":[["t-roofing-sm",400],["t-roofing",800]],"tr-panel":[["tr-panel-sm",400],["tr-panel-md",800],["tr-panel",1400]],"tr-road":[["tr-road-sm",400],["tr-road-md",800],["tr-road",1400]],"tr-solar":[["tr-solar-sm",400],["tr-solar-md",800],["tr-solar",1400]],"tr-solar2":[["tr-solar2-sm",400],["tr-solar2-md",800],["tr-solar2",1400]],"tr-wire":[["tr-wire-sm",400],["tr-wire-md",800],["tr-wire",1400]],"x-carpentry":[["x-carpentry-sm",400],["x-carpentry",800]],"x-concrete":[["x-concrete-sm",400],["x-concrete",800]],"x-deck":[["x-deck-sm",400],["x-deck",800]],"x-drywall":[["x-drywall-sm",400],["x-drywall",800]],"x-fence":[["x-fence-sm",400],["x-fence",800]],"x-flooring":[["x-flooring-sm",400],["x-flooring",800]],"x-hvac-2":[["x-hvac-2-sm",400],["x-hvac-2",800]],"x-paint-2":[["x-paint-2-sm",400],["x-paint-2",800]],"x-roof-2":[["x-roof-2-sm",400],["x-roof-2",800]],"x-windows":[["x-windows-sm",400],["x-windows",800]]};
+const V21SIZES=[[/\bv4cat\b/,"(max-width: 700px) 46vw, 240px"],[/\bv19-g\b|\bg12\b/,"(max-width: 700px) 46vw, 260px"],[/\bpx-cover\b/,"100vw"],[/\bpc-img\b/,"(max-width: 700px) 82vw, 340px"],[/\bv4pro-img\b|\bt5home-img\b|\bv4cta\b|\bt6simc\b/,"(max-width: 700px) 92vw, 380px"]];
+// the closest known container class before the <img> decides the hint (lists repeat the container per card)
+function v21Sizes(before,own){let best=-1,out="(max-width: 700px) 92vw, 420px";for(const[re,s]of V21SIZES){if(re.test(own))return s;const g=new RegExp(re.source,"g");let m,last=-1;while((m=g.exec(before)))last=m.index;if(last>best){best=last;out=s}}return out}
+function IMGSET(h){h=String(h==null?"":h);if(h.indexOf("/img/")<0&&h.indexOf("fetchpriority")<0)return h;
+ return h.replace(/<img\b[^>]*>/g,(t,at)=>{let o=t;
+  if(/\bfetchpriority="high"/.test(o)&&/\bloading="lazy"/.test(o))o=o.replace(/\s*fetchpriority="high"/,"");
+  const m=/\ssrc="\/img\/([a-z0-9-]+)\.webp"/.exec(o);if(!m||/\ssrcset=/.test(o))return o;const set=V21IMGW[m[1]];if(!set||set.length<2)return o;
+  const before=(h.slice(Math.max(0,at-1200),at).match(/class="[^"]*"/g)||[]).join(" ");const own=(/\sclass="([^"]*)"/.exec(o)||[])[1]||"";
+  return o.replace(/\ssrc="/,` srcset="${set.map(([f,w])=>"/img/"+f+".webp "+w+"w").join(", ")}" sizes="${v21Sizes(before,own)}" src="`)})}
+/* SW-016: pretty in-app links. Templates keep building "#/…" strings (older layers patch them by text), and every link is
+   rewritten to its pretty form when it reaches the page: href="#/find?cat=Roofing" becomes href="/find?cat=Roofing" and
+   href="#/home" becomes href="/". A click on a same-origin app link navigates in place (pushState) instead of reloading.
+   Modified clicks (new tab/window), downloads, target=_blank and non-app paths (/api, /auth, /u, files) behave normally. */
+function v21PrettyLinks(root){if(!root||!root.querySelectorAll)return;const fix=a=>{const h=a.getAttribute("href");if(h&&h.startsWith("#/"))a.setAttribute("href",prettyOf(h))};
+ if(root.matches&&root.matches('a[href^="#/"]'))fix(root);root.querySelectorAll('a[href^="#/"]').forEach(fix)}
+function v21AppPath(p){if(p==="/"||p==="/index.html")return true;const m=/^\/([a-z0-9]{1,20})(?:\/|$)/.exec(p);if(!m)return false;if(m[1]==="p"||m[1]==="t")return /^\/[pt]\/[\w-]{1,40}\/?$/.test(p);
+ return m[1]!=="api"&&m[1]!=="auth"&&m[1]!=="notfound"&&Object.prototype.hasOwnProperty.call(VIEWS,m[1])}
+if(typeof document!=="undefined"&&document.addEventListener&&typeof MutationObserver!=="undefined"){
+ new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes)if(n.nodeType===1)v21PrettyLinks(n)}).observe(document.documentElement,{childList:true,subtree:true});
+ document.addEventListener("DOMContentLoaded",()=>v21PrettyLinks(document.body));
+ document.addEventListener("click",e=>{if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
+  const a=e.target&&e.target.closest&&e.target.closest("a[href]");if(!a||(a.target&&a.target!=="_self")||a.hasAttribute("download"))return;
+  let raw=a.getAttribute("href")||"";if(raw.startsWith("#/"))raw=prettyOf(raw);if(raw[0]!=="/"||raw[1]==="/")return;
+  let u;try{u=new URL(raw,location.origin)}catch(x){return}if(u.origin!==location.origin||!v21AppPath(u.pathname))return;
+  e.preventDefault();const was=location.pathname+location.search;
+  if(was===u.pathname+u.search&&!location.hash){if(u.hash&&u.hash.length>1){const t=document.getElementById(u.hash.slice(1));if(t)t.scrollIntoView({behavior:"smooth",block:"start"})}else render();return}
+  try{history.pushState(null,"",u.pathname+u.search+(u.hash&&!u.hash.startsWith("#/")?u.hash:""))}catch(x){location.href=u.href;return}
+  try{window.dispatchEvent(new HashChangeEvent("hashchange"))}catch(x){render()}
+  if(u.hash&&u.hash.length>1&&!u.hash.startsWith("#/"))setTimeout(()=>{const t=document.getElementById(u.hash.slice(1));if(t)t.scrollIntoView({block:"start"})},50)});
+ // Back/forward between pretty entries: same listeners as a hash change (render, close the modal and menus, …).
+ // A traversal that only changes a #/ hash already fires a native hashchange, so it is not sent twice.
+ let v21Last=location.pathname+location.search+location.hash;
+ window.addEventListener("hashchange",()=>{v21Last=location.pathname+location.search+location.hash});
+ window.addEventListener("popstate",()=>{const now=location.pathname+location.search+location.hash;const onlyHash=now.split("#")[0]===v21Last.split("#")[0]&&now!==v21Last;v21Last=now;if(!onlyHash){try{window.dispatchEvent(new HashChangeEvent("hashchange"))}catch(x){render()}}})}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
