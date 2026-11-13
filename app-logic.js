@@ -4226,6 +4226,14 @@ function v24JobPanel(j,m){const cat=j.cat||"",town=String(townOf(j.zip||"")||"")
   // also contradicted the "This request is full" note right above it)
   if(!m)h=h.replace(/<div class="actions"><a class="btn primary" href="[^"]*">Sign in to quote or respond<\/a><\/div>/,"");
   const panel=v24JobPanel(j,m);if(!panel)return h;const k=h.lastIndexOf("</section>");return k<0?h+panel:h.slice(0,k)+panel+h.slice(k)}catch(e){return h}}}
+/* (2) Reply times are measured, not self-reported. When Sawyer has measured a pro's first replies (messages, invited
+   quotes, crew invites), the profile's "typical reply" stat and the "Usually replies …" lines show that median.
+   A pro with no measured replies yet keeps the time they gave at signup. */
+{const ov=VIEWS.pro;VIEWS.pro=function(id){let h=ov.apply(this,arguments);try{const u=U(id);if(!u||u.role!=="contractor"||typeof respStats!=="function")return h;
+  const r=respStats(u.id);if(!r||!(r.n>=2)||r.med==null)return h;const t=mins(r.med);
+  h=h.replace(/<div><b>[^<]*<\/b><small>typical reply<\/small><\/div>/,()=>`<div><b>${esc(t)}</b><small>median reply</small></div>`);
+  h=h.replace(/Usually replies (within an hour|within \d+ hours|same day|within a day)/g,()=>"Usually replies in "+t);
+ }catch(e){}return h}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
