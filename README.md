@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.3.0
+# Sawyer (beta) — v2.4.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.3.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.4.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
