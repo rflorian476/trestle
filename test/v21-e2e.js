@@ -149,6 +149,28 @@ let LOCAL=null,PUB=null,br=null;
   const q=await page(LOCAL.B);await q.goto(LOCAL.B+"/");await q.waitForSelector(".mainnav a[href='/find']");const [np]=await Promise.all([q.context().waitForEvent("page",{timeout:5000}).catch(()=>null),q.click(".mainnav a[href='/find']",{modifiers:["Control"]})]);
   ok(np&&q.url()===LOCAL.B+"/","Ctrl/Cmd-click opens the pretty URL in a new tab and leaves this page alone",q.url());if(np){await np.waitForLoadState().catch(()=>{});ok(new URL(np.url()).pathname==="/find","the new tab is /find",np.url())}await q.context().close()}
 
+ // ===== 5. One reminder (and one email) when the license and insurance share an expiry date =====
+ {const inbox=[];const mock=http.createServer((rq,rs)=>{const ch=[];rq.on("data",c=>ch.push(c));rq.on("end",()=>{let j=null;try{j=JSON.parse(Buffer.concat(ch).toString())}catch(e){}inbox.push(j);rs.writeHead(200,{"Content-Type":"application/json"});rs.end(J({id:"mock_"+inbox.length}))})});
+  await new Promise(r=>mock.listen(0,"127.0.0.1",r));const MAIL=await startApp(await freePort(),{RENDER:"true",RESEND_API_KEY:"re_test_v21_mock_key_not_real",RESEND_API_URL:"http://127.0.0.1:"+mock.address().port+"/emails",MAIL_FROM:"Sawyer <onboarding@resend.dev>"});
+  try{const day=d=>{const t=new Date(Date.now()+d*864e5);return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0")};
+   const pro=async(tag,lic,ins)=>{const em="v21-"+tag+"-"+Date.now()+"@example.com";const su=await req(MAIL.port,"POST","/api/signup",JH,J({kind:"pro",password:"v21-pass-word-9",data:{name:"Rae "+tag,email:em,biz:"Rae "+tag+" Electric",trade:"Electrical",zip:"78704"}}));
+    const ck=(String(su.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0];const coi=await req(MAIL.port,"POST","/api/upload",{"Content-Type":"image/png","x-sawyer-upload":"coi",Cookie:ck},fs.readFileSync(path.join(__dirname,"fixtures/v16-plain.png")));
+    const sub=await req(MAIL.port,"POST","/api/act",Object.assign({Cookie:ck},JH),J({name:"submitVerify19",args:[{license:"QA-V21-"+tag,licState:"TX",insurance:"Test Mutual, $1M GL",licExp:day(lic),insExp:day(ins),coiFile:coi.json&&coi.json.url}]}));
+    ok(su.status===200&&sub.status===200&&sub.json&&sub.json.res&&sub.json.res.ok!==false,tag+": throwaway pro submits license "+day(lic)+" / insurance "+day(ins),sub.body.slice(0,160));return{em,ck}};
+   // the server's own boot sweep (5 s after start) may get there first, so count every email to this address, whenever sent
+   const sweep=async ck=>{const r=await req(MAIL.port,"POST","/api/act",Object.assign({Cookie:ck},JH),J({name:"sweepVerify19",args:[]}));await sleep(500);return{n:r.json&&r.json.res&&r.json.res.n,mails:inbox.slice()}};
+   const notes=async ck=>{const st=(await req(MAIL.port,"GET","/api/state",{Cookie:ck})).json.state;const me=st.me;return(st.notifs||[]).filter(n=>n.to===me&&n.link==="verify").map(n=>n.text)};
+   {const P=await pro("same7",7,7);const s1=await sweep(P.ck);const mine=s1.mails.filter(m=>m&&m.to&&m.to[0]===P.em);
+    ok(mine.length===1,"same date, 7 days out: exactly one reminder email ("+mine.length+")",J(mine.map(m=>m.subject)));
+    ok(mine[0]&&/license and insurance certificate expire in 7 days/i.test(mine[0].text||""),"the one email names both documents",mine[0]&&mine[0].text);
+    const ns=await notes(P.ck);ok(ns.filter(t=>/expire/.test(t)).length===1,"…and one in-app notice",J(ns));
+    await sleep(5200);const s2=await sweep(P.ck);ok(s2.mails.filter(m=>m&&m.to&&m.to[0]===P.em).length===1,"later sweeps (including the server's own) send nothing new")}
+   {const P=await pro("today",0,0);const s=await sweep(P.ck);const mine=s.mails.filter(m=>m&&m.to&&m.to[0]===P.em);
+    ok(mine.length===1&&/license and insurance certificate expire today/i.test(mine[0].text||""),"same date, expiry day: one 'expire today' email",J(mine.map(m=>m.text&&m.text.slice(0,140))))}
+   {const P=await pro("diff",7,30);const s=await sweep(P.ck);const mine=s.mails.filter(m=>m&&m.to&&m.to[0]===P.em);
+    ok(mine.length===2&&mine.some(m=>/license expires in 7 days/i.test(m.text||""))&&mine.some(m=>/insurance certificate expires in 30 days/i.test(m.text||"")),"different dates still get their own reminders",J(mine.map(m=>m.text&&m.text.slice(0,100))))}
+  }finally{await stopApp(MAIL);mock.close()}}
+
  //@@V21_MORE@@
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);await stopApp(PUB)}

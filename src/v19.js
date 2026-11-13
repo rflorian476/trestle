@@ -38,17 +38,21 @@ function v19Expire(u){if(!u||u.role!=="contractor"||!u.verified)return false;
  notify(u.id,"Your Verified badge came off because your "+which+" expired. Submit the renewal so the Trust team can put it back on.","verify");
  return true}
 
+// v21: when the license and the insurance certificate share an expiry date, each reminder step (60, 30, 7 days and the
+// expiry date) sends ONE notice (and so one email) covering both, as the FAQ promises, instead of two identical ones.
 function v19Remind(u){if(!u||u.role!=="contractor")return 0;let n=0;
- [["licExp","license"],["insExp","insurance certificate"]].forEach(([k,label])=>{const left=v19Left(u[k]);if(left==null)return;
+ const due=[];[["licExp","license"],["insExp","insurance certificate"]].forEach(([k,label])=>{const left=v19Left(u[k]);if(left==null)return;
   const step=[0,7,30,60].find(x=>left<=x);if(step==null)return;
   u.verifyRem19=u.verifyRem19||{};const key=k+":"+(v19Day(u[k])||"") +":"+step;if(u.verifyRem19[key])return;
-  u.verifyRem19[key]=v19Now();
-  const badge=u.verified;
-  const when=left<0?`Your ${label} expired ${v19Day(u[k])}. ${badge?"Your Verified badge comes off until the Trust team reviews the renewal.":"Upload the renewal and resubmit for review."}`
-   :left===0?`Your ${label} expires today (${v19Day(u[k])}). ${badge?"The Verified badge stays on through today and comes off at the end of the day. Renew it and resubmit so the badge can stay on.":"Renew it today and resubmit for review."}`
-   :`Your ${label} expires in ${left} day${left===1?"":"s"} (${v19Day(u[k])}). ${badge?"Renew it and resubmit so your Verified badge stays on.":"Renew it before it lapses."}`;
+  due.push({k,label,left,step,key,day:v19Day(u[k])})});
+ const groups=[];for(const d of due){const g=groups.find(x=>x[0].day===d.day&&x[0].step===d.step&&x[0].left===d.left);if(g)g.push(d);else groups.push([d])}
+ for(const g of groups){const d=g[0],both=g.length>1,label=both?"license and insurance certificate":d.label,left=d.left,badge=u.verified;
+  g.forEach(x=>{u.verifyRem19[x.key]=v19Now()});
+  const when=left<0?`Your ${label} expired ${d.day}. ${badge?"Your Verified badge comes off until the Trust team reviews the renewal.":"Upload the renewal and resubmit for review."}`
+   :left===0?`Your ${label} ${both?"expire":"expires"} today (${d.day}). ${badge?"The Verified badge stays on through today and comes off at the end of the day. Renew "+(both?"them":"it")+" and resubmit so the badge can stay on.":"Renew "+(both?"them":"it")+" today and resubmit for review."}`
+   :`Your ${label} ${both?"expire":"expires"} in ${left} day${left===1?"":"s"} (${d.day}). ${badge?"Renew "+(both?"them":"it")+" and resubmit so your Verified badge stays on.":"Renew "+(both?"them":"it")+" before "+(both?"they lapse":"it lapses")+"."}`;
   notify(u.id,when,"verify");
-  n++});
+  n++}
  return n}
 
 Object.assign(A,{
