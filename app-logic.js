@@ -4268,6 +4268,12 @@ function v25Band(j,town){const g=v25Guide(j);if(!g)return "";const what=g.sub?St
  const note=!b?"":b[1]<g.low?"The posted budget is under the usual range, so quotes may come in higher.":b[0]>g.high?"The posted budget is above the usual range.":"The posted budget is within the usual range.";
  return `<div class="v25b">${b?`<p class="v25bi"><small>Posted budget</small><b>${esc(bs)}</b></p>`:""}<p class="v25bi"><small>Typical for ${esc(what)} near ${esc(town||"you")}</small><b>${money(g.low)} – ${money(g.high)}</b></p></div>
   <p class="v25n">${note?esc(note)+" ":""}A guide, not a quote.</p>`}
+/* (2) Find cards show the measured median reply once Sawyer has 2+ measured first replies for a pro (same rule as the
+   profile's reply stat in v24). Pros without enough measured replies show nothing extra. */
+if(typeof PROCARD==="function"){const oc=PROCARD;PROCARD=function(x){const h=oc.apply(this,arguments);try{const u=x&&x.u;if(!u||typeof respStats!=="function")return h;
+  // the public snapshot carries the server-measured stats (u.rs); prefer them so the server prerender and the app agree
+  const r=u.rs&&u.rs.n!=null?u.rs:respStats(u.id);if(!r||!(r.n>=2)||r.med==null)return h;const line=`<p class="v25rs">${I("zap",13)}<span>Replies in ${esc(mins(r.med))}</span><small>median</small></p>`;
+  return h.replace(/(<div class="pc-body">[\s\S]*?<p class="muted">[^<]*<\/p>)/,(m)=>m+line)}catch(e){return h}}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
