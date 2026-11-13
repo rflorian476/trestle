@@ -117,6 +117,38 @@ let LOCAL=null,PUB=null,br=null;
   const c2=await br.newContext({viewport:{width:1440,height:900}});await c2.addCookies([{name:"swsid",value:ck,url:LOCAL.B}]);const p2=await c2.newPage();await p2.goto(LOCAL.B+"/find");await p2.waitForTimeout(2000);
   ok(await p2.evaluate(()=>!!(DB.me&&DB.users.length)),"signed-in boot gets the private snapshot from the prefetch");await c2.close()}
 
+ // ===== 4. SW-016: pretty in-app links; old #/ links still work; the server serves the app for view paths =====
+ {for(const u of ["/","/prices","/p/c1"]){const t=(await req(LOCAL.port,"GET",u)).body;ok(!/href="#\//.test(t),u+": server-rendered HTML has no #/ links",(t.match(/href="#\/[^"]*"/)||[])[0])}
+  for(const u of ["/find","/find?cat=Roofing","/pro/c1","/job/j1","/pros","/faq","/prices?cat=HVAC","/signup?next=%2Fjob%2Fj1","/msgs/a1","/office/schedule"]){const r=await req(LOCAL.port,"GET",u);ok(r.status===200&&/text\/html/.test(r.headers["content-type"])&&/<main id="app"/.test(r.body),"server serves the app for "+u,r.status)}
+  {const r=await req(LOCAL.port,"GET","/no-such-view");ok(r.status===404,"unknown paths are still 404",r.status);const a=await req(LOCAL.port,"GET","/api/nope");ok(a.status>=400&&/json/.test(a.headers["content-type"])&&!/<main id="app"/.test(a.body),"unknown /api paths stay JSON errors, not the app",a.status)}
+  const p=await page(LOCAL.B);let loads=0;p.on("load",()=>loads++);
+  await p.goto(LOCAL.B+"/");await p.waitForSelector("#app .v4cat");loads=0;
+  const H=()=>p.evaluate(()=>({path:location.pathname+location.search,hash:location.hash,h1:((document.querySelector("#app h1")||{}).textContent||"").trim(),hashLinks:document.querySelectorAll('a[href^="#/"]').length}));
+  let s=await H();ok(s.path==="/"&&s.hash===""&&s.hashLinks===0,"home has no #/ links and keeps a clean address",J(s));
+  ok(await p.$(".mainnav a[href='/find']")&&await p.$("a.brand[href='/']"),"header links are pretty (/find, logo → /)");
+  await p.click(".mainnav a[href='/find']");await p.waitForFunction(()=>location.pathname==="/find");await p.waitForTimeout(300);s=await H();
+  ok(s.path==="/find"&&/pros/i.test(s.h1)&&s.hashLinks===0,"clicking Find pros opens /find in place",J(s));
+  const pro=await p.$eval("#app a[href^='/pro/']",a=>a.getAttribute("href"));await p.click(`#app a[href='${pro}']`);await p.waitForFunction(x=>location.pathname===x,pro);await p.waitForTimeout(300);s=await H();
+  ok(s.path===pro&&s.h1.length>2,"clicking a pro card opens "+pro,J(s));
+  await p.goBack();await p.waitForFunction(()=>location.pathname==="/find");await p.waitForTimeout(300);s=await H();ok(/pros/i.test(s.h1),"Back returns to /find",J(s));
+  await p.goForward();await p.waitForFunction(x=>location.pathname===x,pro);await p.waitForTimeout(300);s=await H();ok(s.path===pro,"Forward returns to the profile",J(s));
+  ok(loads===0,"in-app navigation never reloads the page",loads);
+  for(const [legacy,want,re] of [["/#/prices","/prices",/cost|price/i],["/#/find?cat=Roofing","/find?cat=Roofing",/roofing/i],["/#/home","/",/./],["/#/pro/c1","/pro/c1",/bluebonnet/i]]){await p.goto(LOCAL.B+legacy);await p.waitForTimeout(1200);s=await H();
+   ok(s.path===want&&s.hash===""&&re.test(s.h1),"old link "+legacy+" opens the view and becomes "+want,J(s))}
+  await p.evaluate(()=>{location.hash="#/faq"});await p.waitForTimeout(600);s=await H();ok(s.path==="/faq"&&/question/i.test(s.h1),"code that still sets location.hash='#/…' keeps working",J(s));
+  await p.goto(LOCAL.B+"/p/c1");await p.waitForTimeout(1500);s=await H();ok(s.path==="/p/c1"&&/bluebonnet/i.test(s.h1),"/p/c1 stays /p/c1 and shows the profile",J(s));
+  // sign-in with ?next= returns to the pretty page
+  await p.goto(LOCAL.B+"/job/j1");await p.waitForTimeout(1200);const nx=await p.$("#app a[href^='/signup?next=']");ok(!!nx,"signed-out job page links to /signup?next=…");
+  await p.goto(LOCAL.B+"/signup?next=%2Fjob%2Fj1");await p.waitForSelector("#loginf",{state:"attached"});await p.evaluate(()=>{const d=document.getElementById("pwSection");if(d)d.open=true});
+  await p.fill("#li-e","demo-homeowner@sawyer.test");await p.fill("#li-p","sawyer-demo-2026");await p.click("#loginf button[type=submit]");await p.waitForTimeout(1200);s=await H();
+  ok(s.path==="/job/j1","after logging in, next= brings the person back to /job/j1",J(s));await p.context().close();
+  // phone: menu links are pretty and navigate in place
+  const m=await page(LOCAL.B,390);await m.goto(LOCAL.B+"/");await m.waitForSelector("#menuBtn");await m.click("#menuBtn");await m.waitForSelector(".mmenu a[href='/travel']");await m.click(".mmenu a[href='/travel']");await m.waitForTimeout(800);
+  ok(await m.evaluate(()=>location.pathname==="/travel"&&!document.querySelector(".mmenu:not([hidden]) a[href='/travel']")||location.pathname==="/travel"),"390: mobile menu → /travel",await m.evaluate(()=>location.href));await m.context().close();
+  // modified clicks are left to the browser (open in a new tab)
+  const q=await page(LOCAL.B);await q.goto(LOCAL.B+"/");await q.waitForSelector(".mainnav a[href='/find']");const [np]=await Promise.all([q.context().waitForEvent("page",{timeout:5000}).catch(()=>null),q.click(".mainnav a[href='/find']",{modifiers:["Control"]})]);
+  ok(np&&q.url()===LOCAL.B+"/","Ctrl/Cmd-click opens the pretty URL in a new tab and leaves this page alone",q.url());if(np){await np.waitForLoadState().catch(()=>{});ok(new URL(np.url()).pathname==="/find","the new tab is /find",np.url())}await q.context().close()}
+
  //@@V21_MORE@@
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);await stopApp(PUB)}

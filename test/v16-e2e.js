@@ -68,7 +68,7 @@ function pngChunk(type,data){const d=Buffer.from(data,"latin1"),h=Buffer.alloc(8
   ok(a.html===b.html,w+": the page doesn't change when the full state arrives");
   if(w===1300)await shot(p,"v16-p-c1-slim-1300");
   await p.click("a.backlink");await p.waitForTimeout(900);const cards=await p.$$eval("#app .pcard, #app article.pc, #app .pc",e=>e.length).catch(()=>0);
-  ok(/#\/find/.test(p.url())&&cards>=3,w+": Find opens with the full list after leaving the profile ("+cards+" cards)");
+  ok(/\/find/.test(p.url())&&cards>=3,w+": Find opens with the full list after leaving the profile ("+cards+" cards)");
   const q=await c.newPage();q.on("pageerror",e=>pe.push(String(e).slice(0,200)));await q.goto(B+"/p/c1",{waitUntil:"domcontentloaded"});await q.waitForFunction(()=>typeof __PART!=="undefined"&&typeof DB!=="undefined"&&DB,null,{polling:5,timeout:15000});
   await q.evaluate(()=>{location.hash="#/find?cat=Electrical"});await q.waitForTimeout(700);
   const qn=await q.evaluate(()=>({part:__PART,n:DB.users.length,cards:document.querySelectorAll("#app .pcard, #app article.pc, #app .pc").length}));

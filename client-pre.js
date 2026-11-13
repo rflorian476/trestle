@@ -8,6 +8,6 @@ function __applyState(st){if(!st)return;if(!st.partial)__PART=null;const p=__pre
 // public state loads in the background right after the page has loaded, and synchronously before any other page renders.
 let __PART=null;
 function __fullSync(){if(!__PART)return;const r=__xhr("GET","/api/state");if(r&&r.state&&!r.state.partial)__applyState(r.state)}
-function __partOk(){if(!__PART)return true;const h=String(location.hash||"").replace(/\?.*$/,"");return(h===""||h==="#"||h==="#/")?location.pathname==="/p/"+__PART:h==="#/pro/"+encodeURIComponent(__PART)}
+function __partOk(){if(!__PART)return true;const h=String(typeof routeStr==="function"?routeStr():location.hash||"").replace(/\?.*$/,"");return h==="#/pro/"+encodeURIComponent(__PART)||h==="#/pro/"+__PART}
 function __fullLater(){const f=()=>setTimeout(()=>{if(!__PART)return;const x=new XMLHttpRequest();x.open("GET","/api/state");x.onload=()=>{try{const r=JSON.parse(x.responseText);if(__PART&&r.state&&!r.state.partial){__applyState(r.state);if(typeof SHELL==="function")SHELL()}}catch(e){}};x.send()},60);if(document.readyState==="complete")f();else addEventListener("load",f,{once:true})}
 function __liveLoad(){const r=window.__ST?{state:window.__ST}:__xhr("GET","/api/state");window.__ST=null;if(r&&r.state&&r.state.partial){__PART=r.state.partial;__fullLater()}if(r&&r.state){const p=__prefs();r.state.theme="light";r.state.recent=p.recent||[];LIVEV=r.state._v||0;return r.state}return{v:1,users:[],jobs:[],reviews:[],msgs:[],quotes:[],notifs:[],projects:[],pmsgs:[],me:null,theme:"light",recent:[]}}

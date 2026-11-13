@@ -165,7 +165,7 @@ if(typeof document!=="undefined"&&document.addEventListener)document.addEventLis
 /* ---- header: search button + schedule link; role-aware mobile tabs ---- */
 {const os=SHELL;SHELL=function(){os.apply(this,arguments);if(typeof document==="undefined"||!document.getElementById)return;const m=me();const ta=document.querySelector("#top .topact");
  if(ta&&!ta.querySelector("#sk8"))ta.insertAdjacentHTML("afterbegin",`<button class="sk8" id="sk8" type="button" aria-label="Search (${/Mac/.test(navigator.platform||"")?"Command":"Control"} K)">${I("search",17)}<span>Search</span><kbd>${/Mac/.test(navigator.platform||"")?"⌘":"Ctrl "}K</kbd></button>`);const sb=document.getElementById("sk8");if(sb)sb.onclick=v8Palette;
- const am=document.getElementById("acctMenu");if(am&&m&&!am.querySelector("[data-v8]")){const o=am.querySelector('a[href="#/office"]');const x=(v7Pro(m)?`<a href="${href("schedule")}" data-v8>${I("cal",16)}Schedule</a>`:"")+`<a href="${href("welcome")}" data-v8>${I("target",16)}Change what I see</a>`+(window.__bip?`<button type="button" data-v8 id="inst8">${I("download",16)}Install the app</button>`:"");if(o)o.insertAdjacentHTML("afterend",x);else am.insertAdjacentHTML("beforeend",x);const ib=document.getElementById("inst8");if(ib)ib.onclick=v8Install}
+ const am=document.getElementById("acctMenu");if(am&&m&&!am.querySelector("[data-v8]")){const o=am.querySelector('a[href="#/office"],a[href="/office"]');const x=(v7Pro(m)?`<a href="${href("schedule")}" data-v8>${I("cal",16)}Schedule</a>`:"")+`<a href="${href("welcome")}" data-v8>${I("target",16)}Change what I see</a>`+(window.__bip?`<button type="button" data-v8 id="inst8">${I("download",16)}Install the app</button>`:"");if(o)o.insertAdjacentHTML("afterend",x);else am.insertAdjacentHTML("beforeend",x);const ib=document.getElementById("inst8");if(ib)ib.onclick=v8Install}
  const nav=document.querySelector("#top .mainnav a[data-v7]");if(nav&&["schedule"].includes(ROUTE.v))nav.classList.add("on")}}
 function v8Unread(m){if(!m)return 0;return(DB.msgs||[]).filter(x=>(x.a===m.id||x.b===m.id)&&x.from!==m.id&&!x.read).length}
 natTabs=function(){if(typeof document==="undefined")return;let t=document.getElementById("mtabs");const m=me();const f=v8Focus(m);
@@ -213,7 +213,7 @@ function v8Meta(){if(typeof document==="undefined")return;const v=ROUTE.v,p=ROUT
  document.querySelectorAll("script#ld8").forEach(s=>s.remove());
  if(demo)document.querySelectorAll('script[type="application/ld+json"]').forEach(s=>{if(/HomeAndConstructionBusiness|JobPosting/.test(s.textContent||""))s.remove()});}
 if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener("hashchange",()=>setTimeout(v8Meta,0));setTimeout(v8Meta,0);
- if(/^\/[pt]\/[\w-]+$/.test(location.pathname)&&!location.hash){const[,k,id]=location.pathname.split("/");history.replaceState(null,"","/#/"+(k==="p"?"pro":"tcall")+"/"+id);setTimeout(()=>{render();v8Meta()},0)}}
+ /* v21 SW-016: /p/<id> and /t/<id> stay in the address bar; routeStr() maps them to the profile / call view */}
 /* ---- images: lazy by default below the fold ---- */
 if(typeof document!=="undefined"&&window.MutationObserver){const lz=()=>document.querySelectorAll("#app img:not([loading]):not([fetchpriority=high])").forEach((im,i)=>{if(im.getBoundingClientRect().top>innerHeight){im.loading="lazy";im.decoding="async"}});new MutationObserver(lz).observe(document.getElementById("app")||document.body,{childList:true,subtree:true})}
 /* v8: de-duplicate the legacy hero greeting under Next actions; label business accounts correctly */

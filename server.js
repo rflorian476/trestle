@@ -214,7 +214,9 @@ const xe=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
 const sj=o=>JSON.stringify(o).replace(/</g,"\\u003c");
 // v11 perf: signed-out visitors to "/" get the real home hero inside <main> (public/pre-home.html, made by
 // tools/prerender-hero.js) so the photo and headline paint before the app JS runs. Deep links (#/...) fall back to the skeleton.
-let PRE_HOME=null,PRE_TOP=null;try{PRE_HOME=fs.readFileSync(path.join(__dirname,"public/pre-home.html"),"utf8");PRE_TOP=fs.readFileSync(path.join(__dirname,"public/pre-top.html"),"utf8")}catch(e){}
+// v21 SW-016: server-rendered fragments use the same pretty links as the app (#/home -> /, #/find -> /find)
+const prettyHrefs=h=>h==null?h:String(h).replace(/href="#\/([^"]*)"/g,(m,r)=>'href="'+(r==="home"||r==="home/"?"/":r.startsWith("home?")?"/"+r.slice(4):"/"+r)+'"');
+let PRE_HOME=null,PRE_TOP=null;try{PRE_HOME=prettyHrefs(fs.readFileSync(path.join(__dirname,"public/pre-home.html"),"utf8"));PRE_TOP=prettyHrefs(fs.readFileSync(path.join(__dirname,"public/pre-top.html"),"utf8"))}catch(e){}
 const noJsPreload=h=>h.replace(/<link rel="preload" href="\/js\/[^"]+" as="script">/g,"");// v21: prerendered pages fetch app JS after first paint
 function preHome(req,h){if(!PRE_HOME||sessionUid(req))return h;const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
  if(PRE_TOP)h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP);
@@ -226,7 +228,7 @@ let PRE_PRO={k:"",v:null};
 function proCover(id){const k=id+"|"+VER;if(PRE_PRO.k===k)return PRE_PRO.v;let v=null;const save=api.DB;
  try{if(api.VIEWS&&api.VIEWS.pro){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}/* v16: same stock-cover order as the browser's first render */const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
   const out=String(api.VIEWS.pro(id,{})||"");const m=out.match(/<div class="px-cover[^"]*">[\s\S]*?<div class="px-shade"><\/div><a class="backlink"[^>]*>[\s\S]*?<\/a><\/div>/);
-  if(m&&!/<script/i.test(m[0])){const img=(m[0].match(/<img[^>]*src="([^"]+)"/)||[])[1];v={html:m[0],img:img&&/^\/(img|u)\//.test(img)?img:null}}}}
+  if(m&&!/<script/i.test(m[0])){const img=(m[0].match(/<img[^>]*src="([^"]+)"/)||[])[1];v={html:prettyHrefs(m[0]),img:img&&/^\/(img|u)\//.test(img)?img:null}}}}
  catch(e){v=null}finally{api.DB=save}PRE_PRO={k,v};return v}
 function prePro(req,h,id){if(sessionUid(req))return h;const c=proCover(id);if(!c)return h;const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;
  if(PRE_TOP)h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
@@ -242,7 +244,7 @@ let PRE_PRICES={v:-1,h:null};
 function pricesHtml(){if(PRE_PRICES.v===VER&&PRE_PRICES.h)return PRE_PRICES.h;const save=api.DB;let h=null;
  try{if(api.VIEWS&&api.VIEWS.prices){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
   const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
-  const out=String(api.VIEWS.prices(null,{})||"");if(out&&!/<script/i.test(out))h=out}}
+  const out=String(api.VIEWS.prices(null,{})||"");if(out&&!/<script/i.test(out))h=prettyHrefs(out)}}
  catch(e){h=null}finally{api.DB=save}PRE_PRICES={v:VER,h};return h}
 function prePrices(req,h){if(sessionUid(req)||!PRE_TOP)return h;const body=pricesHtml();if(!body)return h;
  const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
@@ -296,7 +298,8 @@ function pathDemo(p){const d=DB();let m=/^\/([pt])\/([A-Za-z0-9_-]{1,40})$/.exec
  m=/^\/tcall\/([\w.-]{1,60})\/?$/.exec(p);if(m)return isDemo((d.tcalls||[]).find(c=>c.id===m[1]));return false}
 // SW-007: pretty URLs for app views (/prices, /find, /job/j12 ...) serve the app; the client maps the path to its #/ route.
 const VIEW_META={find:["Find pros","Search licensed, reviewed local pros by trade and distance. Free for customers."],prices:["Price guide","Typical prices for common home projects, adjusted by ZIP code."],pricing:["Pricing","Free for customers. Pros pay a flat $20/mo with no lead fees."],pros:["For pros","A flat $20/month gets you a profile, job-board leads and the business tools. No lead fees."],faq:["FAQ","Answers about quotes, reviews, payments and the pro plan."],about:["About","Why Sawyer exists and how it keeps reviews honest."],jobs:["Job board","Open jobs from customers near you. Pros quote free."],post:["Request a pro","Describe your project and get matched with local pros."],travel:["Traveling electricians","Traveler calls with rate, per diem and layoff risk up front."],traveling:["Traveling electricians","Traveler calls with rate, per diem and layoff risk up front."],signup:["Join","Customers are free. Pros pay a flat $20/mo."],credits:["Photo credits","Photo credits."]};
-function viewRoute(p){const m=/^\/([a-z0-9]{2,20})(?:\/([\w.-]{1,60}))?\/?$/.exec(p);if(!m||m[1]==="notfound"||m[1]==="api"||m[1]==="auth")return null;const V=api.VIEWS||{};return Object.prototype.hasOwnProperty.call(V,m[1])?m[1]:null}
+// v21 SW-016: in-app links are pretty now, so any /<view>[/<id or sub-path>] serves the app (ids may be URL-encoded)
+function viewRoute(p){const m=/^\/([a-z0-9]{2,20})(?:\/([\w.%~@+-]{1,120}(?:\/[\w.%~@+-]{1,120}){0,2}))?\/?$/.exec(p);if(!m||m[1]==="notfound"||m[1]==="api"||m[1]==="auth")return null;const V=api.VIEWS||{};return Object.prototype.hasOwnProperty.call(V,m[1])?m[1]:null}
 const SW_JS=`const C="sawyer-v21";const SHELL=["/","/icons/icon-192.png","/img/hero.webp","/fonts/plus-jakarta-sans-400.woff2","/fonts/plus-jakarta-sans-800.woff2"];
 self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL)).catch(()=>{}))});
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
@@ -361,7 +364,7 @@ async function deliverVerifyEmails(before){
    const row=db.prepare("SELECT email FROM accounts WHERE uid=?").get(n.to);
    const em=row&&row.email;if(!mailer.mailable(em))continue;
    const heading=/expired|comes off|came off/i.test(n.text||"")?"Your Sawyer Verified badge":"A reminder from Sawyer";
-   const mail=mailer.noticeEmail({brand:BRAND.name,heading,body:n.text,ctaUrl:origin?origin+"/#/verify":"",ctaLabel:"Renew on Sawyer"});
+   const mail=mailer.noticeEmail({brand:BRAND.name,heading,body:n.text,ctaUrl:origin?origin+"/verify":"",ctaLabel:"Renew on Sawyer"});
    await mailer.send({to:em,subject:mail.subject,text:mail.text,html:mail.html});
   }catch(e){console.error("mailer: reminder not sent")}
  }

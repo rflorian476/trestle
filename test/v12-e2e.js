@@ -111,7 +111,7 @@ ok(await pm.evaluate(([p,r])=>{const x=DB.projects.find(q=>q.id===p).roles.find(
 ok(!(await pm.evaluate(([p,r])=>A.setRoleDates12(p,r,"2001-01-01","2001-01-02"),[pid,rlid])).ok,"dates outside the project are refused");
 ok((await pm.evaluate(([p,r])=>A.setRoleDates12(p,r,"",""),[pid,rlid])).ok,"dates reset to the phase plan");
 // ---- trust team ----
-const tt=await as("demo-trust@sawyer.test");await nav(tt,"/dash");await tt.waitForTimeout(200);ok(/#\/mod/.test(tt.url())||await tt.$("[data-mod12]")!==null,"trust team lands on the moderation queue");
+const tt=await as("demo-trust@sawyer.test");await nav(tt,"/dash");await tt.waitForTimeout(200);ok(/\/mod/.test(tt.url())||await tt.$("[data-mod12]")!==null,"trust team lands on the moderation queue");
 await nav(tt,"/mod");const open=await tt.$$("[data-mod12]");ok(open.length>=3,"queue has the seeded and new reports ("+open.length+")");await shot(tt,"desktop-moderation",true);
 const rp1=await tt.evaluate(()=>DB.reports12.find(x=>x.id==="rp1").rid);const r0=await tt.evaluate(i=>{const r=DB.reviews.find(x=>x.id===i);return r?{id:i,pro:r.cid,n:DB.reviews.filter(x=>x.cid===r.cid).length}:null},rp1);ok(!!r0,"seeded reported review exists");
 await tt.fill('[data-mod12="report|rp1"] input',"Copied text, no matching job photos");await tt.click('[data-mod12="report|rp1"] [data-md=remove]');await tt.waitForTimeout(500);

@@ -103,7 +103,7 @@ ok(require("fs").readFileSync(__dirname+"/../app-logic.js","utf8").includes('fil
  await post(p,"/api/logout",{});await p.goto(B+"/#/signup");await p.reload();await p.waitForSelector("#authBox");
  await p.evaluate(()=>{const d=document.getElementById("pwSection");if(d)d.open=true});ok(await p.isVisible("#liForgot"),"password sign-in has a 'Forgot password?' link (SW-033)");
  await p.fill("#li-e",em);await p.click("#liForgot");ok((await p.inputValue("#au-to"))===em,"forgot password pre-fills the one-time code form");await code(p);
- await p.waitForSelector("#npw",{timeout:8000});await p.waitForTimeout(900);await p.waitForSelector("#npw");ok(/#\/account/.test(await p.evaluate(()=>location.hash)),"after the code, the account page opens Set a password");
+ await p.waitForSelector("#npw",{timeout:8000});await p.waitForTimeout(900);await p.waitForSelector("#npw");ok(/#\/account/.test(await p.evaluate(()=>routeStr())),"after the code, the account page opens Set a password");
  await p.fill("#npw","second-pass-456");if(await p.$("#npw2"))await p.fill("#npw2","second-pass-456");/* v18 dialog confirms the new password */await p.click("#npwGo");await p.waitForTimeout(500);await post(p,"/api/logout",{});
  ok((await post(p,"/api/login",{email:em,password:"second-pass-456"})).ok&&!(await post(p,"/api/login",{email:em,password:"first-pass-123"})).ok,"the new password works and the old one doesn't");
  await p.goto(B+"/#/account");await p.reload();await p.waitForSelector("#delGo",{timeout:8000});const uid=await p.evaluate(()=>DB.me);

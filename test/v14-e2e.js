@@ -102,13 +102,13 @@ for(const w of [390,320,1440]){const p=await mk(w);await p.goto(B+"/does-not-exi
  ok(/Your travel work/.test(await t.textContent("h1").catch(()=>"")),"traveler dashboard H1 is 'Your travel work'");
  ok((await t.$$("h1")).length===1,"traveler dashboard has exactly one H1");
  ok((await t.$$(".tv14-t")).length===4,"four travel tiles (matches, applications, invites, references)");
- const best=await t.$$eval(".tv14-l a",as=>as.map(a=>a.getAttribute("href")));ok(best.length>=1&&best.every(h=>/#\/tcall\//.test(h)),"best matches link to traveler calls ("+best.length+")",JSON.stringify(best));
+ const best=await t.$$eval(".tv14-l a",as=>as.map(a=>a.getAttribute("href")));ok(best.length>=1&&best.every(h=>/^(#)?\/tcall\//.test(h)),"best matches link to traveler calls ("+best.length+")",JSON.stringify(best));
  const rates=await t.$$eval(".tv14-p b",bs=>bs.map(b=>b.textContent));ok(rates.length&&rates.every(x=>/^\$\d+(\.\d+)?\/hr$/.test(x)),"match rates read like $45/hr",JSON.stringify(rates));
  ok(/Traveler/.test(await t.textContent(".uh-k").catch(()=>"")),"header kicker says Traveler");
  ok(await t.$(".tv14-home h2")!==null&&await t.$(".na8")!==null,"home tools stay below under 'Your home'");
- ok(await t.$('.uh-r a[href="#/travel"]')!==null,"primary header action is Find calls");
+ ok(await t.$('.uh-r a[href="/travel"]')!==null,"primary header action is Find calls");
  await shot(t,"traveler-dash",true);
- await t.click(".tv14-l a");await t.waitForTimeout(700);ok(/#\/tcall\//.test(t.url()),"tapping a match opens the call");
+ await t.click(".tv14-l a");await t.waitForTimeout(700);ok(/\/tcall\//.test(t.url()),"tapping a match opens the call");
  await t.context().close();
  const tm=await as("demo-traveler@sawyer.test",390);await nav(tm,"/dash");ok(await noX(tm)&&(await tm.$$(".tv14-t")).length===4,"traveler dashboard fits at 390px");await shot(tm,"traveler-dash-390",true);await tm.context().close();
  const h=await as("demo-homeowner@sawyer.test");await nav(h,"/dash");ok(await h.$(".tv14")===null&&/Your home/.test(await h.textContent("h1").catch(()=>"")),"homeowners keep the 'Your home' dashboard");await h.context().close();

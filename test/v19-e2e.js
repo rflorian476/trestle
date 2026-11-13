@@ -212,10 +212,10 @@ const br=await chromium.launch();
  const hash=await req("/#/prices"); // server sees path /
  const c=await ctxFor(br,null);const pg=await c.newPage();
  await pg.goto(B+"/prices",{waitUntil:"networkidle"});await pg.waitForTimeout(400);
- const at=await pg.evaluate(()=>({path:location.pathname,hash:location.hash,h1:(document.querySelector("h1")||{}).textContent||"",links:[...document.querySelectorAll("a[href^='/p/'],a[href^='/prices'],a[href^='/find']")].slice(0,5).map(a=>a.getAttribute("href"))}));
+ const at=await pg.evaluate(()=>({path:location.pathname,hash:routeStr(),h1:(document.querySelector("h1")||{}).textContent||"",links:[...document.querySelectorAll("a[href^='/p/'],a[href^='/prices'],a[href^='/find']")].slice(0,5).map(a=>a.getAttribute("href"))}));
  ok((at.path==="/prices"||at.hash==="#/prices"||at.hash.startsWith("#/prices"))&&/price|cost/i.test(at.h1),"typed /prices opens the price guide (hash rewrite or pretty path)",JSON.stringify(at));
  await pg.goto(B+"/#/prices",{waitUntil:"networkidle"});await pg.waitForTimeout(300);
- const hashOk=await pg.evaluate(()=>({hash:location.hash,h1:(document.querySelector("h1")||{}).textContent||""}));
+ const hashOk=await pg.evaluate(()=>({hash:routeStr(),h1:(document.querySelector("h1")||{}).textContent||""}));
  ok(/price|cost/i.test(hashOk.h1),"legacy #/prices still opens the price guide",JSON.stringify(hashOk));
  await shot(pg,"v19-prices-1440");await c.close()}
 

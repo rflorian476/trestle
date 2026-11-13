@@ -16,7 +16,7 @@ const noX=p=>p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1);
  await p.evaluate(()=>sessionStorage.clear());await nav(p,"/post");ok(await p.$(".w11-tile"),"signed-out visitors can start a request");await p.click('.w11-tile[data-cat="Electrical"]');await p.waitForTimeout(300);
  ok(await p.$("#w11t"),"picking a trade goes to details");await p.fill("#w11t","Add an EV charger in the garage");await p.fill("#w11d","Tesla wall connector, 200A panel about 20 feet away.");await p.click("#w11Next");await p.waitForTimeout(300);
  ok(await p.$("#w11price"),"timing step shows the typical price range");await p.click("#w11Next");await p.waitForTimeout(300);ok(/Create free account/.test(await p.textContent("#w11Next")),"last step asks a signed-out visitor to create an account");
- await p.click("#w11Next");await p.waitForTimeout(600);ok(/signup/.test(await p.evaluate(()=>location.hash)),"goes to sign-up with the request saved");ok(await p.evaluate(()=>JSON.parse(sessionStorage.getItem("sw11post")).title==="Add an EV charger in the garage"),"draft survives the sign-up step");await p.close()}
+ await p.click("#w11Next");await p.waitForTimeout(600);ok(/signup/.test(await p.evaluate(()=>routeStr())),"goes to sign-up with the request saved");ok(await p.evaluate(()=>JSON.parse(sessionStorage.getItem("sw11post")).title==="Add an EV charger in the garage"),"draft survives the sign-up step");await p.close()}
 // ---- homeowner: guided request with photo -> shortlist -> invite -> compare ----
 let cu=await as("demo-homeowner@sawyer.test");await cu.evaluate(()=>sessionStorage.clear());await nav(cu,"/post");
 await cu.fill("#w11q","water heater leaking");await cu.waitForTimeout(300);ok(await cu.$(".w11-sg"),"typing the problem suggests a trade");await shot(cu,"desktop-request-step1");
@@ -27,12 +27,12 @@ ok(await cu.$(".w11-ph-g img"),"photo uploads and shows a thumbnail");await shot
 await cu.click("#w11Next");await cu.waitForTimeout(300);await cu.click('label.w11-card:has(input[value="urgent"])');await cu.waitForTimeout(500);
 ok(await cu.evaluate(()=>w11Get().urg)==="urgent","urgency picked");await cu.click("#w11Next");await cu.waitForTimeout(300);
 ok(await cu.$(".w11-rev-ph img"),"review shows the photo");ok(/Up to 3 matched pros/.test(await cu.textContent(".w11-promise")),"review states the 3-pro cap and no-spam promise");await shot(cu,"desktop-request-review");
-await cu.click("#w11Next");await cu.waitForTimeout(1500);ok(/#\/job\/j/.test(cu.url()),"posting opens the job page");
+await cu.click("#w11Next");await cu.waitForTimeout(1500);ok(/\/job\/j/.test(cu.url()),"posting opens the job page");
 const jid=cu.url().match(/job\/(j[^?]+)/)[1];const J=await cu.evaluate(id=>DB.jobs.find(j=>j.id===id),jid);
 ok(J&&J.rphotos&&J.rphotos.length===1&&J.est11&&J.urgent,"job saved with photo, price range and urgency");
 ok(await cu.$(".w11-sent"),"success banner");const nm=(await cu.$$(".w11-m")).length;ok(nm>=2,"instant shortlist of matched pros ("+nm+")");await shot(cu,"desktop-matches",true);
 await cu.click("[data-inv11]");await cu.waitForTimeout(800);ok(await cu.evaluate(id=>DB.jobs.find(j=>j.id===id).invited.length>=1,jid),"invite to quote works");
-await cu.click("#w11Cmp");await cu.waitForTimeout(900);ok(/#\/cmp/.test(cu.url())&&(await cu.$$("table.c11-tbl thead th")).length>=3,"compare opens side by side");ok(await cu.$(".c11-best"),"compare marks the best number in a row");await shot(cu,"desktop-compare");
+await cu.click("#w11Cmp");await cu.waitForTimeout(900);ok(/\/cmp/.test(cu.url())&&(await cu.$$("table.c11-tbl thead th")).length>=3,"compare opens side by side");ok(await cu.$(".c11-best"),"compare marks the best number in a row");await shot(cu,"desktop-compare");
 const bad=await cu.evaluate(()=>A.inviteQuote("j1","nope"));ok(bad&&!bad.ok,"inviting a non-pro is refused");
 // compare tray on search
 await cu.evaluate(()=>sessionStorage.removeItem("sw11cmp"));await nav(cu,"/find?cat=Plumbing");const ts=await cu.$$(".c11-t");ok(ts.length>=2,"search cards have a Compare toggle");

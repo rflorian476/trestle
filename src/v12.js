@@ -261,7 +261,7 @@ AFTER.board=()=>{document.querySelectorAll("[data-b12r]").forEach(b=>{const open
 /* ------------------------------------------------------------------ */
 function rr12Eligible(m){return(DB.jobs||[]).filter(j=>j.hired===m.id&&j.status==="completed"&&!(DB.reviews||[]).some(r=>r.job===j.id)).map(j=>({j,c:U(j.cust),rq:(DB.rreq12||[]).find(x=>x.job===j.id&&x.by===m.id)}))}
 const RR12TPL="Hi {first}, thanks for choosing {biz} for \"{job}\". Would you leave a quick review on Sawyer? It takes a minute and helps your neighbors find honest pros. {link}";
-const rr12Fill=(t,m,c,j)=>String(t||RR12TPL).replace(/\{first\}/g,String(nameOf(c)).split(" ")[0]).replace(/\{biz\}/g,v12Nm(m)).replace(/\{job\}/g,j.archived||j.title==="Past job"?(j.sub||j.cat):j.title).replace(/\{link\}/g,v12Origin()+"/#/job/"+j.id+"?review=1");
+const rr12Fill=(t,m,c,j)=>String(t||RR12TPL).replace(/\{first\}/g,String(nameOf(c)).split(" ")[0]).replace(/\{biz\}/g,v12Nm(m)).replace(/\{job\}/g,j.archived||j.title==="Past job"?(j.sub||j.cat):j.title).replace(/\{link\}/g,v12Origin()+"/job/"+j.id+"?review=1");
 Object.assign(A,{
  rreqSend12(ids,text,ch){const m=me();if(!m||m.role!=="contractor")return{ok:false,msg:"Pro accounts only"};const el=rr12Eligible(m);const pick=(Array.isArray(ids)?ids:[]).slice(0,40).map(id=>el.find(x=>x.j.id===id)).filter(Boolean);
   if(!pick.length)return{ok:false,msg:"Pick at least one finished job"};const t=v7S(text,600)||RR12TPL;if(!/\{link\}/.test(t))return{ok:false,msg:"Keep {link} in the message so they can find the review form"};const chan=["email","text","both"].includes(ch)?ch:"email";let n=0,skip=0;
@@ -308,7 +308,7 @@ Object.assign(A,{
   return{ok:true,msg:what==="remove"?"Review removed. The pro's rating updates everywhere.":"Review kept. Everyone involved has been told."}}});
 /* "Report" link on every review (not your own, not your business: pros use Dispute) */
 {const orv=reviewItem;reviewItem=function(r,canReply){const h=orv(r,canReply);const m=me();if(m&&(r.uid===m.id||r.cid===m.id))return h;const k=h.lastIndexOf("</article>");if(k<0)return h;return h.slice(0,k)+`<button type="button" class="linkbtn rp12" data-rp12="${esc(r.id)}">${I("flag",13)}Report</button>`+h.slice(k)}}
-function rp12Modal(rid){const m=me();if(!m){go("signup",null,{next:location.hash.slice(1)});return}
+function rp12Modal(rid){const m=me();if(!m){go("signup",null,{next:routeStr().slice(1)});return}
  modal(`<h2>Report this review</h2><p class="muted small">Reviews on Sawyer come only from finished, hired jobs, but tell us if something looks off. A person checks every report.</p><form id="rp12F"><fieldset class="rp12-r"><legend class="sr-only">Reason</legend>${Object.entries(RP12).map(([k,t],i)=>`<label class="chk"><input type="radio" name="reason" value="${k}" ${i?"":"required"}> ${t}</label>`).join("")}</fieldset>
  <div class="fld"><label for="rp12n">Anything we should know? <span class="muted">(optional)</span></label><textarea id="rp12n" name="note" rows="3" maxlength="600"></textarea></div><div class="row end"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary">${I("flag",14)}Send report</button></div></form>`);
  document.querySelectorAll("#modal [data-close]").forEach(b=>b.onclick=closeModal);document.getElementById("rp12F").onsubmit=e=>{e.preventDefault();act(A.reportReview12(rid,readForm(e.target)),()=>closeModal())}}
