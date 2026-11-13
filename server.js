@@ -308,6 +308,9 @@ function callHtml(id){if(PRE_CALL.v!==VER)PRE_CALL={v:VER,m:new Map()};if(PRE_CA
  catch(e){h=null}finally{api.DB=save}if(PRE_CALL.m.size>300)PRE_CALL.m.clear();PRE_CALL.m.set(id,h);return h}
 function preCall(req,h,id){if(sessionUid(req)||!PRE_TOP)return h;const body=callHtml(id);if(!body)return h;
  const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
+ // the call header's chips and stats use the 500-700 weights: load them up front (as on /find) so a late font swap
+ // doesn't re-wrap the chip row and nudge the heading on phones
+ h=h.replace(/(<link rel="preload" href="\/fonts\/plus-jakarta-sans-800\.woff2"[^>]*>)/,x=>x+FIND_FONTS);
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
@@ -367,7 +370,7 @@ function pathDemo(p){const d=DB();let m=/^\/([pt])\/([A-Za-z0-9_-]{1,40})$/.exec
 const VIEW_META={find:["Find pros","Search licensed, reviewed local pros by trade and distance. Free for customers."],prices:["Price guide","Typical prices for common home projects, adjusted by ZIP code."],pricing:["Pricing","Free for customers. Pros pay a flat $20/mo with no lead fees."],pros:["For pros","A flat $20/month gets you a profile, job-board leads and the business tools. No lead fees."],faq:["FAQ","Answers about quotes, reviews, payments and the pro plan."],about:["About","Why Sawyer exists and how it keeps reviews honest."],jobs:["Job board","Open jobs from customers near you. Pros quote free."],post:["Request a pro","Describe your project and get matched with local pros."],travel:["Traveling electricians","Traveler calls with rate, per diem and layoff risk up front."],traveling:["Traveling electricians","Traveler calls with rate, per diem and layoff risk up front."],signup:["Sign up","Customers are free. Pros pay a flat $20/mo."],credits:["Photo credits","Photo credits."]};
 // v21 SW-016: in-app links are pretty now, so any /<view>[/<id or sub-path>] serves the app (ids may be URL-encoded)
 function viewRoute(p){const m=/^\/([a-z0-9]{2,20})(?:\/([\w.%~@+-]{1,120}(?:\/[\w.%~@+-]{1,120}){0,2}))?\/?$/.exec(p);if(!m||m[1]==="notfound"||m[1]==="api"||m[1]==="auth")return null;const V=api.VIEWS||{};return Object.prototype.hasOwnProperty.call(V,m[1])?m[1]:null}
-const SW_JS=`const C="sawyer-v24";const SHELL=["/","/icons/icon-192.png","/img/hero.webp","/fonts/plus-jakarta-sans-400.woff2","/fonts/plus-jakarta-sans-800.woff2"];
+const SW_JS=`const C="sawyer-v25";const SHELL=["/","/icons/icon-192.png","/img/hero.webp","/fonts/plus-jakarta-sans-400.woff2","/fonts/plus-jakarta-sans-800.woff2"];
 self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL)).catch(()=>{}))});
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("fetch",e=>{const r=e.request;if(r.method!=="GET")return;const u=new URL(r.url);if(u.origin!==location.origin||u.pathname.startsWith("/api/")||u.pathname.startsWith("/auth/"))return;
