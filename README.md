@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.6.0
+# Sawyer (beta) — v2.7.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.6.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.7.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,16 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v24: job pages that work for both sides, honest reply times
+Builds on v23 (live as `05906fc`).
+- **Public job pages (`/job/<id>`, signed out).** Below the job, a two-card panel: **For pros** (no lead fee to quote, one flat $20/mo with 3 free months, at most 3 pros per request with the spots left, contact details private) and **For homeowners** (a real example photo of that trade, labeled as an example, the typical local price range for this kind of job, "Post a similar job" for the same trade, and the price guide). An open request says "Sign in to send a quote"; a full or finished one no longer offers a quote button and points to open jobs in that trade. The panel uses public job facts only, so the server prerender stays public-data only. Owners and signed-in pros see their normal tools instead.
+- **Measured reply times.** Once Sawyer has measured at least 2 first replies for a pro, the profile's reply stat reads "22 min · median reply" and the "Usually replies …" lines use that median. Pros without measured replies keep the time they gave.
+- **SW-057.** The signup divider "or get a one-time code by email" no longer reads "orget … byemail": small muted labels drop the body's negative tracking and get a little word space, and the divider text never squeezes.
+- **Traveler-call titles** read `<call> · <town, ST> · Sawyer` (for example "Hyperscale data center: journeyman wiremen · Ashburn, VA · Sawyer"), the same in first HTML, after mount and in-app navigation. The "(demo)" marker stays on the page.
+- **Lighthouse SEO on `/job/<id>`** (66 vs 69 elsewhere): the only difference was that the page had no images, so the image-alt audit didn't apply and the beta `noindex` weighed more. The panel's labeled photo makes it 69 like the other pages. `noindex` stays until `SAWYER_INDEXABLE=1`.
+- Tests: `node test/v24-e2e.js` (self-contained) is part of `test/run-all.sh`. `v22-e2e` clicks the Find result card through a locator after hydration (no more detached-element flake).
 
 
 ## v23: one title everywhere, faster job pages

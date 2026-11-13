@@ -35,8 +35,8 @@ const match=(t,want)=>want instanceof RegExp?want.test(t):t===want;
  br=await chromium.launch();
  const errs=[];
  const page=async(w,js)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},javaScriptEnabled:js!==false});const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.6.0-sawyer","healthz reports 2.6.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v23"/.test(sw.body),"service worker cache is sawyer-v23");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
 
  // ===== 1-2. first-HTML titles (local and public host) =====
  const first={};
