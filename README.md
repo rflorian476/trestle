@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.4.0
+# Sawyer (beta) — v2.5.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.4.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.5.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,14 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v22: faster first paint on profiles and Find
+Builds on v21 (live as `900f81c`).
+- **Profile cover photos (SW-055).** Signed-out `/p/<id>` and `/pro/<id>` covers arrive with `srcset`/`sizes` (the same `IMGSET()` the app uses). The cover preload uses `imagesrcset`/`imagesizes` with the `-sm` file as `href`, like the home hero, and the first cover photo loads eagerly. When the app mounts it keeps the painted photos and their `srcset`/`sizes`.
+- **Pretty-path first HTML.** `/pro/<id>` is served exactly like `/p/<id>` (title, description, cover prerender, slim state; canonical stays `/p/<id>`). `/job/<id>` and `/compare/<id>` get the job's own title ("Compare bids: …" for compare). The app sets the same titles after it mounts, so the tab text no longer flips back to a generic one.
+- **Find first paint.** Signed-out `/find` (and `/find?cat=…` etc. with the usual filter keys) includes the site header and the real results in the first HTML. The loading skeleton starts hidden, the first result photo loads eagerly, the painted photos are kept when the app mounts, and the page's extra font weights are preloaded so the first paint is already in its final layout. Mobile Lighthouse on `/find` went from the high 80s to the high 90s locally.
+- Tests: `node test/v22-e2e.js` (self-contained) is part of `test/run-all.sh`.
 
 
 ## v20: real sign-in emails through Resend
