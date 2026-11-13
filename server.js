@@ -295,6 +295,21 @@ function preJob(req,h,id){if(sessionUid(req)||!PRE_TOP)return h;const body=jobHt
  const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
+// v25 perf: signed-out /t/<id> (traveler call) gets the real call page inside <main> plus the site header, rendered by the
+// same VIEWS.tcall the browser runs, from the public (signed-out) snapshot only: the call's public facts (rate, per diem,
+// hours, location, license, dates, open spots) and nothing an applicant or the contractor keeps private (no applications,
+// notes, invites, emails or phones). Signed-in visitors get the normal app page.
+let PRE_CALL={v:-1,m:new Map()};
+function callHtml(id){if(PRE_CALL.v!==VER)PRE_CALL={v:VER,m:new Map()};if(PRE_CALL.m.has(id))return PRE_CALL.m.get(id);const save=api.DB;let h=null;
+ try{if(api.VIEWS&&api.VIEWS.tcall){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
+  const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];
+  if((s.tcalls||[]).some(c=>c.id===id)){api.DB=s;const out=String(api.VIEWS.tcall(id,{})||"");
+   if(out&&!/<script/i.test(out)&&(out.match(/<h1[\s>]/g)||[]).length===1&&!/@[\w-]+\.[a-z]{2,}/i.test(out))h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out)}}}
+ catch(e){h=null}finally{api.DB=save}if(PRE_CALL.m.size>300)PRE_CALL.m.clear();PRE_CALL.m.set(id,h);return h}
+function preCall(req,h,id){if(sessionUid(req)||!PRE_TOP)return h;const body=callHtml(id);if(!body)return h;
+ const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
+ h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
+ return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
 // v16 (QA SW-018): a signed-out /p/<id> page inlines only the data that profile needs (the pro, their reviews, quotes,
 // consults, the jobs and crew projects they're part of), about 10 KB instead of the whole
@@ -339,7 +354,7 @@ function jobTitle(v,j){return TITLE(v,j.id)}
 function SEO_PAGE(req,k,id){const d=DB(),o=ORIGIN(req);if(k==="p"){const u=(d.users||[]).find(x=>x.id===id&&x.role==="contractor");if(!u)return null;const town=String(u.zip||"");const name=u.biz||u.name;const demo=isDemo(u);
   return prePro(req,withMeta(req,{title:proTitle(u),desc:`${name}, ${String(u.trade||"").toLowerCase()} pro. ${u.rating?(+u.rating).toFixed(1)+" stars from "+(u.reviews||0)+" verified reviews. ":""}Free quotes, no lead fees.`,path:"/p/"+id,slim:id,type:"profile",img:u.cover||"/img/pro-1.webp",noindex:demo,ld:demo?null:Object.assign({"@context":"https://schema.org","@type":"HomeAndConstructionBusiness",name,url:o+"/p/"+id,address:{"@type":"PostalAddress",postalCode:town,addressCountry:"US"}},u.rating&&u.reviews?{aggregateRating:{"@type":"AggregateRating",ratingValue:(+u.rating).toFixed(1),reviewCount:u.reviews}}:{})}),id)}
  const c=(d.tcalls||[]).find(x=>x.id===id);if(!c)return null;const org=(d.users||[]).find(x=>x.id===c.by)||{};const demo=isDemo(c);
- return withMeta(req,{title:TITLE("tcall",id),desc:`$${c.rate}/hr${c.perDiem?" + $"+c.perDiem+"/day per diem":""}, about ${c.weeks} weeks. Rate, per diem and layoff risk up front.`,path:"/t/"+id,img:"/img/tr-wire.webp",noindex:demo,ld:demo?null:{"@context":"https://schema.org","@type":"JobPosting",title:c.title,description:c.desc||c.title,datePosted:new Date(c.date||Date.now()).toISOString().slice(0,10),employmentType:"CONTRACTOR",hiringOrganization:{"@type":"Organization",name:org.biz||"Sawyer contractor"},jobLocation:{"@type":"Place",address:{"@type":"PostalAddress",addressLocality:c.loc||"",addressRegion:c.state||"",addressCountry:"US"}},baseSalary:{"@type":"MonetaryAmount",currency:"USD",value:{"@type":"QuantitativeValue",value:c.rate,unitText:"HOUR"}}}})}
+ return preCall(req,withMeta(req,{title:TITLE("tcall",id),desc:`$${c.rate}/hr${c.perDiem?" + $"+c.perDiem+"/day per diem":""}, about ${c.weeks} weeks. Rate, per diem and layoff risk up front.`,path:"/t/"+id,img:"/img/tr-wire.webp",noindex:demo,ld:demo?null:{"@context":"https://schema.org","@type":"JobPosting",title:c.title,description:c.desc||c.title,datePosted:new Date(c.date||Date.now()).toISOString().slice(0,10),employmentType:"CONTRACTOR",hiringOrganization:{"@type":"Organization",name:org.biz||"Sawyer contractor"},jobLocation:{"@type":"Place",address:{"@type":"PostalAddress",addressLocality:c.loc||"",addressRegion:c.state||"",addressCountry:"US"}},baseSalary:{"@type":"MonetaryAmount",currency:"USD",value:{"@type":"QuantitativeValue",value:c.rate,unitText:"HOUR"}}}}),id)}
 function sitemapUrls(){if(!indexable())return ["/"];const d=DB();return ["/"].concat((d.users||[]).filter(u=>u.role==="contractor"&&u.biz&&!isDemo(u)).map(u=>"/p/"+u.id),(d.tcalls||[]).filter(c=>c.status!=="closed"&&!isDemo(c)).map(c=>"/t/"+c.id))}
 function robotsTxt(base){if(!indexable())return "# Sawyer beta on a temporary domain. Demo listings must not be indexed.\n# Launch switch (one line), on the custom domain: SAWYER_INDEXABLE=1\n# Also set SAWYER_BASE_URL=https://your-domain\n\nUser-agent: *\nDisallow: /\n";return "# Indexing is on because SAWYER_INDEXABLE=1. Demo records are omitted from the sitemap.\n\nUser-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /auth/\nDisallow: /u/\n\nSitemap: "+base+"/sitemap.xml\n"}
 // A pretty URL or /p /t path that points at a demo pro, job, project or traveler call.
