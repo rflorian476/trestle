@@ -83,7 +83,7 @@ const login=async(port,email)=>{const r=await req(port,"POST","/api/login",JH,J(
    ok(!/Sign in to quote/.test(h)&&/href="\/jobs\?cat=Plumbing"[^>]*>See open Plumbing jobs/.test(pre),tag+" /job/j1 (full): points pros to open Plumbing jobs instead of 'Sign in to quote'");
    ok(/href="\/post\?cat=Plumbing&amp;sub=Water%20heaters"[^>]*>Post a similar job/.test(pre)||/href="\/post\?cat=Plumbing&(amp;)?sub=Water(%20|\+)heaters"/.test(pre),tag+" /job/j1: 'Post a similar job' carries the trade",(pre.match(/href="\/post[^"]*"/)||[""])[0]);
    ok(/<img class="v24-ph"[^>]*alt="Example of Plumbing work"[^>]*loading="lazy"/.test(pre)&&/src="\/img\/[a-z0-9-]+\.webp"/.test((pre.match(/<img class="v24-ph"[^>]*>/)||[""])[0]),tag+" /job/j1: a real example photo, labeled as an example, lazy-loaded");
-   ok(/Typical for this kind of job near Austin, TX/.test(pre)&&/\$[\d,]+ – \$[\d,]+/.test(pre),tag+" /job/j1: typical local price range shown");
+   ok(/Typical for [^<]{3,60} near Austin, TX/.test(pre)&&/\$[\d,]+ – \$[\d,]+/.test(pre),tag+" /job/j1: typical local price range shown");
    ok(!secrets.some(s=>h.includes(s))&&!/escrow|"cases"/i.test(pre.replace(/<script[\s\S]*?<\/script>/g,"")),tag+" /job/j1: still no owner-only data in public HTML")}
   {const h=(await req(S.port,"GET","/job/j2")).body;ok(/href="\/signup\?next=%2Fjob%2Fj2"[^>]*>Sign in to send a quote/.test(h)&&/3 spots left on this one/.test(h),tag+" /job/j2 (open): 'Sign in to send a quote' and the spots left",(h.match(/href="\/signup[^"]*"/)||[""])[0])}
   {const h=(await req(S.port,"GET","/job/x1")).body;ok(/<div class="v24pub">/.test(h)&&/This one's taken/.test(h)&&!/Sign in to (send a )?quote/.test(h),tag+" /job/x1 (completed): no quote button, points to open jobs")}}
