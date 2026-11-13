@@ -4,3 +4,14 @@
 .v3or span{letter-spacing:0;word-spacing:.15em;flex-shrink:0;white-space:nowrap}
 small,.v3fine,.v3note,.eslegend,.n11-ms,.w11-prog li,.w11-why,.v2stat span,.cb-sum span,.tbproof span,.rp12,.estphoto figcaption,.cmp-note,.fp14-band small{letter-spacing:0;word-spacing:.06em}
 @media(max-width:360px){.v3or span{white-space:normal;text-align:center}}
+/* v24: public job page panel (pros + homeowners) */
+.v24pub{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0 8px;align-items:start}
+.v24c{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.v24c h2{font-size:1.2rem!important;line-height:1.25;margin:0;color:#0F2A44}
+.v24k{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc)}
+.v24l{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:7px;font-size:14.5px}.v24l li{display:flex;gap:8px;align-items:flex-start}.v24l li>.i,.v24l li>svg{flex:none;margin-top:3px;color:#1B3A5B}
+.v24a{display:flex;flex-wrap:wrap;gap:8px;padding-top:6px}
+.v24-ph{width:100%;height:auto;aspect-ratio:5/2;object-fit:cover;border-radius:12px;display:block;margin-bottom:4px;background:#ECE7DC}
+.v24r{margin:0;display:flex;flex-direction:column}.v24r b{font-size:1.35rem;color:#0F2A44;letter-spacing:-.01em}.v24r small{color:var(--muted);font-size:13px}
+.v24h p.muted{margin:0;font-size:14.5px}
+@media(max-width:760px){.v24pub{grid-template-columns:1fr}.v24-ph{aspect-ratio:16/9}}
