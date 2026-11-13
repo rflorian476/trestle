@@ -88,7 +88,12 @@ const attr=(tag,k)=>(new RegExp("\\s"+k+'="([^"]*)"').exec(tag)||[])[1];
    ok(o.kept&&!o.pre&&o.h1===1&&/gone/.test(o.sk||"")&&o.cards>=3&&/^Find pros/.test(o.title)&&!o.ow,w+" /find: app mounts over the prerender (photo kept, one H1, skeleton hidden, no overflow)",J(o));
    // filters still work after mounting
    await p.goto(LOCAL.B+"/find?cat=Plumbing");await p.waitForSelector("#app .pcard");const h=await p.textContent("#app h1");ok(/^Plumbing/.test(h),w+" /find?cat=Plumbing shows plumbing",h);
-   const a=await p.$("#app .pcard a[href^='/pro/']");if(a){await a.click();await p.waitForFunction(()=>location.pathname.startsWith("/pro/"));await p.waitForSelector("#app .px-cover");ok(true,w+" a result card opens the profile in place")}else ok(false,w+" result card link found");
+   // v24: the card can be re-rendered right after hydration (the app remounts over the prerender), so a saved element
+   // handle may detach before the click. Wait for the filtered results to settle, then click through a locator, which
+   // re-queries the live DOM on every attempt.
+   await p.waitForFunction(()=>!document.getElementById("pre11")&&/^Plumbing/.test((document.querySelector("#app h1")||{}).textContent||""));await p.waitForTimeout(300);
+   const a=p.locator("#app .pcard a[href^='/pro/']").first();if(await a.count()){let opened=false;for(let i=0;i<3&&!opened;i++){try{await a.click({timeout:5000});await p.waitForFunction(()=>location.pathname.startsWith("/pro/"),null,{timeout:5000});opened=true}catch(e){await p.waitForTimeout(300)}}
+    if(opened)await p.waitForSelector("#app .px-cover");ok(opened,w+" a result card opens the profile in place")}else ok(false,w+" result card link found");
    await p.goBack();await p.waitForFunction(()=>location.pathname==="/find");ok(/^Plumbing/.test(await p.textContent("#app h1")),w+" back returns to the filtered results");
    await p.context().close()}
   // no-JS first paint: content is there before any app script
