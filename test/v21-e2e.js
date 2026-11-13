@@ -139,7 +139,8 @@ let LOCAL=null,PUB=null,br=null;
   await p.evaluate(()=>{location.hash="#/faq"});await p.waitForTimeout(600);s=await H();ok(s.path==="/faq"&&/question/i.test(s.h1),"code that still sets location.hash='#/…' keeps working",J(s));
   await p.goto(LOCAL.B+"/p/c1");await p.waitForTimeout(1500);s=await H();ok(s.path==="/p/c1"&&/bluebonnet/i.test(s.h1),"/p/c1 stays /p/c1 and shows the profile",J(s));
   // sign-in with ?next= returns to the pretty page
-  await p.goto(LOCAL.B+"/job/j1");await p.waitForTimeout(1200);const nx=await p.$("#app a[href^='/signup?next=']");ok(!!nx,"signed-out job page links to /signup?next=…");
+  // v24: a full request (j1) no longer offers a quote sign-in; an open one (j2) does
+  await p.goto(LOCAL.B+"/job/j2");await p.waitForTimeout(1200);const nx=await p.$("#app a[href^='/signup?next=']");ok(!!nx,"signed-out job page links to /signup?next=…");
   await p.goto(LOCAL.B+"/signup?next=%2Fjob%2Fj1");await p.waitForSelector("#loginf",{state:"attached"});await p.evaluate(()=>{const d=document.getElementById("pwSection");if(d)d.open=true});
   await p.fill("#li-e","demo-homeowner@sawyer.test");await p.fill("#li-p","sawyer-demo-2026");await p.click("#loginf button[type=submit]");await p.waitForTimeout(1200);s=await H();
   ok(s.path==="/job/j1","after logging in, next= brings the person back to /job/j1",J(s));await p.context().close();
