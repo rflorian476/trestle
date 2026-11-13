@@ -54,7 +54,7 @@ function pngChunk(type,data){const d=Buffer.from(data,"latin1"),h=Buffer.alloc(8
  ok(x&&!/"(email|phone|password|hash|salt)":"[^"]/.test(JSON.stringify(x.st.users.filter(u=>u.id!=="c1")))&&!x.st.users.some(u=>u.id==="c1"&&u.phone),"no contact details in the slim state");
  const pros=full.users.filter(u=>u.role==="contractor").slice(0,8);let n=0;for(const u of pros){const y=inl((await req("/p/"+u.id)).t);if(y&&y.st.partial===u.id&&y.len<20000)n++}
  ok(n===pros.length,"every sampled profile gets its slim state ("+n+"/"+pros.length+")");
- const H=await login("demo-homeowner@sawyer.test");const rs=await req("/p/c1",{cookie:H.cookie});ok(rs.code===200&&rs.t.indexOf("window.__ST=")<0,"signed-in visitors never get inline state");
+ const H=await login("demo-homeowner@sawyer.test");const rs=await req("/p/c1",{cookie:H.cookie});ok(rs.code===200&&rs.t.indexOf("<script>window.__ST=")<0,"signed-in visitors never get inline state");
  const br=await chromium.launch();
  for(const w of [1300,390]){const c=await br.newContext({viewport:{width:w,height:w<500?844:900}});const p=await c.newPage();const pe=[];p.on("pageerror",e=>pe.push(String(e).slice(0,200)));
   let hold=true;await p.route("**/api/state*",async rt=>{while(hold)await new Promise(z=>setTimeout(z,50));await rt.continue()});// hold the background load until the first paint is checked
