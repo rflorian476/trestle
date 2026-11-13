@@ -1,0 +1,6 @@
+/* v24 (SW-057): Plus Jakarta Sans has a narrow word space (0.17em). At 13px, under the body's slight negative tracking,
+   short words in muted labels ran together ("orget a one-time code byemail"). Small muted labels drop the body
+   tracking and get a little extra word space; the signup divider gets a bit more and never squeezes. */
+.v3or span{letter-spacing:0;word-spacing:.15em;flex-shrink:0;white-space:nowrap}
+small,.v3fine,.v3note,.eslegend,.n11-ms,.w11-prog li,.w11-why,.v2stat span,.cb-sum span,.tbproof span,.rp12,.estphoto figcaption,.cmp-note,.fp14-band small{letter-spacing:0;word-spacing:.06em}
+@media(max-width:360px){.v3or span{white-space:normal;text-align:center}}
