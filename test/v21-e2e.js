@@ -57,6 +57,26 @@ let LOCAL=null,PUB=null,br=null;
   const o=await p.evaluate(()=>({oauth:[...document.querySelectorAll(".v3o[data-p]")].map(e=>e.dataset.p+":"+!!e.querySelector(".v3demo")),sms:!!document.getElementById("tab-sms")}));
   ok(o.oauth.join()==="google:true,apple:true,microsoft:true,facebook:true"&&o.sms,"local test mode keeps the four demo providers and the Phone tab",J(o));await p.context().close()}
 
+ // ===== 2. SW-054: friendly passkey errors, raw text only in the console =====
+ {const p=await page(PUB.B);const cons=[];p.on("console",m=>cons.push(m.text()));await p.goto(PUB.B+"/signup");await p.waitForSelector("#au-passkey");
+  const RAW="Resident credentials or empty 'allowCredentials' lists are not supported at this time.";
+  const tryErr=async(name,msg)=>{await p.evaluate(([n,m])=>{document.querySelectorAll("#toasts .toast").forEach(t=>t.remove());navigator.credentials.get=async()=>{throw new DOMException(m,n)}},[name,msg]);await p.click("#au-passkey");await p.waitForTimeout(500);return toasts(p)};
+  let t=await tryErr("NotSupportedError",RAW);
+  ok(t.length&&t.every(x=>!/Resident|allowCredentials/.test(x))&&t.some(x=>/Passkeys aren't available in this browser, or none is set up\. Use email or a password\./.test(x)),"NotSupportedError shows fixed friendly copy, not the raw WebAuthn string",J(t));
+  ok(cons.some(x=>/passkey error/.test(x)&&/Resident/.test(x)),"the raw name/message is logged to the console",J(cons.slice(-3)));
+  t=await tryErr("NotAllowedError","The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.");
+  ok(t.some(x=>/cancelled or timed out/.test(x))&&!t.some(x=>/w3\.org|operation either/.test(x)),"NotAllowedError shows the cancelled/timed-out copy",J(t));
+  t=await tryErr("SecurityError","The relying party ID is not a registrable domain suffix of, nor equal to the current domain.");
+  ok(t.some(x=>/Passkeys aren't available/.test(x))&&!t.some(x=>/relying party/.test(x)),"SecurityError is mapped too",J(t));
+  await p.evaluate(()=>{document.querySelectorAll("#toasts .toast").forEach(t=>t.remove());delete window.PublicKeyCredential;window.PublicKeyCredential=undefined});await p.click("#au-passkey");await p.waitForTimeout(400);t=await toasts(p);
+  ok(t.some(x=>/Passkeys aren't available/.test(x)),"a browser without WebAuthn gets the same friendly copy",J(t));
+  ok(/signup/.test(p.url()),"stays on sign-up after a passkey failure",p.url());await p.context().close();
+  // server: parser/crypto internals never reach the person
+  const bad=await req(PUB.port,"POST","/api/passkey/login/verify",JH,J({id:"x",clientDataJSON:"%%%not-base64%%%",authenticatorData:"",signature:""}));
+  ok(bad.status===400&&bad.json&&/That passkey didn't work/.test(bad.json.error)&&!/Unexpected|JSON|token|position/i.test(bad.json.error),"server maps a malformed passkey response to fixed copy",bad.body);
+  const forged=await req(PUB.port,"POST","/api/passkey/login/verify",JH,J({id:"x",clientDataJSON:Buffer.from(J({type:"webauthn.get",challenge:"nope",origin:PUB.B})).toString("base64url"),authenticatorData:"",signature:""}));
+  ok(forged.json&&/Challenge expired/.test(forged.json.error),"known friendly server messages (Challenge expired) are kept",forged.body)}
+
  //@@V21_MORE@@
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);await stopApp(PUB)}
