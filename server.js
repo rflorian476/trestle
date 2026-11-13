@@ -281,6 +281,20 @@ function preFind(req,h,search){if(sessionUid(req)||!PRE_TOP)return h;const body=
  h=h.replace(/(<link rel="preload" href="\/fonts\/plus-jakarta-sans-800\.woff2"[^>]*>)/,x=>x+FIND_FONTS);
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
+// v23 perf: signed-out /job/<id> gets the real job page inside <main> (plus the site header), rendered by the same
+// VIEWS.job the browser runs, from the public (signed-out) snapshot only: the same data any signed-out visitor's browser
+// already receives (no escrow, cases, private photos or quote prices). /compare/<id> is owner-only and is never prerendered.
+let PRE_JOB={v:-1,m:new Map()};
+function jobHtml(id){if(PRE_JOB.v!==VER)PRE_JOB={v:VER,m:new Map()};if(PRE_JOB.m.has(id))return PRE_JOB.m.get(id);const save=api.DB;let h=null;
+ try{if(api.VIEWS&&api.VIEWS.job){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
+  const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];
+  if((s.jobs||[]).some(j=>j.id===id)){api.DB=s;const out=String(api.VIEWS.job(id,{})||"");
+   if(out&&!/<script/i.test(out)&&/<h1[\s>]/.test(out))h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out)}}}
+ catch(e){h=null}finally{api.DB=save}if(PRE_JOB.m.size>300)PRE_JOB.m.clear();PRE_JOB.m.set(id,h);return h}
+function preJob(req,h,id){if(sessionUid(req)||!PRE_TOP)return h;const body=jobHtml(id);if(!body)return h;
+ const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
+ h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
+ return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
 // v16 (QA SW-018): a signed-out /p/<id> page inlines only the data that profile needs (the pro, their reviews, quotes,
 // consults, the jobs and crew projects they're part of), about 10 KB instead of the whole
@@ -472,7 +486,7 @@ const server=http.createServer(async(req,res)=>{
    // v22: /pro/<id> is the same profile as /p/<id> (title, description, cover prerender, slim state); canonical stays /p/<id>
    if(v==="pro"){const pm=/^\/pro\/([A-Za-z0-9_-]{1,40})\/?$/.exec(p);if(pm){const html=SEO_PAGE(req,"p",pm[1]);if(html)return sendHtml(res,req,200,html)}}
    if(v==="job"||v==="compare"){const jm=/^\/(?:job|compare)\/([\w.%~@+-]{1,120})\/?$/.exec(p);let jid=null;try{jid=jm&&decodeURIComponent(jm[1])}catch(e){}
-    const j=jid&&(DB().jobs||[]).find(x=>x.id===jid);if(j){const html=withMeta(req,{title:jobTitle(v,j),desc:v==="compare"?"Compare bids side by side: price, timing, reviews and license, on Sawyer.":`${j.cat?j.cat+" job":"Job"} on Sawyer. Local pros quote free, and the customer compares bids side by side.`,path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,html)}}
+    const j=jid&&(DB().jobs||[]).find(x=>x.id===jid);if(j){const html=withMeta(req,{title:jobTitle(v,j),desc:v==="compare"?"Compare bids side by side: price, timing, reviews and license, on Sawyer.":`${j.cat?j.cat+" job":"Job"} on Sawyer. Local pros quote free, and the customer compares bids side by side.`,path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="job"?preJob(req,html,j.id):html)}}
    if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:TITLE(v,(/^\/[a-z0-9]{2,20}\/([^/?]{1,120})/.exec(p)||[])[1]||null),desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="prices"?prePrices(req,html):v==="find"&&/^\/find\/?$/.test(p)?preFind(req,html,url.search):html)}
    return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/\">Go to the home page</a></p>")}
   return send(res,404,{error:"Not found"})}
