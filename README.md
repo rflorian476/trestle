@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.5.0
+# Sawyer (beta) — v2.6.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.5.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.6.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,14 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v23: one title everywhere, faster job pages
+Builds on v22 (live as `c2970a4`).
+- **Titles (SW-056).** One helper, `sawyerTitle()` in `src/v23.js`, builds every title. The server uses it for the first-HTML `<title>` and the app runs the same function after every render, so the tab text never changes when the app mounts. Named pages read `<Page> · Sawyer` (`/signup` is "Sign up · Sawyer" in both, no tagline added after mount); home keeps "Sawyer — Hire pros you'd trust with your house."; profiles, jobs, compare and traveler calls use their record title.
+- **Job pages paint first.** Signed-out `/job/<id>` includes the site header and the real job page in the first HTML, rendered from the signed-out public snapshot only (no escrow, cases, private photos, quote prices or notes). Signed-in visitors and `/compare/<id>` (owner-only) are never prerendered.
+- **Headshots.** 240 px `-sm` copies of the pro headshots (resized from the same real photos), so `/find` cards get a `srcset`.
+- Tests: `node test/v23-e2e.js` (self-contained) is part of `test/run-all.sh`.
 
 
 ## v22: faster first paint on profiles and Find

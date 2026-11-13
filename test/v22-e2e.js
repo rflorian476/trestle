@@ -31,7 +31,7 @@ const attr=(tag,k)=>(new RegExp("\\s"+k+'="([^"]*)"').exec(tag)||[])[1];
  br=await chromium.launch();
  const errs=[];
  const page=async(B,w,js)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},javaScriptEnabled:js!==false});const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.5.0-sawyer","healthz reports 2.5.0-sawyer",J(hz));
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
 
  for(const S of [LOCAL,PUB]){const tag=S===PUB?"public":"local";
   // ===== 1. SW-055: responsive cover on /p/<id> and /pro/<id> =====
