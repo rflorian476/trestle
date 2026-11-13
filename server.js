@@ -215,7 +215,8 @@ const sj=o=>JSON.stringify(o).replace(/</g,"\\u003c");
 // v11 perf: signed-out visitors to "/" get the real home hero inside <main> (public/pre-home.html, made by
 // tools/prerender-hero.js) so the photo and headline paint before the app JS runs. Deep links (#/...) fall back to the skeleton.
 let PRE_HOME=null,PRE_TOP=null;try{PRE_HOME=fs.readFileSync(path.join(__dirname,"public/pre-home.html"),"utf8");PRE_TOP=fs.readFileSync(path.join(__dirname,"public/pre-top.html"),"utf8")}catch(e){}
-function preHome(req,h){if(!PRE_HOME||sessionUid(req))return h;const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;
+const noJsPreload=h=>h.replace(/<link rel="preload" href="\/js\/[^"]+" as="script">/g,"");// v21: prerendered pages fetch app JS after first paint
+function preHome(req,h){if(!PRE_HOME||sessionUid(req))return h;const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
  if(PRE_TOP)h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP);
  return h.replace(re,()=>'<div id="pre11">'+PRE_HOME+'</div><script>if(location.hash.length>2){document.getElementById("top").classList.remove("on-home");var e=document.getElementById("pre11");e.outerHTML=\'<div class="sk11 wrap" aria-hidden="true"><i style="height:34px;width:42%"></i><i style="height:16px;width:64%"></i><i style="height:220px"></i></div>\'}</script>')}
 // v13 perf: signed-out visitors to /p/<id> get that pro's real cover photos inside <main>, rendered by the same
@@ -244,7 +245,7 @@ function pricesHtml(){if(PRE_PRICES.v===VER&&PRE_PRICES.h)return PRE_PRICES.h;co
   const out=String(api.VIEWS.prices(null,{})||"");if(out&&!/<script/i.test(out))h=out}}
  catch(e){h=null}finally{api.DB=save}PRE_PRICES={v:VER,h};return h}
 function prePrices(req,h){if(sessionUid(req)||!PRE_TOP)return h;const body=pricesHtml();if(!body)return h;
- const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;
+ const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
@@ -270,9 +271,16 @@ function pubSlim(id){if(process.env.SLIM_P==="0")return null;if(SLIM.v!==VER)SLI
  if(SLIM.m.size>500)SLIM.m.clear();SLIM.m.set(id,out);return out}
 function withMeta(req,m){let h=INDEX().toString();const o=ORIGIN(req);const block=!indexable()||!!m.noindex;const robots=block?`<meta name="robots" content="noindex, nofollow" data-sawyer-robots="${indexable()?"demo":"beta"}">`:"";const og=`<meta property="og:type" content="${m.type||"website"}"><meta property="og:site_name" content="Sawyer"><meta property="og:title" content="${xe(m.title)}"><meta property="og:description" content="${xe(m.desc)}"><meta property="og:url" content="${xe(o+(m.path||"/"))}"><meta property="og:image" content="${xe(o+(m.img||"/img/hero.webp"))}"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${xe(o+(m.path||"/"))}">`+robots+(m.ld&&!block?`<script type="application/ld+json">${sj(m.ld)}</script>`:"");
  h=h.replace(/<title>[^<]*<\/title>/,`<title>${xe(m.title)}</title>`).replace(/<meta name="description" content="[^"]*">/,`<meta name="description" content="${xe(m.desc)}">`+og);
- // v9 perf: inline the public snapshot for signed-out visitors so first paint skips the blocking /api/state round trip (never inline private state).
- if(!sessionUid(req)){const st=(m.slim&&pubSlim(m.slim))||pubST();h=h.replace("</head>",`<script>window.__ST=${st}</script></head>`)}
- if((m.path||"/")==="/")h=h.replace("</head>",`<link rel="preload" as="image" href="/img/hero-sm.webp" imagesrcset="/img/hero-sm.webp 800w, /img/hero.webp 1600w" imagesizes="(max-width: 900px) 100vw, 50vw" fetchpriority="high"></head>`);
+ // v21 perf: the ~92 KB public snapshot is no longer inlined. Every page starts fetch("/api/state") from <head> (window.__STP)
+ // and the script loader hands it to the app before boot, so the HTML stays small and boot never blocks on a synchronous XHR.
+ // A signed-out /p/<id> still inlines its slim (~10 KB) per-profile state (v16), never private state.
+ const slim=!sessionUid(req)&&m.slim?pubSlim(m.slim):null;
+ // Both go right after the viewport meta: an image preload placed before it is sized against the 980 px default
+ // viewport, which made phones fetch the 1600w hero as well as the 800w one.
+ const vp=/<meta name="viewport"[^>]*>/;
+ h=h.replace(vp,x=>x+(slim?`<script>window.__ST=${slim}</script>`:`<script>window.__STP=fetch("/api/state",{credentials:"same-origin"}).then(function(r){return r.json()}).catch(function(){return null})</script>`));
+ // the home hero is preloaded near the top of <head> so it starts before the stylesheet and fonts
+ if((m.path||"/")==="/")h=h.replace(vp,x=>x+`<link rel="preload" as="image" href="/img/hero-sm.webp" imagesrcset="/img/hero-sm.webp 800w, /img/hero.webp 1600w" imagesizes="(max-width: 900px) 100vw, 50vw" fetchpriority="high">`);
  return h}
 function SEO_PAGE(req,k,id){const d=DB(),o=ORIGIN(req);if(k==="p"){const u=(d.users||[]).find(x=>x.id===id&&x.role==="contractor");if(!u)return null;const town=String(u.zip||"");const name=u.biz||u.name;const demo=isDemo(u);
   return prePro(req,withMeta(req,{title:`${name}: ${u.trade||"Contractor"} · Sawyer`,desc:`${name}, ${String(u.trade||"").toLowerCase()} pro. ${u.rating?(+u.rating).toFixed(1)+" stars from "+(u.reviews||0)+" verified reviews. ":""}Free quotes, no lead fees.`,path:"/p/"+id,slim:id,type:"profile",img:u.cover||"/img/pro-1.webp",noindex:demo,ld:demo?null:Object.assign({"@context":"https://schema.org","@type":"HomeAndConstructionBusiness",name,url:o+"/p/"+id,address:{"@type":"PostalAddress",postalCode:town,addressCountry:"US"}},u.rating&&u.reviews?{aggregateRating:{"@type":"AggregateRating",ratingValue:(+u.rating).toFixed(1),reviewCount:u.reviews}}:{})}),id)}
@@ -289,12 +297,12 @@ function pathDemo(p){const d=DB();let m=/^\/([pt])\/([A-Za-z0-9_-]{1,40})$/.exec
 // SW-007: pretty URLs for app views (/prices, /find, /job/j12 ...) serve the app; the client maps the path to its #/ route.
 const VIEW_META={find:["Find pros","Search licensed, reviewed local pros by trade and distance. Free for customers."],prices:["Price guide","Typical prices for common home projects, adjusted by ZIP code."],pricing:["Pricing","Free for customers. Pros pay a flat $20/mo with no lead fees."],pros:["For pros","A flat $20/month gets you a profile, job-board leads and the business tools. No lead fees."],faq:["FAQ","Answers about quotes, reviews, payments and the pro plan."],about:["About","Why Sawyer exists and how it keeps reviews honest."],jobs:["Job board","Open jobs from customers near you. Pros quote free."],post:["Request a pro","Describe your project and get matched with local pros."],travel:["Traveling electricians","Traveler calls with rate, per diem and layoff risk up front."],traveling:["Traveling electricians","Traveler calls with rate, per diem and layoff risk up front."],signup:["Join","Customers are free. Pros pay a flat $20/mo."],credits:["Photo credits","Photo credits."]};
 function viewRoute(p){const m=/^\/([a-z0-9]{2,20})(?:\/([\w.-]{1,60}))?\/?$/.exec(p);if(!m||m[1]==="notfound"||m[1]==="api"||m[1]==="auth")return null;const V=api.VIEWS||{};return Object.prototype.hasOwnProperty.call(V,m[1])?m[1]:null}
-const SW_JS=`const C="sawyer-v13";const SHELL=["/","/icons/icon-192.png","/img/hero.webp","/fonts/plus-jakarta-sans-400.woff2","/fonts/plus-jakarta-sans-800.woff2"];
+const SW_JS=`const C="sawyer-v21";const SHELL=["/","/icons/icon-192.png","/img/hero.webp","/fonts/plus-jakarta-sans-400.woff2","/fonts/plus-jakarta-sans-800.woff2"];
 self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL)).catch(()=>{}))});
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("fetch",e=>{const r=e.request;if(r.method!=="GET")return;const u=new URL(r.url);if(u.origin!==location.origin||u.pathname.startsWith("/api/")||u.pathname.startsWith("/auth/"))return;
  if(r.mode==="navigate"){e.respondWith(fetch(r).then(x=>{const y=x.clone();caches.open(C).then(c=>c.put("/",y));return x}).catch(()=>caches.match("/")));return}
- if(/^\\/(img|icons|u|fonts|js)\\//.test(u.pathname))e.respondWith(caches.match(r).then(h=>h||fetch(r).then(x=>{if(x.ok){const y=x.clone();caches.open(C).then(c=>c.put(r,y))}return x})))});`;
+ if(/^\\/(img|icons|u|fonts|js|css)\\//.test(u.pathname))e.respondWith(caches.match(r).then(h=>h||fetch(r).then(x=>{if(x.ok){const y=x.clone();caches.open(C).then(c=>c.put(r,y))}return x})))});`;
 const SEC={"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"same-origin","Permissions-Policy":"geolocation=(), camera=(), microphone=()"};
 // SW-003: app pages get a strict CSP. Inline boot scripts are allowed by their exact sha256 hash (computed per response),
 // app code only from this origin, no inline event handlers, no plugins, no framing, no foreign form posts.
@@ -394,7 +402,8 @@ const server=http.createServer(async(req,res)=>{
  if(!indexable()||pathDemo(p))res.setHeader("X-Robots-Tag","noindex, nofollow");
  try{
  if(req.method==="GET"&&(p==="/"||p==="/index.html")){return sendHtml(res,req,200,preHome(req,withMeta(req,{title:"Sawyer: hire pros you'd trust with your house",desc:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees, and the business tools are included. Reviews only from completed jobs.",path:"/",ld:{"@context":"https://schema.org","@type":"Organization",name:"Sawyer",url:ORIGIN(req),logo:ORIGIN(req)+"/icons/icon-512.png"}})))}
- if(req.method==="GET"&&/^\/img\/[a-z0-9-]+\.webp$/.test(p)){const f=path.join(__dirname,"public/img",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"image/webp","Cache-Control":"public, max-age=604800"});return res.end(fs.readFileSync(f))}
+ if(req.method==="GET"&&/^\/img\/[a-z0-9-]+\.webp$/.test(p)){const f=path.join(__dirname,"public/img",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"image/webp","Cache-Control":"public, max-age=2592000, stale-while-revalidate=86400"});return res.end(fs.readFileSync(f))}// v21: 30 days (was 7)
+ if(req.method==="GET"&&/^\/css\/app\.[0-9a-f]{10}\.css$/.test(p)){const f=path.join(__dirname,"public/css",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"text/css; charset=utf-8","Cache-Control":"public, max-age=31536000, immutable"});return res.end(fs.readFileSync(f))}
  if(req.method==="GET"&&/^\/icons\/[a-z0-9-]+\.(png|svg|webmanifest)$/.test(p)){const f=path.join(__dirname,"public/icons",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});const ty={png:"image/png",svg:"image/svg+xml",webmanifest:"application/manifest+json"}[p.split(".").pop()];res.writeHead(200,{"Content-Type":ty,"Cache-Control":"public, max-age=86400","X-Content-Type-Options":"nosniff"});return res.end(fs.readFileSync(f))}
  if(req.method==="GET"&&/^\/fonts\/[a-z0-9-]+\.woff2$/.test(p)){const f=path.join(__dirname,"public/fonts",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"font/woff2","Cache-Control":"public, max-age=31536000, immutable","Access-Control-Allow-Origin":"*"});return res.end(fs.readFileSync(f))}
  if(req.method==="GET"&&/^\/js\/(a\d+|lz\d+)\.[0-9a-f]{10}\.js$/.test(p)){const f=path.join(__dirname,"public/js",path.basename(p));if(!fs.existsSync(f))return send(res,404,{error:"Not found"});res.writeHead(200,{"Content-Type":"text/javascript; charset=utf-8","Cache-Control":"public, max-age=31536000, immutable"});return res.end(fs.readFileSync(f))}
@@ -425,7 +434,10 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==="POST"){const o=req.headers.origin;if(o&&req.headers.host&&new URL(o).host!==req.headers.host)return send(res,403,{error:"Bad origin"});if(!/application\/json/.test(req.headers["content-type"]||""))return send(res,415,{error:"JSON only"})}
  if(limited("all:"+ip(req),600,60e3))return send(res,429,{error:"Too many requests, slow down."});
  const uid=sessionUid(req);
- if(req.method==="GET"&&p==="/api/state"){const v=+url.searchParams.get("v");if(v&&v===VER)return send(res,200,{same:true});return send(res,200,{state:snapshot(uid)})}
+ if(req.method==="GET"&&p==="/api/state"){const v=+url.searchParams.get("v");if(v&&v===VER)return send(res,200,{same:true});
+  // v21: every page now prefetches this, so signed-out visitors share the cached public snapshot (rebuilt at most every 3 s)
+  if(!uid){res.writeHead(200,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; frame-ancestors 'none'"});return res.end('{"state":'+pubST()+'}')}
+  return send(res,200,{state:snapshot(uid)})}
  if(p==="/api/pview"&&req.method==="POST"){const b=clean(await body(req).catch(()=>({})));const pid=String(b.pid||"").slice(0,40);const u=DB().users.find(x=>x.id===pid&&x.role==="contractor");
   if(!u)return send(res,404,{error:"Not found"});if(uid===pid||/bot|crawl|spider|slurp|lighthouse/i.test(req.headers["user-agent"]||""))return send(res,200,{ok:true,counted:false});
   if(limited("pv:"+ip(req),60,60e3))return send(res,429,{error:"Too many requests, slow down."});

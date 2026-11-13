@@ -43,6 +43,7 @@ const o1=await p.textContent("#pdo9");await p.fill("#pdf9 input[name=lodge]","24
 await p.close();
 // --- perf/a11y guards
 const r=await fetch(B+"/",{headers:{"Accept-Encoding":"br"}});const t=await r.text();
-ok(t.includes("window.__ST=")&&t.includes('rel="preload" as="image" href="/img/hero-sm.webp"'),"home inlines public state + preloads mobile hero");
-ok(!/"email":"demo-/.test(t.split("window.__ST=")[1].split("</script>")[0]),"inlined state has no private emails");
+// v21 perf: home prefetches /api/state instead of inlining ~92 KB of it
+ok(t.includes('window.__STP=fetch("/api/state"')&&!t.includes("window.__ST=")&&t.includes('rel="preload" as="image" href="/img/hero-sm.webp"'),"home prefetches public state (not inlined) + preloads mobile hero");
+{const pub=await (await fetch(B+"/api/state")).text();ok(!/"email":"demo-/.test(pub),"public state has no private emails")}
 ok(errs.length===0,"no console errors "+errs.slice(0,3).join(" | "));await br.close();process.exit(fail?1:0)})();

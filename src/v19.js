@@ -275,7 +275,7 @@ function v19Gallery(u,own){const mine=v19OwnPhotos(u);
  const trade=u.trade||"trade";
  const label=own?`These are example ${trade} photos until you add pictures of your own jobs.`:`Example of ${trade} work — not photos from this pro. Ask for pictures of similar jobs when you request a quote.`;
  return`<div class="v19-exgal" aria-label="Example ${esc(trade)} photos"><div class="v19-exh"><span class="badge">${I("camera",12)}Example photos</span><small>${esc(label)}</small></div>
-  <div class="v19-g">${photos.map((p,i)=>`<figure><img class="art v4art" src="${esc(p.src)}" alt="Example of ${esc(trade)} work" ${i?'loading="lazy" decoding="async"':'fetchpriority="high"' }><figcaption>Example of ${esc(trade)} work</figcaption></figure>`).join("")}</div>
+  <div class="v19-g">${photos.map((p,i)=>`<figure><img class="art v4art" src="${esc(p.src)}" alt="Example of ${esc(trade)} work" loading="lazy" decoding="async"><figcaption>Example of ${esc(trade)} work</figcaption></figure>`).join("")}</div>
   ${own?`<a class="btn sm" href="${href("pro",u.id)}#photos">Add photos of your work</a>`:`<a class="btn sm ghost" href="${href("post",null,{invite:u.id})}">Request a quote</a>`}</div>`}
 
 function v19ReplaceSoon(h,html){const re=/<div class="(?:g12-soon )?sec-soon">/g;let m,out="",last=0;

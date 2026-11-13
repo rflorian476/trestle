@@ -83,7 +83,9 @@ const meOf=(st,id)=>st.users.find(u=>u.id===id);
   if(st.partial){const pid=st.partial;ok(st.users.some(u=>u.id===pid&&u.role==="contractor")&&(st.reviews||[]).some(r=>r.pro===pid||r.to===pid||r.cid===pid),label+": slim profile state (v16 SW-018) still has that pro and their reviews")}
   else ok(st.users.filter(u=>u.role==="contractor").length>=40&&st.jobs.length>=40&&st.reviews.length>=20,label+": public profiles, job cards and reviews still present")};
  {chk((await req("/api/state")).j.state,"signed-out /api/state");
-  for(const p of ["/","/p/c1","/prices"]){const h=(await req(p)).t;const m=h.match(/<script>window\.__ST=([\s\S]*?)<\/script>/);ok(!!m,"__ST inlined on "+p);if(m)chk(JSON.parse(m[1]),"inlined __ST on "+p)}
+  // v21 perf: "/" and "/prices" no longer inline the public snapshot (they prefetch /api/state, checked above); /p/<id> inlines its slim state.
+  for(const p of ["/","/p/c1","/prices"]){const h=(await req(p)).t;const m=h.match(/<script>window\.__ST=([\s\S]*?)<\/script>/);
+   if(p==="/p/c1"){ok(!!m,"__ST inlined on "+p);if(m)chk(JSON.parse(m[1]),"inlined __ST on "+p)}else ok(!m&&/window\.__STP=fetch\("\/api\/state"/.test(h),"no inline snapshot on "+p+"; it prefetches /api/state")}
   const P=await login("demo-pro@sawyer.test");const sp=(await req("/api/state",{cookie:P.cookie})).j.state;
   ok(sp.users.filter(u=>u.role==="contractor"&&u.phone).length>=40,"signed-in viewers see pros' business phones");
   ok(sp.jobs.filter(j=>j.status==="posted"&&j.desc).length>0,"signed-in pros see open job details to quote");

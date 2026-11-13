@@ -6,9 +6,13 @@ const BRAND=require("./brand.json");
 // Brand tokens: change brand.json to rename the product (one line).
 const T=s=>s.split("__BRAND_LC__").join(BRAND.name.toLowerCase()).split("__BRAND__").join(BRAND.name).split("__TAGLINE__").join(BRAND.tagline);
 const src=T(fs.readFileSync(SRC,"utf8"));
+// v21: widths of the built-in photos and their smaller copies (NAME-sm / NAME-md), read from the WebP headers.
+function webpWidth(b){const t=b.toString("latin1",12,16);if(t==="VP8 ")return b.readUInt16LE(26)&0x3fff;if(t==="VP8L")return 1+(((b[22]&0x3f)<<8)|b[21]);if(t==="VP8X")return 1+b.readUIntLE(24,3);return 0}
+function IMGW(){const dir=path.join(__dirname,"public/img"),o={};for(const f of fs.readdirSync(dir).filter(f=>/^[a-z0-9-]+\.webp$/.test(f)).sort()){const n=f.slice(0,-5),base=n.replace(/-(sm|md)$/,"");const w=webpWidth(fs.readFileSync(path.join(dir,f)));if(w)(o[base]=o[base]||[]).push([n,w])}
+ for(const k of Object.keys(o)){o[k].sort((a,b)=>a[1]-b[1]);if(o[k].length<2||k==="hero")delete o[k]}return o}
 const a=src.indexOf("<script>"),b=src.lastIndexOf("</script>");
 let js=src.slice(a+8,b);
-const V2JS=T(fs.readFileSync(path.join(__dirname,"src/v2.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v4.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v5.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v6.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v7.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v8.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v9.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v10.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v11.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v12.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v13.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v14.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v16.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v18.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/sec.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v19.js"),"utf8"));
+const V2JS=T(fs.readFileSync(path.join(__dirname,"src/v2.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v3.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v4.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v5.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v6.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v7.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v8.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v9.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v10.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v11.js"),"utf8")+"\n//@@SPLIT@@\n"+fs.readFileSync(path.join(__dirname,"src/v12.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v13.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v14.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v16.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v18.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/sec.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v19.js"),"utf8")+"\n"+fs.readFileSync(path.join(__dirname,"src/v21.js"),"utf8").replace("__IMGW__",()=>JSON.stringify(IMGW())));
 if(!js.includes("\nboot();"))throw new Error("boot anchor missing");
 js=js.replace("\nboot();","\n//@@SPLIT@@\n"+V2JS+"\nboot();");
 fs.writeFileSync(path.join(__dirname,"app-logic.js"),js+"\n;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};\n");
@@ -67,6 +71,17 @@ html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
   html=html.replace(/<script>([\s\S]*?)<\/script>/g,(m,code)=>"<script>"+esb.transformSync(code,{...o,loader:"js"}).code.trim()+"</script>");
   html=html.replace(/<style>([\s\S]*?)<\/style>/,(m,css)=>"<style>"+esb.transformSync(css,{...o,loader:"css"}).code.trim()+"</style>");
   console.log("minified",n0,"->",html.length)}else console.log("minify skipped (esbuild not found)")}
+// v21 perf: the CSS ships as one hashed, immutable /css/app.<hash>.css instead of ~300 KB inlined in every page.
+// Historic :root theme layers and declarations a later identical selector overrides are removed first
+// (lib/css-dedupe.js), so the final Linen & Navy tokens are the only ones left. Repeat views reuse the cached file.
+{const m=html.match(/<style>([\s\S]*?)<\/style>/);if(!m)throw new Error("style block missing");
+ const r=require("./lib/css-dedupe.js").dedupe(m[1]);let css=r.css;
+ if(!/--bg:#F8F6F1/i.test(css)||!/--acc:#AE4718/i.test(css)||!/#0F2A44/i.test(css))throw new Error("final Linen & Navy tokens missing from CSS");
+ if(/font-family:"?Sawyer WM"?[^}]*font-display:block/.test(css))throw new Error("wordmark font must not use font-display:block");
+ const dir=path.join(__dirname,"public/css");fs.rmSync(dir,{recursive:true,force:true});fs.mkdirSync(dir,{recursive:true});
+ const f="app."+require("crypto").createHash("sha256").update(css).digest("hex").slice(0,10)+".css";fs.writeFileSync(path.join(dir,f),css);
+ html=html.replace(m[0],()=>'<link rel="stylesheet" href="/css/'+f+'">');
+ console.log("external css",m[1].length,"->",css.length,"("+f+") dedupe",JSON.stringify(r.stats))}
 // v11 perf: app layers ship as hashed, immutable /js/*.js files loaded with defer (order kept, run before DOMContentLoaded),
 // so the HTML is small, the prerendered hero paints right away, and repeat visits reuse cached JS.
 {const dir=path.join(__dirname,"public/js");fs.rmSync(dir,{recursive:true,force:true});fs.mkdirSync(dir,{recursive:true});let n=0;
@@ -76,8 +91,12 @@ html=rep(html,"</style></head>",`.betabar{text-align:center;padding:7px 12px}
  // the app code evaluates; everywhere else it starts at once. Preloads let the files download in parallel with the HTML.
  const srcs=[...html.matchAll(/<script defer src="(\/js\/[^"]+)"><\/script>/g)].map(m=>m[1]);
  html=html.replace(/<script defer src="\/js\/[^"]+"><\/script>/g,"");
+ // v21 perf: script preloads are emitted for app-rendered pages only. The server removes them on pages that arrive
+ // prerendered (/, /prices, /p/<id>) so they don't compete with the hero/cover; there the loader fetches after first paint.
  html=html.replace("</head>",srcs.map(u=>'<link rel="preload" href="'+u+'" as="script">').join("")+"</head>");
- html=html.replace(/<\/body>/,'<script>(function(){var s='+JSON.stringify(srcs)+',d=0;function g(){if(d)return;d=1;s.forEach(function(u){var e=document.createElement("script");e.src=u;e.async=false;document.body.appendChild(e)})}if(document.getElementById("pre11")){try{new PerformanceObserver(function(){setTimeout(g,0)}).observe({type:"largest-contentful-paint",buffered:true})}catch(x){requestAnimationFrame(function(){setTimeout(g,0)})}setTimeout(g,400)}else g()})()</script></body>');
+ // v21 perf: the public snapshot is no longer inlined; the head starts fetch("/api/state") (window.__STP) and the
+ // loader hands the result to the app as window.__ST before the first app script runs (no synchronous XHR at boot).
+ html=html.replace(/<\/body>/,'<script>(function(){var s='+JSON.stringify(srcs)+',d=0;function run(){s.forEach(function(u){var e=document.createElement("script");e.src=u;e.async=false;document.body.appendChild(e)})}function g(){if(d)return;d=1;var P=window.__STP;if(P&&!window.__ST&&P.then)P.then(function(r){if(r&&r.state&&!window.__ST)window.__ST=r.state;run()},run);else run()}if(document.getElementById("pre11")){try{new PerformanceObserver(function(){setTimeout(g,0)}).observe({type:"largest-contentful-paint",buffered:true})}catch(x){requestAnimationFrame(function(){setTimeout(g,0)})}setTimeout(g,400)}else g()})()</script></body>');
  fs.writeFileSync(path.join(dir,LZ12_FILE),LZ12);
  console.log("external scripts",n,"+ on-demand",LZ12_FILE,LZ12.length)}
 fs.writeFileSync(path.join(__dirname,"public/index.html"),html);
