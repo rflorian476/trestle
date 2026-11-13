@@ -228,11 +228,19 @@ let PRE_PRO={k:"",v:null};
 function proCover(id){const k=id+"|"+VER;if(PRE_PRO.k===k)return PRE_PRO.v;let v=null;const save=api.DB;
  try{if(api.VIEWS&&api.VIEWS.pro){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}/* v16: same stock-cover order as the browser's first render */const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
   const out=String(api.VIEWS.pro(id,{})||"");const m=out.match(/<div class="px-cover[^"]*">[\s\S]*?<div class="px-shade"><\/div><a class="backlink"[^>]*>[\s\S]*?<\/a><\/div>/);
-  if(m&&!/<script/i.test(m[0])){const img=(m[0].match(/<img[^>]*src="([^"]+)"/)||[])[1];v={html:prettyHrefs(m[0]),img:img&&/^\/(img|u)\//.test(img)?img:null}}}}
+  // v22 SW-055: the same IMGSET() pass the browser's render() runs, so the painted cover photos carry srcset/sizes
+  if(m&&!/<script/i.test(m[0])){let html=typeof ctx.IMGSET==="function"?String(ctx.IMGSET(m[0])):m[0];
+   // the first cover photo is the profile's largest paint: load it now (high priority) instead of lazily
+   html=html.replace(/<img\b[^>]*>/,x=>/\sloading="lazy"/.test(x)?x.replace(/\sloading="lazy"/,' fetchpriority="high"'):x);const t=(html.match(/<img\b[^>]*>/)||[])[0]||"";const at=k=>(new RegExp("\\s"+k+'="([^"]*)"').exec(t)||[])[1]||"";
+   const img=at("src");v={html:prettyHrefs(html),img:img&&/^\/(img|u)\//.test(img)?img:null,srcset:at("srcset"),sizes:at("sizes")}}}}
  catch(e){v=null}finally{api.DB=save}PRE_PRO={k,v};return v}
 function prePro(req,h,id){if(sessionUid(req))return h;const c=proCover(id);if(!c)return h;const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;
  if(PRE_TOP)h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
- if(c.img)h=h.replace('<meta name="viewport"',()=>`<link rel="preload" as="image" href="${xe(c.img)}" fetchpriority="high"><meta name="viewport"`);
+ // v22 SW-055: a responsive preload (imagesrcset/imagesizes identical to the <img>, so the browser reuses it) with the
+ // smallest copy as href, like the home hero. It goes right after the viewport meta so phones size it against the real viewport.
+ if(c.img){const sm=c.srcset?(c.srcset.split(",")[0].trim().split(/\s+/)[0]||c.img):c.img;
+  const tag=c.srcset?`<link rel="preload" as="image" href="${xe(sm)}" imagesrcset="${xe(c.srcset)}" imagesizes="${xe(c.sizes||"100vw")}" fetchpriority="high">`:`<link rel="preload" as="image" href="${xe(c.img)}" fetchpriority="high">`;
+  h=h.replace(/<meta name="viewport"[^>]*>/,x=>x+tag)}
  // the cover gets the bandwidth first; the loader at the end of <body> fetches the app scripts right after it paints
  h=h.replace(/<link rel="preload" href="\/js\/[^"]+" as="script">/g,"");
  return h.replace(re,()=>'<div id="pre11"><section class="px">'+c.html+'</section></div>')}
