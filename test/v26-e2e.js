@@ -22,7 +22,7 @@ const J=o=>JSON.stringify(o),JH={"Content-Type":"application/json"};
 const toasts=p=>p.evaluate(()=>[...document.querySelectorAll("#toasts .toast")].map(t=>t.textContent.trim()));
 // Covers: SW-059 (no general "3 free months" promise; /signup names founding pros), SW-060 (signed-out traveler calls carry
 // counts only, no applications or hires; spots meters still right), the /prices quote check (bands, deep link from public
-// job pages, nothing sent or put in the URL), health 2.9.0-sawyer and SW cache sawyer-v26.
+// job pages, nothing sent or put in the URL), health and SW cache (any Sawyer version, checked exactly in the current release suite).
 let LOCAL=null,PUB=null,br=null;
 const pre=h=>(h.match(/<div id="pre11">[\s\S]*$/)||[""])[0].replace(/<script[\s\S]*?<\/script>/g,"");
 const login=async(port,email)=>{const r=await req(port,"POST","/api/login",JH,J({email,password:"sawyer-demo-2026"}));return {ck:(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0],st:(r.json&&r.json.state)||{}}};
@@ -36,8 +36,8 @@ const stateOf=r=>(r.json&&(r.json.state||r.json))||{};
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:(S||LOCAL).B}])}
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));
   await p.addInitScript(()=>{window.__cls=0;try{new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)window.__cls+=e.value}).observe({type:"layout-shift",buffered:true})}catch(e){}});return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.9.0-sawyer","healthz reports 2.9.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v26"/.test(sw.body),"service worker cache is sawyer-v26");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
 
  // ===== 1. SW-059: every 3-month promise names founding pros =====
  {const src=fs.readFileSync(path.join(ROOT,"app-logic.js"),"utf8")+fs.readdirSync(path.join(ROOT,"public/js")).map(f=>fs.readFileSync(path.join(ROOT,"public/js",f),"utf8")).join("\n");

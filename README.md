@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.9.0
+# Sawyer (beta) — v2.10.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.9.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.10.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,18 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v27: a pipeline for pros, no second signup, Thumbtack vs Jobber
+Builds on v26 (live as `4d59c1a`).
+- **No second signup for pros.** A signed-in pro who opens `/join` (bookmark, header link, old email) goes to `/dash?setup=1` instead of the blank 6-step wizard: a 302 on a full page load, a replace-navigation in the app. Customers and signed-out visitors still get the wizard.
+- **"Finish your profile" guided flow** on the pro dashboard: **add 3 job photos**, **set a starting price**, **submit the Verified packet**, one current step at a time with a 0–3 progress meter. Photos and prices open the existing editors; the packet links to `/verify` (a packet in review counts as done). It disappears once all three are done, except when arriving from `/join`, where it says so. Code: `src/v27.js`, `src/v27.css`.
+- **Job board as a pipeline.** For a signed-in pro, dashboard "New jobs in your area" and `/jobs` cards add a strip: why the job fits (your trade, a service you list, inside your radius), roughly how far it is, and spots left of the 3-pro cap ("2 of 3 spots left", "You're in · 3 of 3 pros", "Full: 3 of 3 pros"). **Quote in two taps:** "Quote" opens a short sheet with a suggested price (your own starting price for that service, else the middle of the typical local range), start days and a default note; "Send quote" sends it. A full request has no quote button.
+- **Start from an Office estimate.** The quote sheet and the job-page quote modal list the pro's own estimates; picking one fills the price (total with switched-on options and tax) and itemized line items, optional add-ons listed separately. Still editable.
+- **"Not hired" notices.** When hiring, the owner can share an optional one-line reason (presets or "Something else…", 140 characters max). Pros who quoted or marked interest and weren't picked get an in-app notice (bell, a "Not hired this time" card on the dashboard, and "You weren't hired this time" on the job page) with the reason if one was shared. The reason is stored on that pro's own quote and redacted for everyone else (other pros, signed out). No email or SMS.
+- **`/pros`: Thumbtack or Jobber?** A Sawyer / Thumbtack / Jobber table: what it is, how customers find you, lead cost, pros per request, office tools, monthly price. Claims are general and dated (public pages, checked Nov 2026): Thumbtack is pay per lead inside a weekly budget with several pros often contacted; Jobber is field-service software with no built-in lead marketplace and plans above $20 (Core from $29/mo billed annually). No Instant Book claim: Thumbtack retired it in Nov 2024. Stacked, labeled rows on phones.
+- **`/prices` SEO (66 → 69).** The quote check now has a small labeled example photo of the work picked (real stock photo, follows the job picker), so Lighthouse's image-alt audit applies as on the other pages. Beta `noindex` stays.
+- Tests: `node test/v27-e2e.js` (self-contained) is part of `test/run-all.sh`. `v26-e2e` now accepts any Sawyer version / SW cache name. Existing hire flows keep `#cfHire` / `#cfCHire`.
 
 
 ## v26: check any quote, founding wording, private traveler calls
