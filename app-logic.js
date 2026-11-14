@@ -4419,15 +4419,15 @@ function v27LostCard(m){const l=v27Lost(m).slice(0,3);if(!l.length)return "";
   // pros who only marked "interested" (no quote) hear it too
   (j.interested||[]).forEach(p=>{if(p!==cid&&!told.has(p)){notify(p,"This job was filled: "+j.title+". The customer hired another pro.","job:"+jid);told.add(p)}});
   if(why)DB.notifs.slice(before).forEach(n=>{if(n.link==="job:"+jid&&/^This job was filled/.test(n.text))n.text+=" Their note: “"+why+"”"});save()}catch(e){}return r}}
-function v27HireModal(jid,u,after){modal(`<div class="v27q"><h2 id="mtitle">Hire ${esc(u.biz)}?</h2><p>The other pros will be told the job is filled. You can message ${esc(String(u.name||"").split(" ")[0])} to set a start date.</p>
+function v27HireModal(jid,u,after,bid){modal(`<div class="v27q"><h2 id="mtitle">Hire ${esc(u.biz)}?</h2><p>The other pros will be told the job is filled. You can message ${esc(String(u.name||"").split(" ")[0])} to set a start date.</p>
  <form id="v27hf" class="form"><div class="fld"><label for="v27hw">Tell the other pros why? (optional)</label><select id="v27hw" name="why"><option value="">Don't share a reason</option>${V27WHY.map(x=>`<option>${esc(x)}</option>`).join("")}<option value="__o">Something else…</option></select></div>
  <div class="fld" id="v27hoF" hidden><label for="v27ho">One line, no names or prices</label><input id="v27ho" name="other" maxlength="140" autocomplete="off"></div>
  <p class="muted small">Only the pros who quoted see it. It helps them quote better next time.</p>
- <div class="actions"><button type="button" class="btn ghost" data-close>Not yet</button><button class="btn primary" id="v27hgo">${I("check",16)}Yes, hire</button></div></form></div>`);
+ <div class="actions"><button type="button" class="btn ghost" data-close>Not yet</button><button class="btn primary" id="${bid||"cfHire"}">${I("check",16)}Yes, hire</button></div></form></div>`);
  document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);const s=document.getElementById("v27hw"),of=document.getElementById("v27hoF");s.onchange=()=>{of.hidden=s.value!=="__o"};
  document.getElementById("v27hf").onsubmit=e=>{e.preventDefault();const w=s.value==="__o"?document.getElementById("v27ho").value:s.value;closeModal();act(A.hire(jid,u.id,w),after)}}
-{const oa=AFTER.job;AFTER.job=function(id){const r=oa&&oa.apply(this,arguments);try{document.querySelectorAll("[data-hire]").forEach(b=>b.onclick=()=>{const u=U(b.dataset.hire);if(u)v27HireModal(id,u,render)})}catch(e){}return r}}
-{const oa=AFTER.compare;if(oa)AFTER.compare=function(jid){const r=oa.apply(this,arguments);try{document.querySelectorAll("[data-chire]").forEach(b=>b.onclick=()=>{const u=U(b.dataset.chire);if(u)v27HireModal(jid,u,()=>go("job",jid))})}catch(e){}return r}}
+{const oa=AFTER.job;AFTER.job=function(id){const r=oa&&oa.apply(this,arguments);try{document.querySelectorAll("[data-hire]").forEach(b=>b.onclick=()=>{const u=U(b.dataset.hire);if(u)v27HireModal(id,u,render,"cfHire")})}catch(e){}return r}}
+{const oa=AFTER.compare;if(oa)AFTER.compare=function(jid){const r=oa.apply(this,arguments);try{document.querySelectorAll("[data-chire]").forEach(b=>b.onclick=()=>{const u=U(b.dataset.chire);if(u)v27HireModal(jid,u,()=>go("job",jid),"cfCHire")})}catch(e){}return r}}
 // the job page for a pro who quoted and wasn't picked
 {const ov=VIEWS.job;VIEWS.job=function(id){let h=ov.apply(this,arguments);try{const m=me(),j=DB.jobs.find(x=>x.id===id);if(!m||m.role!=="contractor"||!j||!j.hired||j.hired===m.id)return h;
   const q=DB.quotes.find(x=>x.job===id&&x.cid===m.id);if(!q&&!(j.interested||[]).includes(m.id))return h;
