@@ -4552,6 +4552,16 @@ calcWidget=function(){return`<div class="calc card"><h2 class="h-sub">${I("calc"
 {const fix=()=>{try{const o=document.getElementById("calcOut");const s=o&&o.querySelector("div span");if(s&&s.textContent==="Pay-per-lead sites")s.textContent="Pay-per-lead, at these numbers"}catch(e){}};
  for(const k of ["pros","pricing"]){const oa=AFTER[k];AFTER[k]=function(){const r=oa&&oa.apply(this,arguments);try{fix();const cl=document.getElementById("cl"),cc=document.getElementById("cc");if(cl&&cc&&!cl.__v29){cl.__v29=1;const a=cl.oninput;cl.oninput=cc.oninput=function(){const x=a&&a.apply(this,arguments);fix();return x}}}catch(e){}return r}}}
 
+/* (4) Less noise for pros: a posted job that already has its full set of pros (every lead slot taken, and this pro isn't
+   one of them) no longer counts as "new" on the dashboard and isn't tagged New. When a job fills up or is hired, the
+   unread "New job in your area" bell notices of pros who aren't on it are marked read and say so ("now full" / "filled"),
+   so the bell count only shows work a pro can still quote. Pros who are on the job keep their notice as it was. */
+function v29Full(j,m){try{if(!j||j.status!=="posted"||j.hired)return true;const s=leadSlots(j);return s.n>=s.cap&&!engaged(j).has(m&&m.id)}catch(e){return false}}
+{const on=v28NewJobs;v28NewJobs=function(m){return on.apply(this,arguments).filter(j=>!v29Full(j,m))}}
+function v29Quiet(jid){try{const j=DB.jobs.find(x=>x.id===jid);if(!j)return;const hired=j.status!=="posted"||!!j.hired,s=leadSlots(j);if(!hired&&s.n<s.cap)return;const e=engaged(j);let ch=false;
+ for(const n of DB.notifs)if(n&&n.link==="job:"+jid&&n.kind28==="newjob"&&!n.read&&!e.has(n.to)&&!n.kind29){n.read=true;n.kind29=hired?"filled":"full";n.text+=hired?" · filled, the customer hired a pro":" · now full ("+s.cap+" of "+s.cap+" pros)";ch=true}
+ if(ch)save()}catch(e){}}
+for(const k of ["quote","interest","hire"]){const oa=A[k];if(typeof oa!=="function")continue;A[k]=function(jid){const r=oa.apply(this,arguments);try{if(r&&r.ok)v29Quiet(jid)}catch(e){}return r}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
