@@ -184,7 +184,7 @@ function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===ui
  const jobs=d.jobs.map(j=>{const party=uid&&(j.cust===uid||j.hired===uid);if(party)return j;const c=Object.assign({},j);delete c.escrow;delete c.cases;const done=j.status==="completed"&&j.custConfirmed;if(!done){delete c.photos;delete c.rphotos}
   if(!isPro){c.cust=null;c.desc="";delete c.interested;delete c.invited;delete c.rphotos;delete c.est11;delete c.noShow;delete c.flags}return c});
  const myJobs=new Set(d.jobs.filter(j=>j.cust===uid).map(j=>j.id));
- const quotes=d.quotes.map(q=>(q.cid===uid||myJobs.has(q.job))?q:Object.assign({},q,{price:null,note:""}));
+ const quotes=d.quotes.map(q=>{if(q.cid===uid||myJobs.has(q.job))return q;const o=Object.assign({},q,{price:null,note:""});delete o.why;return o});// v27: the owner's "why not hired" note goes to that pro only
  const pm=new Map((d.projects||[]).map(p=>[p.id,p]));
  const pmsgs=(d.pmsgs||[]).filter(m=>{const p=pm.get(m.pid);if(!p||!uid)return false;if(m.from===uid||m.to===uid)return true;return m.to==="all"&&(p.pm===uid||crewOf(p).includes(uid))});
  // SW-039: a review's author id stays with the parties (the author, the reviewed pro) and staff. Everyone else gets a

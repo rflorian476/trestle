@@ -15,3 +15,22 @@
 @media(max-width:640px){.v27g{padding:16px}.v27g-s{grid-template-columns:28px minmax(0,1fr)}.v27g-a{grid-column:2}.v27g-p{align-items:flex-start}}
 .v27g-p .v27g-m{height:8px;border-radius:99px;background:#ECE7DC;overflow:hidden}.v27g-p .v27g-m i{display:block;height:100%;border-radius:99px;background:#1C5E3C}
 .v27g .btn,.v27jc .btn,.v27q .btn,.v27nh .btn{word-spacing:.12em;letter-spacing:0}
+/* v27: job pipeline cards, quick quote, not-hired notices */
+.v27jc{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);margin:0 0 12px;overflow:hidden}
+.v27jc.urgent{border-left:4px solid var(--bad)}
+.v27jc>.jobcard{flex:1 0 auto;border:0!important;box-shadow:none!important;margin:0!important;border-radius:0;padding-bottom:12px}.v27jc>.jobcard:hover{transform:none}
+.v27p{display:flex;gap:10px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 18px 14px;border-top:1px dashed var(--line);background:#FBF8F2}
+.v27p-f{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:#1B3A5B}
+.v27p-f li{display:inline-flex;gap:5px;align-items:center}.v27p-f li svg{color:#1C5E3C;flex:none}.v27p-f li.full{color:#8F2C1A}.v27p-f li.full svg{color:#8F2C1A}
+.v27p-a{display:flex;gap:8px}
+.v27p-sub{display:block;color:var(--muted);font-size:13px;font-weight:500;margin-top:2px}
+.v27q h2{font-size:1.2rem}.v27q-row{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}.v27q-row .fld{margin:0}
+.v27q-s{display:flex;gap:6px;align-items:center;margin:8px 0 4px}.v27q-s svg{flex:none}
+.v27why{display:block;margin-top:6px;padding:6px 10px;border-left:3px solid #9DB4CC;background:#F6F9FC;border-radius:0 8px 8px 0;color:#1B3A5B;font-size:14px}
+.v27nh-a{margin-top:10px}
+.v27nh-c{margin:4px 0 18px}
+.v27nh-i{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fff;margin-bottom:8px;color:var(--ink);text-decoration:none!important}
+.v27nh-i b{display:block;color:#0F2A44}.v27nh-i small{color:var(--muted);font-size:13px}
+.v27nh-ic{width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;background:#ECE7DC;color:#1B3A5B}
+@media(max-width:640px){.v27p{padding:10px 14px 12px}.v27p-a{width:100%}.v27p-a .btn{flex:1;justify-content:center}.v27q-row{grid-template-columns:1fr}}
+#v27hoF[hidden]{display:none!important}
