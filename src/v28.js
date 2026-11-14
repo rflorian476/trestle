@@ -37,3 +37,13 @@ const V28JB={src:"/img/x-carpentry-sm.webp",alt:"A carpenter framing a house (st
   const img=`<img class="v28jb-ph" id="v28jbPh" src="${V28JB.src}" alt="${esc(V28JB.alt)}" width="400" height="300" loading="lazy" decoding="async">`;
   const k=h.indexOf('<header class="phx phx-jobs"');if(k>=0){const a='<div class="wrap phx-in">',i=h.indexOf(a,k);if(i>=0)return h.slice(0,i)+'<div class="wrap phx-in v28jb">'+img+h.slice(i+a.length)}
   return h.replace('<div class="pagehead">',()=>'<div class="pagehead v28jb">'+img)}catch(e){return h}}}
+
+/* (5) The older "How Sawyer compares" table (/pros, /pricing, the pro dashboard) is dated and hedged like the v27
+   Thumbtack/Jobber table: no exact third-party prices we haven't verified, "varies" wording instead, and a visible
+   "checked November 2026" line. Sawyer's own terms stay exact. */
+COMPETE.splice(0,COMPETE.length,
+ ["__BRAND__","$20/mo flat","$0","Completed jobs only"],
+ ["HomeAdvisor / Angi","Annual membership fee for pros (amount varies)","Pay per lead, varies by trade and area","Mixed"],
+ ["Thumbtack","Free to list","Pay per lead, varies (you set a weekly budget)","Mixed"],
+ ["Yelp Ads","Free listing; ads are optional","Ads billed per click, budget varies","Anyone with a Yelp account"]);
+compareTable=function(){return`<div class="tablewrap"><table class="compare"><caption class="sr">How Sawyer compares, checked November 2026</caption><thead><tr><th scope="col">Platform</th><th scope="col">Membership</th><th scope="col">Lead fees</th><th scope="col">Who can review</th></tr></thead><tbody>${COMPETE.map((r,i)=>`<tr class="${i?"":"us"}"><th scope="row">${esc(r[0])}</th><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td></tr>`).join("")}</tbody></table><p class="muted small v28cmp-n">From each company's public pages, checked November 2026. Lead prices and fees vary by trade, area and plan, and they change, so check each company's site for current details. Trademarks belong to their owners; Sawyer isn't affiliated with them.</p></div>`};
