@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.12.0
+# Sawyer (beta) — v2.13.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.12.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.13.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,15 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v30: savings card for pros, renewals up front, per-trade crew fill, invoice register
+Builds on v29 (live as `eca62d3`).
+- **"Sawyer vs pay-per-lead" on the pro dashboard.** A compact sidebar card with two sliders (leads a month, cost per lead) that uses the same savings math as the `/pros` calculator: "Pay-per-lead, at these numbers $4,320/yr" vs "Sawyer, first year $180/yr". It carries the same hedge (an example of 8 leads at $45, checked November 2026, prices vary) and "How Sawyer compares" expands to the same dated rows and footnote as the `/pros` table. No exact competitor prices. Pros only; its own slider ids.
+- **"Renewals coming up" on the dashboard.** Licenses, insurance, bonds, permits and traveler wallet cards that expire within 60 days (or already have) are listed by name with days left, expired first, up to 4 plus "+N more". Pro docs open Office → Licenses & COIs; wallet cards open the wallet. The bell reminders (60/30/7 days and on the day) are unchanged, and What's next no longer repeats "N docs need attention" when the card shows.
+- **Per-trade fill on PM project cards.** Each project card on a project manager's dashboard lists "Concrete finishers · 1 of 3 filled", open trades first, up to 4 plus "+N more trades".
+- **Invoice register in the tax-year file.** The Office → Reports tax-year CSV adds an INVOICES ISSUED section (issued, invoice, customer, due, total, paid, still owed, status) with a totals row. Drafts and voided invoices are left out. Code: `src/v30.js`, `src/v30.css`.
+- Tests: `node test/v30-e2e.js` (self-contained) is part of `test/run-all.sh`. `v29-e2e` now accepts any Sawyer version / SW cache name. SW cache is `sawyer-v30`.
 
 
 ## v29: cents everywhere, honest calculator, quieter new-work bell

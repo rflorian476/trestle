@@ -24,7 +24,7 @@ const toasts=p=>p.evaluate(()=>[...document.querySelectorAll("#toasts .toast")].
 // Compare bids price + "Hire for", pipeline card, quote check; whole dollars still read "$275" without ".00"), the compare-table
 // footnote spacing on /pros and /pricing, the dated and hedged /pros savings calculator, full and hired jobs dropping out of a
 // pro's "new" count with their unread "New job in your area" notices quieted (other pros' notices untouched, nothing leaks),
-// health 2.12.0-sawyer and SW cache sawyer-v29.
+// health and SW cache (any Sawyer version, checked exactly in the current release suite).
 let LOCAL=null,PUB=null,br=null;
 const pre=h=>(h.match(/<div id="pre11">[\s\S]*$/)||[""])[0].replace(/<script[\s\S]*?<\/script>/g,"");
 const login=async(port,email,pw)=>{const r=await req(port,"POST","/api/login",JH,J({email,password:pw||"sawyer-demo-2026"}));return {ck:(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0],st:(r.json&&r.json.state)||{}}};
@@ -39,8 +39,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  const page=async(w,js,cookie,S)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},javaScriptEnabled:js!==false});
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:(S||LOCAL).B}])}
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.12.0-sawyer","healthz reports 2.12.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v29"/.test(sw.body),"service worker cache is sawyer-v29");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
  const pro=await login(LOCAL.port,"demo-pro@sawyer.test"),ho=await login(LOCAL.port,"demo-homeowner@sawyer.test");
  ok(pro.ck&&ho.ck,"demo pro and demo homeowner sign in");
  const run=Math.random().toString(36).slice(2,8);
