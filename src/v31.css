@@ -1,3 +1,13 @@
 /* v31 (SW-065): button labels keep visible word gaps. Plus Jakarta's narrow space plus the body's negative tracking made
    "Download 2026 tax file (CSV)" paint as "Download2026 tax file(CSV)". Same treatment the v27 buttons already had. */
 .btn{letter-spacing:0;word-spacing:.12em}
+/* v31: P&L by month */
+.v31pl .o7-sh h2{display:flex;align-items:center;gap:8px}
+.v31pl-t tbody th,.v31pl-t tfoot th{text-align:left;font-weight:600}
+.v31pl-t tfoot th,.v31pl-t tfoot td{border-bottom:0;font-weight:800;border-top:2px solid var(--line-strong,var(--line))}
+.v31pl-z td,.v31pl-z th{color:var(--muted)}
+.v31pl-n{white-space:nowrap}
+.v31pl-b{display:inline-block;vertical-align:middle;width:56px;height:6px;margin-right:8px;border-radius:3px;background:var(--surface2)}
+.v31pl-b i{display:block;height:100%;border-radius:3px;background:var(--good)}.v31pl-b i.neg{background:var(--bad)}
+.v31pl-s{margin:10px 0}
+@media(max-width:520px){.v31pl-b{display:none}.v31pl-t th,.v31pl-t td{padding-left:5px;padding-right:5px;font-size:.84rem}.v31pl-t thead th{font-size:.68rem}}
