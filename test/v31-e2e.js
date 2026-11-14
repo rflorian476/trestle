@@ -44,8 +44,8 @@ const cells=line=>{const r=[];let i=0,cur="",q=false;for(;i<line.length;i++){con
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:LOCAL.B}])}
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
  const reports=async(w,ck)=>{const p=await page(w,ck);await p.goto(LOCAL.B+"/office/reports",{waitUntil:"networkidle"});await p.waitForSelector("#taxYear");await p.waitForTimeout(300);return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.14.0-sawyer","healthz reports 2.14.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v31"/.test(sw.body),"service worker cache is sawyer-v31");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
  const pro=await login(LOCAL.port,"demo-pro@sawyer.test"),ho=await login(LOCAL.port,"demo-homeowner@sawyer.test");ok(pro.ck&&ho.ck,"demo pro and homeowner sign in");
  const run=Math.random().toString(36).slice(2,8);
  const su=await req(LOCAL.port,"POST","/api/signup",JH,J({kind:"pro",password:"v31-correct-horse",data:{name:"Vee Tax",biz:"V31 Tax "+run,email:"v31-tax-"+run+"@example.com",trade:"Plumbing",zip:"78704",phone:"5125550100",plan:"founding"}}));

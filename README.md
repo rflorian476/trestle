@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.14.0
+# Sawyer (beta) — v2.15.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.14.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.15.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -21,6 +21,16 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v32: alerts on your phone or computer, cents on the tax card, safer spreadsheets
+Builds on v31 (live as `6c2d3dc`).
+- **Alerts on this device (opt-in browser push).** A card on the dashboard and at the top of Inbox → "How we reach you": **Turn on alerts**, the browser asks, and from then on this device gets a notification even with Sawyer closed. Pros: a new job in their trade and service area (the same match as the v28 bell), "You're hired" and "This job was filled". Homeowners: each new quote. Everyone: "New message from <name>" (never the message text). Per-kind switches in Inbox, **Send a test alert**, **Turn off**, and "Not now" on the dashboard. Clicking a notification opens the job, thread or Inbox.
+  - Standard Web Push: RFC 8030 delivery, RFC 8291 `aes128gcm` payload encryption, RFC 8292 VAPID, all on `node:crypto` (`lib/webpush.js`); no library and no paid service. The browser's own push service (FCM, Mozilla, Apple, WNS) delivers it. iPhone/iPad need Sawyer added to the Home Screen first; the card says so.
+  - **Keys:** the VAPID key pair is generated on first boot and stored in the server database (table `vapid`), or taken from `VAPID_PRIVATE_KEY` + `VAPID_PUBLIC_KEY` if both are set. The private key is never logged, returned or sent to a browser. On the free Render plan the database resets on each deploy, so devices need to turn alerts on again after a deploy (set the two env vars, or add a disk, to keep them).
+  - **Safety:** only known push-service hosts are accepted as endpoints (no SSRF; `PUSH_TEST_ORIGIN` allows a local stand-in only outside production). A device is tied to the session that turned it on: sign-out, a password change that ends other sessions, or account delete stops its alerts. 404/410 endpoints are removed. Pushes carry a title, a one-line summary and a same-site link only (no job descriptions, no message text). "Download my data" lists alert devices (push service, when turned on, last delivered) and choices. `PUSH_DEBUG=1` logs status codes only.
+- **SW-067: the Tax year card shows cents.** Gross, expenses, mileage deduction and est. net profit use `v7$`, so the card reads exactly like the P&L total and the tax CSV (for example **-$23.19**, not **$-23**).
+- **csvCell defense in depth.** A trigger also counts after a leading BOM, zero-width space, spaces or newlines, and fullwidth / small-form lookalikes (`＝ ＋ － ＠ ﹦ ﹢ ﹣ ﹫`) are triggers too. Leading tab/CR are still prefixed; plain numbers (even padded, like ` -12`) stay numeric.
+- Tests: `node test/v32-e2e.js` (self-contained: a local stand-in push service verifies the VAPID JWT with the public key and decrypts every payload; Chromium's DevTools push checks the service worker's notification) is part of `test/run-all.sh`. `v31-e2e` now accepts any Sawyer version / SW cache name. SW cache is `sawyer-v32`.
 
 ## v31: safe spreadsheets, a monthly P&L, one-click backup, bundles that match the source
 Builds on v30 (live as `946c608`).

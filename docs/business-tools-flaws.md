@@ -47,3 +47,4 @@ Status: **Built** means it is in this v7 prototype. **Launch** means it is plann
 | Bait-and-switch pay on arrival | agencies | Contractor score: % paid on time and % matched the posting, from traveler reviews. | Built |
 | Agency markup, unlicensed "journeyman level" | staffing agencies | Contractors hire direct with no markup. Licenses and tickets sit in the traveler's document wallet with expiry dates. | Built |
 | Ghost jobs | Indeed | Calls show posted date, spots open and "filled" status. The poster can close a call in one tap. | Built (v6) |
+| Leads go to whoever answers first, and you only see them when you open the app | Thumbtack, Angi | Opt-in phone/computer alerts (v32) the moment a matching job is posted, plus hires, quotes and messages. Free, no per-lead charge, off in one tap. | Built |
