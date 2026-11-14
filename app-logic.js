@@ -4219,7 +4219,7 @@ function v24JobPanel(j,m){const cat=j.cat||"",town=String(townOf(j.zip||"")||"")
  const home=(!m||m.role==="customer")&&m?.id!==j.cust?`<div class="v24c v24h"><img class="v24-ph" src="${pic}" alt="Example of ${esc(cat||"home")} work" loading="lazy" decoding="async" width="800" height="533"><span class="v24k">${I("home",14)}For homeowners</span><h2>Need this done too?</h2>
   ${typeof v25Band==="function"?v25Band(j,town):rg?`<p class="v24r"><b>${money(rg.low)} – ${money(rg.high)}</b><small>Typical for this kind of job near ${esc(town||"you")}. A guide, not a quote.</small></p>`:""}
   <p class="muted">Post it free. At most ${s.cap} local pros see it, they quote up front, and your number is never handed out.</p>
-  <div class="v24a"><a class="btn primary" href="${href("post",null,Object.assign({},catQ,j.sub?{sub:j.sub}:{}))}">Post a similar job</a><a class="btn" href="${href("prices")}">See the price guide</a></div></div>`:"";
+  <div class="v24a"><a class="btn primary" href="${href("post",null,Object.assign({},catQ,j.sub?{sub:j.sub}:{}))}">Post a similar job</a><a class="btn" href="${typeof v26QcKey==="function"&&v26QcKey(j)?href("prices",null,{qc:v26QcKey(j),zip:j.zip||"",qu:j.urgent?"urgent":""}):href("prices")}">${typeof v26QcKey==="function"&&v26QcKey(j)?"Check a quote you got":"See the price guide"}</a></div></div>`:"";
  if(!pro&&!home)return "";return `<div class="v24pub">${pro}${home}</div>`}
 {const oj=VIEWS.job;VIEWS.job=function(id,q){let h=oj.apply(this,arguments);try{const j=(DB.jobs||[]).find(x=>x.id===id),m=me();if(!j)return h;
   if(m&&(m.id===j.cust||m.role!=="customer"))return h;
