@@ -254,7 +254,11 @@ function oTemplates(m,q){const inv=v7Mine("bills",m).filter(b=>b.type==="inv"&&b
  <p class="muted small">${esc((WAIVERS.find(w=>w[0]===k)||WAIVERS[0])[2])}</p>${waiverDoc(m,sel,k)}</div>
  <div class="card"><div class="o7-sh"><h2>${I("edit",18)} Change orders</h2><a class="btn sm primary" href="${href("invedit","new",{type:"co"})}">${I("plus",14)}New change order</a></div><p class="muted small">Get extras approved in writing before you do them. The customer approves on their phone, and you turn it into an invoice in one tap.</p>
  ${oTable(cos.map(oInvRow),["Number","Customer","Issued","Valid","Total","Balance","Status"])||`<p class="muted">No change orders yet.</p>`}</div></div>`}
-function v7CSV(rows){return rows.map(r=>r.map(v=>{v=v==null?"":String(v);return/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(",")).join("\r\n")}
+/* v31 (SW-066): one CSV cell escaper for every export. A value that starts with = + - @ tab or CR (a spreadsheet formula
+   trigger) gets a leading ' and is quoted, so Excel / Sheets show it as text; plain numbers such as -12.50 stay numbers.
+   Values with a quote, comma or line break are quoted as before. force=true always quotes. */
+function csvCell(v,force){let s=v==null?"":String(v),f=!!force;if(/^[=+\-@\t\r]/.test(s)&&!/^[+-]?\d+(\.\d+)?$/.test(s)){s="'"+s;f=true}return f||/[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function v7CSV(rows){return rows.map(r=>r.map(v=>csvCell(v)).join(",")).join("\r\n")}
 function v7Download(name,txt){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
 function oExport(m,kind){const bs=v7Mine("bills",m).filter(b=>b.type==="inv"&&b.status!=="void"),led=v7Mine("ledger",m),d=v7Today();
  if(kind==="qbo"){const rows=[["InvoiceNo","Customer","InvoiceDate","DueDate","Item(Product/Service)","ItemDescription","ItemQuantity","ItemRate","ItemAmount","Taxable","TaxRate","Memo"]];bs.forEach(b=>b.lines.filter(l=>!l.opt||l.on).forEach(l=>rows.push([b.no,b.cname,new Date(b.date).toISOString().slice(0,10),b.due||"","Services",l.d,l.q,l.r.toFixed(2),(l.q*l.r).toFixed(2),b.tax?"Y":"N",b.tax?b.tax+"%":"",b.po?"PO "+b.po:""])));return v7Download("sawyer-invoices-quickbooks-"+d+".csv",v7CSV(rows))}

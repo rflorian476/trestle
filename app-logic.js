@@ -2007,7 +2007,11 @@ function oTemplates(m,q){const inv=v7Mine("bills",m).filter(b=>b.type==="inv"&&b
  <p class="muted small">${esc((WAIVERS.find(w=>w[0]===k)||WAIVERS[0])[2])}</p>${waiverDoc(m,sel,k)}</div>
  <div class="card"><div class="o7-sh"><h2>${I("edit",18)} Change orders</h2><a class="btn sm primary" href="${href("invedit","new",{type:"co"})}">${I("plus",14)}New change order</a></div><p class="muted small">Get extras approved in writing before you do them. The customer approves on their phone, and you turn it into an invoice in one tap.</p>
  ${oTable(cos.map(oInvRow),["Number","Customer","Issued","Valid","Total","Balance","Status"])||`<p class="muted">No change orders yet.</p>`}</div></div>`}
-function v7CSV(rows){return rows.map(r=>r.map(v=>{v=v==null?"":String(v);return/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(",")).join("\r\n")}
+/* v31 (SW-066): one CSV cell escaper for every export. A value that starts with = + - @ tab or CR (a spreadsheet formula
+   trigger) gets a leading ' and is quoted, so Excel / Sheets show it as text; plain numbers such as -12.50 stay numbers.
+   Values with a quote, comma or line break are quoted as before. force=true always quotes. */
+function csvCell(v,force){let s=v==null?"":String(v),f=!!force;if(/^[=+\-@\t\r]/.test(s)&&!/^[+-]?\d+(\.\d+)?$/.test(s)){s="'"+s;f=true}return f||/[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function v7CSV(rows){return rows.map(r=>r.map(v=>csvCell(v)).join(",")).join("\r\n")}
 function v7Download(name,txt){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
 function oExport(m,kind){const bs=v7Mine("bills",m).filter(b=>b.type==="inv"&&b.status!=="void"),led=v7Mine("ledger",m),d=v7Today();
  if(kind==="qbo"){const rows=[["InvoiceNo","Customer","InvoiceDate","DueDate","Item(Product/Service)","ItemDescription","ItemQuantity","ItemRate","ItemAmount","Taxable","TaxRate","Memo"]];bs.forEach(b=>b.lines.filter(l=>!l.opt||l.on).forEach(l=>rows.push([b.no,b.cname,new Date(b.date).toISOString().slice(0,10),b.due||"","Services",l.d,l.q,l.r.toFixed(2),(l.q*l.r).toFixed(2),b.tax?"Y":"N",b.tax?b.tax+"%":"",b.po?"PO "+b.po:""])));return v7Download("sawyer-invoices-quickbooks-"+d+".csv",v7CSV(rows))}
@@ -2532,7 +2536,7 @@ function v9Tax(m,y){const inc=[],exp=[],mi=[];v7Mine("bills",m).filter(b=>b.type
  v7Mine("ledger",m).forEach(l=>{if(!l.date.startsWith(y))return;if(l.kind==="exp")exp.push(l);else mi.push(l)});
  const gross=inc.reduce((a,x)=>a+x.amt,0),fees=inc.reduce((a,x)=>a+x.fee,0),ex=exp.reduce((a,x)=>a+x.amt,0),miles=mi.reduce((a,x)=>a+x.miles,0),mded=Math.round(miles*MILE_RATE*100)/100;
  const cats={};exp.forEach(l=>cats[l.cat]=(cats[l.cat]||0)+l.amt);return{inc,exp,mi,gross,fees,ex,miles,mded,cats,net:gross-fees-ex-mded,rcpt:exp.filter(l=>l.photo).length}}
-function v9TaxCsv(m,y){const t=v9Tax(m,y),q=v=>{const s=String(v==null?"":v);return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s},r=a=>a.map(q).join(","),f=n=>(Math.round(n*100)/100).toFixed(2);
+function v9TaxCsv(m,y){const t=v9Tax(m,y),q=v=>csvCell(v),r=a=>a.map(q).join(","),f=n=>(Math.round(n*100)/100).toFixed(2);
  const L=[r([`${m.biz||nameOf(m)} tax-year export ${y}`]),r(["Prepared by Sawyer on "+v7Today()+". Not tax advice. Hand this to your preparer."]),"",r(["SUMMARY","","Amount"]),r(["Gross receipts (payments collected)","",f(t.gross)]),r(["Card/bank processing fees","",f(t.fees)]),r(["Expenses","",f(t.ex)]),r([`Mileage deduction (${f(t.miles)} mi x $${MILE_RATE.toFixed(2)})`,"",f(t.mded)]),r(["Estimated net profit before other deductions","",f(t.net)]),"",
   r(["EXPENSES BY SCHEDULE C LINE","Category","Amount"]),...Object.entries(t.cats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>r([V9SCHC[k]||"Line 27a Other",k,f(v)])),"",
   r(["INCOME","Date","Invoice","Customer","Method","Amount","Processing fee"]),...t.inc.sort((a,b)=>a.date.localeCompare(b.date)).map(x=>r(["",x.date,x.no,x.cust,x.method,f(x.amt),f(x.fee)])),"",
@@ -4616,7 +4620,7 @@ function v30Roles(p){const rs=(p.roles||[]).map(r=>({label:r.label||r.trade,need
 /* (4) Year-end records: the tax-year CSV now also lists every invoice issued that year (number, customer, issued, due,
    total, paid, still owed, status), with totals, so the file doubles as a year-end invoice register for a preparer. */
 function v30InvYear(m,y){return v7Mine("bills",m).filter(b=>b.type==="inv"&&b.status!=="draft"&&b.status!=="void"&&b.date&&String(new Date(b.date).getFullYear())===y).sort((a,b)=>a.date-b.date)}
-{const ot=v9TaxCsv;v9TaxCsv=function(m,y){let s=ot.apply(this,arguments);try{const q=v=>{const x=String(v==null?"":v);return/[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x},r=a=>a.map(q).join(","),f=n=>(Math.round(n*100)/100).toFixed(2);
+{const ot=v9TaxCsv;v9TaxCsv=function(m,y){let s=ot.apply(this,arguments);try{const q=v=>csvCell(v),r=a=>a.map(q).join(","),f=n=>(Math.round(n*100)/100).toFixed(2);
   const inv=v30InvYear(m,String(y));let T=0,P=0,O=0;const rows=inv.map(b=>{const c=billCalc(b);const paid=Math.round((c.total-c.bal)*100)/100;T+=c.total;P+=paid;O+=c.bal;
    return r(["",new Date(b.date).toISOString().slice(0,10),b.no,b.cname,b.due||"",f(c.total),f(paid),f(c.bal),c.bal<=0.004?"Paid":b.due&&v7DaysTo(b.due)<0?"Overdue":"Open"])});
   s+="\n\n"+[r(["INVOICES ISSUED","Issued","Invoice","Customer","Due","Total","Paid","Still owed","Status"]),...rows,r(["TOTAL ("+inv.length+" invoice"+(inv.length===1?"":"s")+")","","","","",f(T),f(P),f(O),""])].join("\n")}catch(e){}return s}}

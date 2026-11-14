@@ -51,7 +51,7 @@ function v30Roles(p){const rs=(p.roles||[]).map(r=>({label:r.label||r.trade,need
 /* (4) Year-end records: the tax-year CSV now also lists every invoice issued that year (number, customer, issued, due,
    total, paid, still owed, status), with totals, so the file doubles as a year-end invoice register for a preparer. */
 function v30InvYear(m,y){return v7Mine("bills",m).filter(b=>b.type==="inv"&&b.status!=="draft"&&b.status!=="void"&&b.date&&String(new Date(b.date).getFullYear())===y).sort((a,b)=>a.date-b.date)}
-{const ot=v9TaxCsv;v9TaxCsv=function(m,y){let s=ot.apply(this,arguments);try{const q=v=>{const x=String(v==null?"":v);return/[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x},r=a=>a.map(q).join(","),f=n=>(Math.round(n*100)/100).toFixed(2);
+{const ot=v9TaxCsv;v9TaxCsv=function(m,y){let s=ot.apply(this,arguments);try{const q=v=>csvCell(v),r=a=>a.map(q).join(","),f=n=>(Math.round(n*100)/100).toFixed(2);
   const inv=v30InvYear(m,String(y));let T=0,P=0,O=0;const rows=inv.map(b=>{const c=billCalc(b);const paid=Math.round((c.total-c.bal)*100)/100;T+=c.total;P+=paid;O+=c.bal;
    return r(["",new Date(b.date).toISOString().slice(0,10),b.no,b.cname,b.due||"",f(c.total),f(paid),f(c.bal),c.bal<=0.004?"Paid":b.due&&v7DaysTo(b.due)<0?"Overdue":"Open"])});
   s+="\n\n"+[r(["INVOICES ISSUED","Issued","Invoice","Customer","Due","Total","Paid","Still owed","Status"]),...rows,r(["TOTAL ("+inv.length+" invoice"+(inv.length===1?"":"s")+")","","","","",f(T),f(P),f(O),""])].join("\n")}catch(e){}return s}}

@@ -86,7 +86,7 @@ function v9Tax(m,y){const inc=[],exp=[],mi=[];v7Mine("bills",m).filter(b=>b.type
  v7Mine("ledger",m).forEach(l=>{if(!l.date.startsWith(y))return;if(l.kind==="exp")exp.push(l);else mi.push(l)});
  const gross=inc.reduce((a,x)=>a+x.amt,0),fees=inc.reduce((a,x)=>a+x.fee,0),ex=exp.reduce((a,x)=>a+x.amt,0),miles=mi.reduce((a,x)=>a+x.miles,0),mded=Math.round(miles*MILE_RATE*100)/100;
  const cats={};exp.forEach(l=>cats[l.cat]=(cats[l.cat]||0)+l.amt);return{inc,exp,mi,gross,fees,ex,miles,mded,cats,net:gross-fees-ex-mded,rcpt:exp.filter(l=>l.photo).length}}
-function v9TaxCsv(m,y){const t=v9Tax(m,y),q=v=>{const s=String(v==null?"":v);return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s},r=a=>a.map(q).join(","),f=n=>(Math.round(n*100)/100).toFixed(2);
+function v9TaxCsv(m,y){const t=v9Tax(m,y),q=v=>csvCell(v),r=a=>a.map(q).join(","),f=n=>(Math.round(n*100)/100).toFixed(2);
  const L=[r([`${m.biz||nameOf(m)} tax-year export ${y}`]),r(["Prepared by Sawyer on "+v7Today()+". Not tax advice. Hand this to your preparer."]),"",r(["SUMMARY","","Amount"]),r(["Gross receipts (payments collected)","",f(t.gross)]),r(["Card/bank processing fees","",f(t.fees)]),r(["Expenses","",f(t.ex)]),r([`Mileage deduction (${f(t.miles)} mi x $${MILE_RATE.toFixed(2)})`,"",f(t.mded)]),r(["Estimated net profit before other deductions","",f(t.net)]),"",
   r(["EXPENSES BY SCHEDULE C LINE","Category","Amount"]),...Object.entries(t.cats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>r([V9SCHC[k]||"Line 27a Other",k,f(v)])),"",
   r(["INCOME","Date","Invoice","Customer","Method","Amount","Processing fee"]),...t.inc.sort((a,b)=>a.date.localeCompare(b.date)).map(x=>r(["",x.date,x.no,x.cust,x.method,f(x.amt),f(x.fee)])),"",
