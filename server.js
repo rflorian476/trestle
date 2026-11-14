@@ -110,6 +110,7 @@ function exportData(uid){const st=snapshot(uid);const a=db.prepare("SELECT email
    passkeys:AUTH.pkList(uid).map(k=>({label:k.label||"Passkey",created:k.created?new Date(k.created).toISOString():null,lastUsed:k.last_used?new Date(k.last_used).toISOString():null})),
    linkedSignIns:AUTH.linked(uid).map(l=>({provider:l.provider,created:l.created?new Date(l.created).toISOString():null}))},
   profile:me_,
+  alerts:{devices:db.prepare("SELECT endpoint,created,last_ok FROM pushsubs WHERE uid=? ORDER BY created").all(uid).map(r=>({service:(()=>{try{return new URL(r.endpoint).hostname}catch(e){return ""}})(),turnedOn:new Date(r.created).toISOString(),lastDelivered:r.last_ok?new Date(r.last_ok).toISOString():null})),choices:pushPrefs(uid)},
   uploads:db.prepare("SELECT name,type,size,created,kind FROM uploads WHERE uid=? ORDER BY created").all(uid).map(u=>({url:(u.kind==="coi"?"/api/coi/":"/u/")+u.name,type:u.type,bytes:u.size,created:new Date(u.created).toISOString(),kind:u.kind||"photo"}))};
  for(const [k,v] of Object.entries(st)){if(k==="users"||!Array.isArray(v))continue;const mine=v.filter(x=>involves(x,uid,0));if(mine.length)out[k]=mine}
  return out}
@@ -200,21 +201,24 @@ function run(uid,name,args){const d=DB();d.me=uid;const pb=pushBefore();let r;tr
 /* ---- v32: browser push alerts (opt-in, per device). Standard Web Push with VAPID (lib/webpush.js), no paid service.
    A device subscription is tied to the session that turned it on: signing out (or the session expiring, or a password
    change that ends other sessions) stops alerts to that device. Three kinds, each one a switch on the account:
+   msgs  = "New message from <name>" (never the message text)
    jobs  = a new job in the pro's trade and service area (the same match as the v28 bell notice)
    hires = "You're hired" / "This job was filled" / traveler-call decisions
    quotes = a pro sent the homeowner a quote. The VAPID private key stays in this process (never logged or sent). ---- */
 db.exec(`CREATE TABLE IF NOT EXISTS pushsubs(endpoint TEXT PRIMARY KEY,uid TEXT NOT NULL,p256dh TEXT NOT NULL,auth TEXT NOT NULL,sess TEXT NOT NULL,created INTEGER NOT NULL,last_ok INTEGER,fails INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS pushprefs(uid TEXT PRIMARY KEY,cats TEXT NOT NULL);`);
 const VAPID=WEBPUSH.makeVapid(db);
-const PUSH_CATS=["jobs","hires","quotes"];
+const PUSH_CATS=["jobs","hires","quotes","msgs"];
 const sessHash=t=>crypto.createHash("sha256").update(String(t||"")).digest("base64url").slice(0,32);
-function pushDefaults(uid){const u=DB().users.find(x=>x.id===uid)||{};return u.role==="contractor"?{jobs:true,hires:true,quotes:false}:{jobs:false,hires:false,quotes:true}}
+function pushDefaults(uid){const u=DB().users.find(x=>x.id===uid)||{};return u.role==="contractor"?{jobs:true,hires:true,quotes:false,msgs:true}:{jobs:false,hires:false,quotes:true,msgs:true}}
 function pushPrefs(uid){const r=db.prepare("SELECT cats FROM pushprefs WHERE uid=?").get(uid);let o=null;try{o=r&&JSON.parse(r.cats)}catch(e){}const d=pushDefaults(uid);const out={};for(const k of PUSH_CATS)out[k]=o&&typeof o[k]==="boolean"?o[k]:d[k];return out}
 function pushKind(n){const t=String(n&&n.text||"");if(n&&n.kind28==="newjob"||/^New (URGENT )?job (near you|in your area): /i.test(t))return "jobs";
  if(/^You're hired: /.test(t)||/^This job was filled: /.test(t)||/the contractor went another way/.test(t))return "hires";
- if(/ sent a quote: /.test(t)&&/^job:/.test(String(n.link||"")))return "quotes";return null}
-function pushUrl(link){const m=/^(job|tcall|project|profile|traveler):([\w.-]{1,60})$/.exec(String(link||""));if(!m)return "/inbox";return "/"+(m[1]==="profile"?"pro":m[1])+"/"+encodeURIComponent(m[2])}
-const PUSH_TITLE={jobs:"New job in your area",hires:"Job update",quotes:"New quote"};
+ if(/ sent a quote: /.test(t)&&/^job:/.test(String(n.link||"")))return "quotes";
+ // msgs: only "New message from <name>". The message itself never goes in the push (lock screens are public).
+ if(/^New message from /.test(t)&&/^chat:/.test(String(n.link||"")))return "msgs";return null}
+function pushUrl(link){const m=/^(job|tcall|project|profile|traveler|chat):([\w.-]{1,60})$/.exec(String(link||""));if(!m)return "/inbox";return "/"+(m[1]==="profile"?"pro":m[1]==="chat"?"msgs":m[1])+"/"+encodeURIComponent(m[2])}
+const PUSH_TITLE={jobs:"New job in your area",hires:"Job update",quotes:"New quote",msgs:"New message"};
 function pushPayload(n,k){let title=PUSH_TITLE[k];const t=String(n.text||"");if(/^You're hired/.test(t))title="You're hired";else if(/^This job was filled/.test(t))title="Job filled";
  return{title,body:t.slice(0,240),url:pushUrl(n.link),tag:k+":"+String(n.link||"").slice(0,60)}}
 let pushAny=!!db.prepare("SELECT 1 FROM pushsubs LIMIT 1").get();

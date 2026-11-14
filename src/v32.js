@@ -1,12 +1,12 @@
 /* v32: opt-in browser alerts (standard Web Push, no paid service). Pros: a new job in their trade and service area, and
-   "you're hired" / "the job filled". Homeowners: a new quote. One clear switch per device on the dashboard and in Inbox,
+   "you're hired" / "the job filled". Homeowners: a new quote. Everyone: "New message from <name>" (never the text). One clear switch per device on the dashboard and in Inbox,
    per-kind switches in Inbox, an easy off switch, and a test alert. Alerts arrive through the browser's own push service
    even when no Sawyer tab is open. Signing out stops alerts to that device. Nothing here runs on the server. */
 const V32H="sawyer_v32_dash_hide";
 function v32Sup(){try{return typeof navigator!=="undefined"&&"serviceWorker" in navigator&&typeof PushManager!=="undefined"&&typeof Notification!=="undefined"&&typeof window!=="undefined"&&window.isSecureContext!==false}catch(e){return false}}
 function v32Who(m){return !!(m&&!m.staff&&!(typeof v12Staff==="function"&&v12Staff(m))&&(m.role==="contractor"||m.role==="customer"))}
-function v32Cats(m){return m.role==="contractor"?[["jobs","New jobs in my trade and area"],["hires","I'm hired, or a job I quoted fills"]]:[["quotes","A pro sends me a quote"]]}
-function v32Copy(m){return m.role==="contractor"?"Get a notification the moment a job in your trade and service area is posted, and when you're hired or a job you quoted fills. Works even with Sawyer closed.":"Get a notification as soon as a pro sends you a quote. Works even with Sawyer closed."}
+function v32Cats(m){return(m.role==="contractor"?[["jobs","New jobs in my trade and area"],["hires","I'm hired, or a job I quoted fills"]]:[["quotes","A pro sends me a quote"]]).concat([["msgs","Someone sends me a message"]])}
+function v32Copy(m){return m.role==="contractor"?"Get a notification the moment a job in your trade and service area is posted, when you're hired or a job you quoted fills, and when a customer messages you. Works even with Sawyer closed.":"Get a notification as soon as a pro sends you a quote or a message. Works even with Sawyer closed."}
 function v32Card(m,where){if(!v32Who(m))return "";const dash=where==="dash";
  return`<div class="card v32push${dash?" v32push-dash":""}" id="v32push-${dash?"dash":"inbox"}" data-v32push="${dash?"dash":"inbox"}"><div class="v32p-h"><span class="v32p-i" aria-hidden="true">${I("bell",18)}</span><div class="v32p-tx"><h2>Alerts on this device</h2><p class="small muted v32p-d">${v32Copy(m)}</p></div></div>
  <div class="v32p-s" data-v32s role="status" aria-live="polite"><span class="muted small">Checking this browser…</span></div>
