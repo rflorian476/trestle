@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.11.0
+# Sawyer (beta) — v2.12.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.11.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.12.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,15 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v29: cents everywhere, honest calculator, quieter new-work bell
+Builds on v28 (live as `aadc311`).
+- **SW-063: quote amounts keep their cents everywhere.** The job-page "You quoted" callout, the homeowner's "… sent a quote: $308.51" bell, the quote list, Compare bids (price and "Hire for"), the pipeline card, the CRM card, the pro's Earned / Booked / Invoices and the quote check all use the cents-aware `v28$`. Whole dollars still read "$275" (no ".00"). The quote check keeps typed cents.
+- **Compare-table footnote spacing.** The dated note under "How Sawyer compares" on `/pros` and `/pricing` has 12px of space above it, 13px muted text.
+- **Dated, hedged savings calculator.** The `/pros` and `/pricing` calculator says its 8 leads × $45 starting point is an example checked November 2026, that lead prices vary by trade, area and site, and to set the sliders to what you pay; the result reads "Pay-per-lead, at these numbers". No exact competitor prices.
+- **Quieter new-work bell for pros.** A posted job whose 3 lead slots are taken (and the pro isn't one of them) no longer counts as "new" on the dashboard. When a job fills up or the customer hires, unread "New job in your area" notices of pros who aren't on it are marked read and say "now full (3 of 3 pros)" or "filled, the customer hired a pro". Pros on the job keep theirs. Code: `src/v29.js`, `src/v29.css`.
+- Tests: `node test/v29-e2e.js` (self-contained) is part of `test/run-all.sh`. `v28-e2e` now accepts any Sawyer version / SW cache name. SW cache is `sawyer-v29`.
 
 
 ## v28: new-work notices, quotes with cents, a dated comparison

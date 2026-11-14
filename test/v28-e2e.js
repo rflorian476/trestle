@@ -25,7 +25,7 @@ const toasts=p=>p.evaluate(()=>[...document.querySelectorAll("#toasts .toast")].
 // done only with a from-price above $0, the /jobs labeled stock photo (prerendered, sized, lazy, no CLS), the dated and
 // hedged /pros "How Sawyer compares" table, in-app "New job in your area" notices plus "new since your last visit" on the
 // dashboard (private to that pro: nothing in other users' state, signed-out /api/state or prerendered HTML),
-// health 2.11.0-sawyer and SW cache sawyer-v28.
+// health and SW cache (any Sawyer version, checked exactly in the current release suite).
 let LOCAL=null,PUB=null,br=null;
 const pre=h=>(h.match(/<div id="pre11">[\s\S]*$/)||[""])[0].replace(/<script[\s\S]*?<\/script>/g,"");
 const login=async(port,email,pw)=>{const r=await req(port,"POST","/api/login",JH,J({email,password:pw||"sawyer-demo-2026"}));return {ck:(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0],st:(r.json&&r.json.state)||{}}};
@@ -41,8 +41,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:(S||LOCAL).B}])}
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));
   await p.addInitScript(()=>{window.__cls=0;try{new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)window.__cls+=e.value}).observe({type:"layout-shift",buffered:true})}catch(e){}});return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.11.0-sawyer","healthz reports 2.11.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v28"/.test(sw.body),"service worker cache is sawyer-v28");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
  const pro=await login(LOCAL.port,"demo-pro@sawyer.test"),ho=await login(LOCAL.port,"demo-homeowner@sawyer.test");
 
  // ===== 1. SW-061: a quote from an Office estimate keeps the cents =====
