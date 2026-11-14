@@ -37,9 +37,9 @@ Status: **Built** means it is in this v7 prototype. **Launch** means it is plann
 | Months of onboarding | ServiceTitan | The hub opens with a 3-step start (add customer → estimate → invoice) and example records. | Built |
 | Processing fees and paid instant payouts | Invoice2go, QBO, Joist | Sawyer adds no markup on payments: Stripe's rate passes through at cost, and ACH is offered for big invoices. The pay page shows the fee up front. | Launch (demo pay shown) |
 | Held funds, "upgrade to get your money" | QBO, Invoice2go | Payouts go straight to your own Stripe Connect account. Sawyer never holds your money and never ties payout speed to your plan. | Launch |
-| Lost records / deactivated accounts | Invoice2go | One-click CSV and a QuickBooks-ready export of invoices, expenses, mileage and time. You keep read-only access and export even after cancelling. | Built (export) |
+| Lost records / deactivated accounts | Invoice2go | One-click CSV and a QuickBooks-ready export of invoices, expenses, mileage and time, plus **Back up everything** (v31): one ZIP of every customer, invoice line, payment, expense, trip, timesheet, license and the P&L. You keep read-only access and export even after cancelling. | Built (export + backup) |
 | Clunky quotes, no options | Jobber | Optional line items customers can check. An estimate converts to an invoice in one tap. | Built |
-| Job costing done in a spreadsheet | Jobber | The by-job report shows billed, collected, expenses, hours and margin. | Built |
+| Job costing done in a spreadsheet | Jobber | The by-job report shows billed, collected, expenses, hours and margin. A month-by-month P&L (v31) matches the tax file. | Built |
 | Support is slow and inconsistent | all | Help is answered by the people building it (beta). There's no sales team and no upsell calls. | Launch (copy) |
 | Customers chasing paper | all | Customers see every invoice in their account, pay a deposit or the full amount, and get a receipt. | Built (demo) |
 | No rate or per diem in the posting | Indeed, recruiters, FB groups | Rate and per diem are required on every traveler call. The per diem unit (7 days vs. days worked) is spelled out. | Built |

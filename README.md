@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.13.0
+# Sawyer (beta) — v2.14.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.13.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.14.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,17 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v31: safe spreadsheets, a monthly P&L, one-click backup, bundles that match the source
+Builds on v30 (live as `946c608`).
+- **SW-066: exports can't smuggle a formula.** One escaper, `csvCell()` in `src/v7.js`, is used by the tax-year file (`v9TaxCsv`), its v30 invoice register, the QuickBooks / payments / expenses / mileage / timesheet exports, the home-history CSV and the new backup. A cell that starts with `=`, `+`, `-`, `@`, tab or CR gets a leading `'` and is quoted (`=1+2` → `"'=1+2"`), so Excel and Google Sheets show it as text. Plain numbers such as `-12.50` or `308.51` stay numbers, and quote / comma / newline quoting is unchanged.
+- **SW-064: "116 mi at $0.70".** The cause was the build, not the source: `build-live.js` spliced the layers in with string replacements, and `String.replace` turns `$$` into `$`, so `$${MILE_RATE}` shipped as `${MILE_RATE}`. The build now uses function replacements. That also fixes the tax file summary ("mi x $0.70") and traveler-call descriptions ("$45/hr").
+- **SW-065: button word gaps.** `.btn` now has `letter-spacing:0; word-spacing:.12em` (the v27 treatment, for every button), so "Download 2026 tax file (CSV)" no longer paints as "Download2026 tax file(CSV)". The space goes from about 2 px to 3.7 px. No new overflow or clipped buttons on 12 pages × 4 roles × 390/1440.
+- **Bundles must match the source.** `test/bundle-sync.js` copies the build inputs to a temp dir, runs `build-live.js` and byte-compares `app-logic.js`, `public/index.html` and every hashed `public/js`, `public/css` and font file with the commit (same file names, same bytes). It's part of `test/run-all.sh` and needs esbuild on `NODE_PATH`, like the release build. A stale bundle fails the run.
+- **Profit & loss, month by month** (Office → Reports, under Tax year). Cash basis, same math as the tax file: payments by the date paid, processor fees, expenses and mileage at $0.70/mi. The total equals the Tax year card's net. Months before the first money in or out are left off, and each month has a small net bar (red when negative). The card shows the best month, a totals row and **Download P&L (CSV)**. Fees and mileage columns fold away on phones. It says it's a planning estimate, not tax advice.
+- **Back up everything** (Office → Reports → Export). One ZIP of plain spreadsheets: customers, invoices and estimates (total, paid, balance, P.O., job), every invoice line, payments, expenses, mileage, timesheets, licenses and insurance, this year's P&L, and a README with record counts. The ZIP is built in the browser (stored ZIP with CRC-32, no library) from the pro's own records. Nothing is uploaded. Photos stay in the account. It answers the "deactivated, lost all my clients' information" complaint in `docs/business-tools-flaws.md`. Code: `src/v31.js`, `src/v31.css`.
+- Tests: `node test/v31-e2e.js` (self-contained) and `node test/bundle-sync.js` are part of `test/run-all.sh`. `v30-e2e` now accepts any Sawyer version / SW cache name. SW cache is `sawyer-v31`.
 
 
 ## v30: savings card for pros, renewals up front, per-trade crew fill, invoice register

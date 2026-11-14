@@ -28,7 +28,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // Covers: the pro dashboard "Sawyer vs pay-per-lead" card (dated, hedged, recalculates, no exact competitor prices, only
 // for pros), the dashboard "Renewals coming up" card (pros' licenses/insurance and travelers' wallet cards, expired first,
 // 60-day window, no duplicate What's-next item, private), per-trade fill on project managers' dashboard project cards,
-// the tax-year CSV's invoice register, health 2.13.0-sawyer and SW cache sawyer-v30.
+// the tax-year CSV's invoice register, health and SW cache (any Sawyer version, checked exactly in the current release suite).
 let LOCAL=null,br=null;
 const dayISO=n=>{const d=new Date(Date.now()+n*864e5);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 (async()=>{try{
@@ -39,8 +39,8 @@ const dayISO=n=>{const d=new Date(Date.now()+n*864e5);return d.getFullYear()+"-"
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:LOCAL.B}])}
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
  const dash=async(w,ck)=>{const p=await page(w,ck);await p.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await p.waitForTimeout(400);return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.13.0-sawyer","healthz reports 2.13.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v30"/.test(sw.body),"service worker cache is sawyer-v30");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
  const pro=await login(LOCAL.port,"demo-pro@sawyer.test"),ho=await login(LOCAL.port,"demo-homeowner@sawyer.test"),pm=await login(LOCAL.port,"demo-pm@sawyer.test"),tv=await login(LOCAL.port,"demo-traveler@sawyer.test");
  ok(pro.ck&&ho.ck&&pm.ck&&tv.ck,"demo pro, homeowner, PM and traveler sign in");
  const run=Math.random().toString(36).slice(2,8);
