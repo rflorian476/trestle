@@ -4490,5 +4490,11 @@ function v28Guard(f){if(!f||f.__v28g)return;const h=f.onsubmit;if(typeof h!=="fu
 {const oq=v27QuickQuote;v27QuickQuote=function(){const r=oq.apply(this,arguments);try{v28Guard(document.getElementById("v27qf"))}catch(e){}return r}}
 {const oq=quoteModal;quoteModal=function(){const r=oq.apply(this,arguments);try{v28Guard(document.getElementById("qf"))}catch(e){}return r}}
 
+/* (3) "Set a starting price" counts as done only when at least one service has a real "from" price (more than $0).
+   Saving the menu with every price blank (the profile then shows the area's typical price) or $0 leaves the step open. */
+function v28HasPrice(m){return Array.isArray(m&&m.menu12)&&m.menu12.some(x=>x&&Number(x.from)>0)}
+{const os=v27Steps;v27Steps=function(m){const s=os.apply(this,arguments);try{const p=s.find(x=>x.k==="price");if(p){const ok=v28HasPrice(m),rows=Array.isArray(m.menu12)&&m.menu12.length>0;p.done=ok;
+  p.meta=ok?"Starting prices set":rows?"No price above $0 yet":"Not set yet";if(!ok&&rows)p.why="Your services are listed, but none has a starting price yet. Add a \"from $X\" price to at least one service so customers see what you charge."}}catch(e){}return s}}
+
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
