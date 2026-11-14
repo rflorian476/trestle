@@ -25,6 +25,7 @@ const MAX_UPLOAD=5*1024*1024;
 const IMGSAFE=require("./lib/imgsafe.js");
 const LIMITS=require("./lib/limits.js");
 const mailer=require("./lib/mailer");
+const WEBPUSH=require("./lib/webpush.js");
 
 /* ---- shared business rules: the same A.* actions the UI was built on, run server-side ---- */
 let VER=Date.now(),allowAuto=false,dirty=false,PUB_ST={t:0,s:"",v:0};
@@ -193,7 +194,65 @@ function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===ui
  const reviews=(d.reviews||[]).map(r=>(staff||(uid&&(r.uid===uid||r.cid===uid)))?r:Object.assign({},r,{uid:"rv-"+r.id,an:shortNm(uName.get(r.uid))}));
  return{v:1,_v:VER,users,jobs,estimates:uid?(d.estimates||[]).filter(e=>e.uid===uid):[],reviews,quotes,msgs:uid?d.msgs.filter(m=>m.a===uid||m.b===uid):[],notifs:uid?d.notifs.filter(n=>n.to===uid):[],projects:(d.projects||[]).map(p=>(uid&&(isPro||onProject(p,uid)))?p:pubProject(p)),pmsgs,tcalls:(d.tcalls||[]).map(c=>c.by===uid?c:Object.assign({},c,{napps:(c.apps||[]).filter(a=>a.status!=="withdrawn").length,nhired:(c.apps||[]).filter(a=>a.status==="hired").length,apps:uid?(c.apps||[]).filter(a=>a.status==="hired"||a.uid===uid).map(a=>a.uid===uid?a:{uid:a.uid,status:a.status,date:a.date}):[],invites:(c.invites||[]).filter(x=>x===uid)})),bills:uid?(d.bills||[]).filter(b=>b.by===uid||(b.cuid===uid&&b.status!=="draft")):[],bcust:own(d.bcust),bdocs:own(d.bdocs),ledger:own(d.ledger),tsheets:own(d.tsheets),lodging:(d.lodging||[]).map(l=>uid?l:pubLodging(l)),creviews:d.creviews||[],visits:uid?(d.visits||[]).filter(v=>v.by===uid||v.cuid===uid):[],cases:uid?(d.cases||[]).filter(c=>c.cu===uid||c.pro===uid):[],crew:own(d.crew),refs:(d.refs||[]).filter(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))).map(r=>r.status==="given"||(uid&&(r.trav===uid||r.by===uid))?r:null),consults:(d.consults||[]).map(c=>uid&&(c.pro===uid||c.cu===uid)?c:(c.status==="requested"||c.status==="confirmed")?{id:c.id,pro:c.pro,date:c.date,time:c.time,status:c.status}:null).filter(Boolean),rreq12:uid?(d.rreq12||[]).filter(r=>r.by===uid||r.cu===uid):[],reports12:staff?(d.reports12||[]):uid?(d.reports12||[]).filter(r=>r.by===uid):[],rmrev12:staff?(d.rmrev12||[]):[],me:uid&&d.users.some(u=>u.id===uid)?uid:null,theme:"light",recent:[]}}
 
-function run(uid,name,args){const d=DB();d.me=uid;let r;try{r=api.A[name](...args)}catch(e){r={ok:false,msg:"That didn't work. The item may have changed, refresh and try again."}}finally{DB().me=null}if(dirty)persist();return r}
+function run(uid,name,args){const d=DB();d.me=uid;const pb=pushBefore();let r;try{r=api.A[name](...args)}catch(e){r={ok:false,msg:"That didn't work. The item may have changed, refresh and try again."}}finally{DB().me=null}if(dirty)persist();pushAfter(pb);return r}
+
+
+/* ---- v32: browser push alerts (opt-in, per device). Standard Web Push with VAPID (lib/webpush.js), no paid service.
+   A device subscription is tied to the session that turned it on: signing out (or the session expiring, or a password
+   change that ends other sessions) stops alerts to that device. Three kinds, each one a switch on the account:
+   jobs  = a new job in the pro's trade and service area (the same match as the v28 bell notice)
+   hires = "You're hired" / "This job was filled" / traveler-call decisions
+   quotes = a pro sent the homeowner a quote. The VAPID private key stays in this process (never logged or sent). ---- */
+db.exec(`CREATE TABLE IF NOT EXISTS pushsubs(endpoint TEXT PRIMARY KEY,uid TEXT NOT NULL,p256dh TEXT NOT NULL,auth TEXT NOT NULL,sess TEXT NOT NULL,created INTEGER NOT NULL,last_ok INTEGER,fails INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS pushprefs(uid TEXT PRIMARY KEY,cats TEXT NOT NULL);`);
+const VAPID=WEBPUSH.makeVapid(db);
+const PUSH_CATS=["jobs","hires","quotes"];
+const sessHash=t=>crypto.createHash("sha256").update(String(t||"")).digest("base64url").slice(0,32);
+function pushDefaults(uid){const u=DB().users.find(x=>x.id===uid)||{};return u.role==="contractor"?{jobs:true,hires:true,quotes:false}:{jobs:false,hires:false,quotes:true}}
+function pushPrefs(uid){const r=db.prepare("SELECT cats FROM pushprefs WHERE uid=?").get(uid);let o=null;try{o=r&&JSON.parse(r.cats)}catch(e){}const d=pushDefaults(uid);const out={};for(const k of PUSH_CATS)out[k]=o&&typeof o[k]==="boolean"?o[k]:d[k];return out}
+function pushKind(n){const t=String(n&&n.text||"");if(n&&n.kind28==="newjob"||/^New (URGENT )?job (near you|in your area): /i.test(t))return "jobs";
+ if(/^You're hired: /.test(t)||/^This job was filled: /.test(t)||/the contractor went another way/.test(t))return "hires";
+ if(/ sent a quote: /.test(t)&&/^job:/.test(String(n.link||"")))return "quotes";return null}
+function pushUrl(link){const m=/^(job|tcall|project|profile|traveler):([\w.-]{1,60})$/.exec(String(link||""));if(!m)return "/inbox";return "/"+(m[1]==="profile"?"pro":m[1])+"/"+encodeURIComponent(m[2])}
+const PUSH_TITLE={jobs:"New job in your area",hires:"Job update",quotes:"New quote"};
+function pushPayload(n,k){let title=PUSH_TITLE[k];const t=String(n.text||"");if(/^You're hired/.test(t))title="You're hired";else if(/^This job was filled/.test(t))title="Job filled";
+ return{title,body:t.slice(0,240),url:pushUrl(n.link),tag:k+":"+String(n.link||"").slice(0,60)}}
+let pushAny=!!db.prepare("SELECT 1 FROM pushsubs LIMIT 1").get();
+function pushBefore(){return pushAny?new Set((DB().notifs||[]).map(n=>n.id)):null}
+function pushAfter(before){if(!before)return;const fresh=(DB().notifs||[]).filter(n=>n&&!before.has(n.id));if(fresh.length)pushDeliver(fresh).catch(()=>console.error("push: batch failed"))}
+function liveSessHashes(uid){return new Set(db.prepare("SELECT token FROM sessions WHERE uid=? AND expires>?").all(uid,Date.now()).map(r=>sessHash(r.token)))}
+function pushSubject(){const s=String(process.env.VAPID_SUBJECT||"").trim();if(/^(mailto:|https:\/\/)/.test(s))return s;const o=configuredOrigin();return /^https:/.test(o)?o:"mailto:support@sawyer.invalid"}
+let PUSH_SENT=0;
+async function pushTo(uid,payload,opts){const subs=db.prepare("SELECT * FROM pushsubs WHERE uid=?").all(uid);if(!subs.length)return{sent:0,devices:0};const live=liveSessHashes(uid);let sent=0;
+ for(const s of subs){if(!live.has(s.sess)){db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(s.endpoint);continue}
+  const r=await WEBPUSH.send(VAPID,{endpoint:s.endpoint,keys:{p256dh:s.p256dh,auth:s.auth}},payload,Object.assign({subject:pushSubject()},opts||{}));
+  if(process.env.PUSH_DEBUG)console.log("push: "+new URL(s.endpoint).hostname+" -> "+r.status);
+  if(r.ok){sent++;PUSH_SENT++;db.prepare("UPDATE pushsubs SET last_ok=?,fails=0 WHERE endpoint=?").run(Date.now(),s.endpoint)}
+  else if(r.gone)db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(s.endpoint);
+  else db.prepare("UPDATE pushsubs SET fails=fails+1 WHERE endpoint=?").run(s.endpoint)}
+ db.prepare("DELETE FROM pushsubs WHERE fails>=8").run();pushAny=!!db.prepare("SELECT 1 FROM pushsubs LIMIT 1").get();return{sent,devices:subs.length}}
+async function pushDeliver(list){for(const n of list.slice(0,200)){const k=pushKind(n);if(!k||!n.to)continue;if(!db.prepare("SELECT 1 FROM pushsubs WHERE uid=? LIMIT 1").get(n.to))continue;
+  if(!pushPrefs(n.to)[k])continue;await pushTo(n.to,pushPayload(n,k),{urgency:k==="jobs"&&/\(urgent\)/.test(n.text||"")?"high":"normal",topic:k})}}
+function pushStatus(uid,endpoint){const row=endpoint?db.prepare("SELECT uid FROM pushsubs WHERE endpoint=?").get(String(endpoint)):null;
+ return{key:VAPID.publicKey,on:!!(row&&row.uid===uid),devices:db.prepare("SELECT COUNT(*) n FROM pushsubs WHERE uid=?").get(uid).n,cats:pushPrefs(uid)}}
+async function pushApi(req,res,p,uid,b){
+ if(p==="/api/push/status")return send(res,200,pushStatus(uid,b.endpoint));
+ if(p==="/api/push/subscribe"){if(limited("pushsub:"+uid,20,3600e3))return send(res,429,{error:"Too many tries. Try again later."});
+  const sub=b.sub&&typeof b.sub==="object"?b.sub:{};const ep=String(sub.endpoint||"");
+  if(!WEBPUSH.endpointOk(ep)||!WEBPUSH.keysOk(sub.keys))return send(res,400,{error:"This browser's push service isn't supported."});
+  const t=cookies(req).swsid;db.prepare("INSERT INTO pushsubs(endpoint,uid,p256dh,auth,sess,created,fails) VALUES(?,?,?,?,?,?,0) ON CONFLICT(endpoint) DO UPDATE SET uid=excluded.uid,p256dh=excluded.p256dh,auth=excluded.auth,sess=excluded.sess,created=excluded.created,fails=0").run(ep,uid,String(sub.keys.p256dh),String(sub.keys.auth),sessHash(t),Date.now());
+  // at most 10 devices per account: the oldest drops off
+  const all=db.prepare("SELECT endpoint FROM pushsubs WHERE uid=? ORDER BY created DESC").all(uid);for(const r of all.slice(10))db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(r.endpoint);
+  if(b.cats&&typeof b.cats==="object"){const o={};for(const k of PUSH_CATS)o[k]=!!b.cats[k];db.prepare("INSERT INTO pushprefs(uid,cats) VALUES(?,?) ON CONFLICT(uid) DO UPDATE SET cats=excluded.cats").run(uid,JSON.stringify(o))}
+  pushAny=true;return send(res,200,Object.assign({ok:true},pushStatus(uid,ep)))}
+ if(p==="/api/push/unsubscribe"){const ep=String(b.endpoint||"");if(b.all===true)db.prepare("DELETE FROM pushsubs WHERE uid=?").run(uid);else if(ep)db.prepare("DELETE FROM pushsubs WHERE endpoint=? AND uid=?").run(ep,uid);
+  pushAny=!!db.prepare("SELECT 1 FROM pushsubs LIMIT 1").get();return send(res,200,Object.assign({ok:true},pushStatus(uid,ep)))}
+ if(p==="/api/push/prefs"){const o={};const c=b.cats&&typeof b.cats==="object"?b.cats:{};for(const k of PUSH_CATS)o[k]=!!c[k];db.prepare("INSERT INTO pushprefs(uid,cats) VALUES(?,?) ON CONFLICT(uid) DO UPDATE SET cats=excluded.cats").run(uid,JSON.stringify(o));return send(res,200,Object.assign({ok:true},pushStatus(uid,b.endpoint)))}
+ if(p==="/api/push/test"){if(limited("pushtest:"+uid,6,3600e3))return send(res,429,{error:"You've sent a few test alerts already. Try again in an hour."});
+  const ep=String(b.endpoint||"");const row=ep&&db.prepare("SELECT uid FROM pushsubs WHERE endpoint=?").get(ep);if(!row||row.uid!==uid)return send(res,400,{error:"Turn alerts on for this device first."});
+  const r=await pushTo(uid,{title:"Sawyer alerts are on",body:"This is how new jobs, quotes and hiring news will show up on this device.",url:"/inbox",tag:"test"},{ttl:600});
+  return send(res,200,{ok:r.sent>0,sent:r.sent})}
+ return send(res,404,{error:"Not found"})}
 
 /* ---- http ---- */
 const INDEX=()=>fs.readFileSync(path.join(__dirname,"public/index.html"));
@@ -386,6 +445,11 @@ function viewRoute(p){const m=/^\/([a-z0-9]{2,20})(?:\/([\w.%~@+-]{1,120}(?:\/[\
 const SW_JS=`const C="sawyer-v31";const SHELL=["/","/icons/icon-192.png","/img/hero.webp","/fonts/plus-jakarta-sans-400.woff2","/fonts/plus-jakarta-sans-800.woff2"];
 self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL)).catch(()=>{}))});
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener("push",e=>{let d={};try{d=e.data?e.data.json():{}}catch(x){d={body:e.data?e.data.text():""}}
+ e.waitUntil(self.registration.showNotification(String(d.title||"Sawyer").slice(0,80),{body:String(d.body||"").slice(0,240),icon:"/icons/icon-192.png",badge:"/icons/favicon-48.png",tag:d.tag||undefined,renotify:!!d.tag,data:{url:typeof d.url==="string"&&d.url.charAt(0)==="/"&&d.url.charAt(1)!=="/"?d.url:"/inbox"}}))});
+self.addEventListener("notificationclick",e=>{e.notification.close();const u=new URL((e.notification.data&&e.notification.data.url)||"/inbox",location.origin).href;
+ e.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(cs=>{for(const c of cs){if(c.url.indexOf(location.origin)===0&&"focus" in c){return c.focus().then(w=>w&&w.navigate?w.navigate(u):w).catch(()=>self.clients.openWindow(u))}}return self.clients.openWindow(u)}))});
+self.addEventListener("pushsubscriptionchange",e=>{e.waitUntil(fetch("/api/push/key").then(r=>r.json()).then(k=>{const b=atob(k.key.replace(/-/g,"+").replace(/_/g,"/"));const a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return self.registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:a})}).then(s=>fetch("/api/push/subscribe",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub:s.toJSON()})})).catch(()=>{}))});
 self.addEventListener("fetch",e=>{const r=e.request;if(r.method!=="GET")return;const u=new URL(r.url);if(u.origin!==location.origin||u.pathname.startsWith("/api/")||u.pathname.startsWith("/auth/"))return;
  if(r.mode==="navigate"){e.respondWith(fetch(r).then(x=>{const y=x.clone();caches.open(C).then(c=>c.put("/",y));return x}).catch(()=>caches.match("/")));return}
  if(/^\\/(img|icons|u|fonts|js|css)\\//.test(u.pathname))e.respondWith(caches.match(r).then(h=>h||fetch(r).then(x=>{if(x.ok){const y=x.clone();caches.open(C).then(c=>c.put(r,y))}return x})))});`;
@@ -537,6 +601,7 @@ const server=http.createServer(async(req,res)=>{
   const day=pvDay(Date.now()),who=uid||"ip:"+crypto.createHash("sha256").update(String(ip(req))).digest("base64url").slice(0,16),k=pid+"|"+who+"|"+day;
   if(PV_SEEN.has(k))return send(res,200,{ok:true,counted:false});if(PV_SEEN.size>100000)PV_SEEN.clear();PV_SEEN.add(k);pvAdd.run(pid,day);return send(res,200,{ok:true,counted:true})}
  if(req.method==="GET"&&p==="/api/auth/methods")return send(res,200,AUTH.methods());
+ if(req.method==="GET"&&p==="/api/push/key")return send(res,200,{key:VAPID.publicKey});
  // v18: "Download my data". A JSON copy of everything this account can see that involves it, built from the same
  // privacy-filtered snapshot the app itself uses (other people's private fields never appear). No password hash, salt,
  // session tokens, passkey keys or one-time codes are included.
@@ -578,7 +643,8 @@ const server=http.createServer(async(req,res)=>{
    const h=hashPw(pw);db.prepare("UPDATE accounts SET salt=?,hash=? WHERE uid=?").run(h.salt,h.hash,uid);
    if(reset)CODE_SESS.delete(cookies(req).swsid);if(acc.hash)db.prepare("DELETE FROM sessions WHERE uid=? AND token<>?").run(uid,cookies(req).swsid||"");return send(res,200,{ok:true})}
   return send(res,404,{error:"Not found"})}
- if(p==="/api/logout"){const t=cookies(req).swsid;if(t)db.prepare("DELETE FROM sessions WHERE token=?").run(t);setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}
+ if(p.startsWith("/api/push/")){if(!uid)return send(res,401,{error:"Sign in first"});return pushApi(req,res,p,uid,b)}
+ if(p==="/api/logout"){const t=cookies(req).swsid;if(t){db.prepare("DELETE FROM sessions WHERE token=?").run(t);db.prepare("DELETE FROM pushsubs WHERE sess=?").run(sessHash(t))}setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}
  // v13 (QA SW-034): delete my account. Ends every session, removes sign-in methods and uploads, anonymizes the profile
  // (reviews stay, credited to "Former Sawyer member"). Shared demo accounts can't be deleted.
  if(p==="/api/account/delete"){if(!uid)return send(res,401,{error:"Sign in first"});if(String(b.confirm||"")!=="DELETE")return send(res,400,{error:'Type DELETE to confirm.'});
@@ -586,7 +652,7 @@ const server=http.createServer(async(req,res)=>{
   const r=run(uid,"__delete13",[]);if(!r||!r.ok)return send(res,400,{error:(r&&r.msg)||"Couldn't delete the account."});
   const a=db.prepare("SELECT email,phone FROM accounts WHERE uid=?").get(uid)||{};
   for(const up of db.prepare("SELECT name FROM uploads WHERE uid=?").all(uid)){try{fs.unlinkSync(path.join(UPLOADS,up.name))}catch(e){}}
-  db.prepare("DELETE FROM uploads WHERE uid=?").run(uid);db.prepare("DELETE FROM pviews WHERE pid=?").run(uid);db.prepare("DELETE FROM sessions WHERE uid=?").run(uid);db.prepare("DELETE FROM accounts WHERE uid=?").run(uid);
+  db.prepare("DELETE FROM uploads WHERE uid=?").run(uid);db.prepare("DELETE FROM pviews WHERE pid=?").run(uid);db.prepare("DELETE FROM pushsubs WHERE uid=?").run(uid);db.prepare("DELETE FROM pushprefs WHERE uid=?").run(uid);db.prepare("DELETE FROM sessions WHERE uid=?").run(uid);db.prepare("DELETE FROM accounts WHERE uid=?").run(uid);
   for(const t of ["passkeys","identities"])try{db.prepare("DELETE FROM "+t+" WHERE uid=?").run(uid)}catch(e){}
   for(const t of [a.email,a.phone].filter(Boolean))try{db.prepare("DELETE FROM codes WHERE target=?").run(String(t).toLowerCase())}catch(e){}
   setCookie(res,req,"",0);return send(res,200,{ok:true,state:snapshot(null)})}

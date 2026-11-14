@@ -1,0 +1,9 @@
+/* v32: alerts on this device */
+.v32push{margin:14px 0}.v32push-w{margin-top:4px}.v32push-w[hidden],.v32push[hidden]{display:none}
+.v32p-h{display:flex;gap:12px;align-items:flex-start}.v32p-tx{min-width:0}.v32p-h h2{font-size:1.02rem;margin:0 0 2px}
+.v32p-i{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:var(--surface2);color:var(--navy,#0F2A44)}
+.v32p-d{margin:0}.v32p-s{margin-top:10px}.v32p-b{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.v32p-f{margin:8px 0 0}.v32p-on{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 0 8px}.v32p-on b{display:inline-flex;align-items:center;gap:6px;color:var(--good)}
+.v32p-x{display:flex;gap:8px;align-items:flex-start;margin:0 0 6px}.v32p-x svg{flex:none;margin-top:3px}
+.v32p-c{border:0;padding:0;margin:12px 0 0;display:grid;gap:6px}.v32p-c legend{font-weight:700;font-size:.9rem;margin-bottom:4px;padding:0}.v32p-c[hidden]{display:none}
+.v32push.v32on{border-color:color-mix(in srgb,var(--good) 35%,var(--line))}
