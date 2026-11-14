@@ -1,1 +1,4 @@
 /* v28 */
+/* v28: labeled stock photo in the /jobs header (SEO image-alt parity with /prices) */
+.v28jb-ph{float:right;position:relative;z-index:1;width:132px;height:99px;object-fit:cover;border-radius:12px;margin:0 0 6px 18px;background:#ECE7DC;border:2px solid rgba(255,255,255,.85)}
+@media(max-width:640px){.v28jb-ph{width:84px;height:63px;margin-left:12px}}

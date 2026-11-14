@@ -28,3 +28,12 @@ function v28Guard(f){if(!f||f.__v28g)return;const h=f.onsubmit;if(typeof h!=="fu
 function v28HasPrice(m){return Array.isArray(m&&m.menu12)&&m.menu12.some(x=>x&&Number(x.from)>0)}
 {const os=v27Steps;v27Steps=function(m){const s=os.apply(this,arguments);try{const p=s.find(x=>x.k==="price");if(p){const ok=v28HasPrice(m),rows=Array.isArray(m.menu12)&&m.menu12.length>0;p.done=ok;
   p.meta=ok?"Starting prices set":rows?"No price above $0 yet":"Not set yet";if(!ok&&rows)p.why="Your services are listed, but none has a starting price yet. Add a \"from $X\" price to at least one service so customers see what you charge."}}catch(e){}return s}}
+
+/* (4) /jobs SEO parity with /prices (66 -> 69). Lighthouse's image-alt audit doesn't apply to a page with no images, so the
+   beta noindex weighed more on the job board. Its header now carries a small, labeled real stock photo (Pexels, credited on
+   /credits), lazy and sized, so nothing shifts. Shown to signed-out visitors and customers (the prerendered page included). */
+const V28JB={src:"/img/x-carpentry-sm.webp",alt:"A carpenter framing a house (stock photo)"};
+{const ov=VIEWS.jobs;VIEWS.jobs=function(){const h=ov.apply(this,arguments);try{const m=me();if(m&&m.role!=="customer")return h;
+  const img=`<img class="v28jb-ph" id="v28jbPh" src="${V28JB.src}" alt="${esc(V28JB.alt)}" width="400" height="300" loading="lazy" decoding="async">`;
+  const k=h.indexOf('<header class="phx phx-jobs"');if(k>=0){const a='<div class="wrap phx-in">',i=h.indexOf(a,k);if(i>=0)return h.slice(0,i)+'<div class="wrap phx-in v28jb">'+img+h.slice(i+a.length)}
+  return h.replace('<div class="pagehead">',()=>'<div class="pagehead v28jb">'+img)}catch(e){return h}}}
