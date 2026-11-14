@@ -63,9 +63,17 @@ function v27QuickQuote(jid){const j=DB.jobs.find(x=>x.id===jid),m=me();if(!j||!m
 function v27BindQ(){document.querySelectorAll("[data-v27q]").forEach(b=>b.onclick=e=>{e.preventDefault();v27QuickQuote(b.dataset.v27q)})}
 {const oa=AFTER.dash;AFTER.dash=function(){const r=oa&&oa.apply(this,arguments);try{v27BindQ()}catch(e){}return r}}
 {const oa=AFTER.jobs;AFTER.jobs=function(){const r=oa&&oa.apply(this,arguments);try{v27BindQ()}catch(e){}return r}}
-// Office estimates are filled in by (3) below; until then the quick quote has no estimate picker
-function v27EstPick(m){return ""}
-function v27EstBind(){}
+// Start from an Office estimate: a pro who already priced the work in The Office picks that estimate and the quote's price
+// (the estimate total with the optional lines it has switched on) and line items are filled in. Nothing else changes.
+function v27Ests(m){return m?(DB.bills||[]).filter(b=>b.by===m.id&&b.type==="est"&&b.status!=="void"&&(b.lines||[]).length).sort((a,b)=>(b.date||0)-(a.date||0)).slice(0,20):[]}
+function v27EstNote(b){const $=n=>money(Math.round(n));const on=b.lines.filter(l=>!l.opt||l.on),opt=b.lines.filter(l=>l.opt&&!l.on);
+ let t="From estimate "+b.no+": "+on.map(l=>(+l.q!==1?l.q+" × ":"")+l.d+" ("+$(l.q*l.r)+")").join("; ")+".";if(opt.length)t+=" Optional add-ons: "+opt.map(l=>l.d+" ("+$(l.q*l.r)+")").join("; ")+".";
+ if(b.tax)t+=" Includes "+b.tax+"% tax.";return t.length>1000?t.slice(0,997)+"…":t}
+function v27EstPick(m){const es=v27Ests(m);if(!es.length)return "";
+ return`<div class="fld v27e"><label for="v27es">Start from an Office estimate (optional)</label><select id="v27es" name="est"><option value="">Don't use an estimate</option>${es.map(b=>`<option value="${esc(b.id)}">${esc(b.no)} · ${esc(b.title||"Estimate")} · ${money(Math.round(billCalc(b).total))}</option>`).join("")}</select><small class="muted">Fills in the price and line items. You can still edit them.</small></div>`}
+function v27EstBind(f,pid,nid){const s=f&&f.querySelector("#v27es");if(!s)return;s.onchange=()=>{const b=(DB.bills||[]).find(x=>x.id===s.value);if(!b)return;const p=document.getElementById(pid),n=document.getElementById(nid);
+ if(p)p.value=String(Math.round(billCalc(b).total));if(n)n.value=v27EstNote(b)}}
+{const oq=quoteModal;quoteModal=function(jid){oq.apply(this,arguments);try{const f=document.getElementById("qf"),m=me();if(!f||!m||f.querySelector("#v27es"))return;const x=v27EstPick(m);if(!x)return;f.insertAdjacentHTML("afterbegin",x);v27EstBind(f,"qp","qn")}catch(e){}}}
 // dashboard section: matched-job explainer + recent "not hired" outcomes
 function v27Lost(m){const t=Date.now()-30*864e5;return DB.quotes.filter(q=>q.cid===m.id&&q.status==="declined").map(q=>({q,j:DB.jobs.find(x=>x.id===q.job)})).filter(x=>x.j&&x.j.hired&&x.j.hired!==m.id&&(x.q.declinedAt||x.j.hiredAt||x.j.created||0)>=t).sort((a,b)=>(b.q.declinedAt||b.j.hiredAt||0)-(a.q.declinedAt||a.j.hiredAt||0))}
 function v27LostCard(m){const l=v27Lost(m).slice(0,3);if(!l.length)return "";

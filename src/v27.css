@@ -50,3 +50,4 @@
 /* v27: labeled example photo on the /prices quote check */
 .v27qc-ph{float:right;width:112px;height:84px;object-fit:cover;border-radius:12px;margin:0 0 8px 14px;background:#ECE7DC}
 @media(max-width:640px){.v27qc-ph{width:84px;height:63px}}
+.v27e small{display:block;margin-top:4px;font-size:12.5px}
