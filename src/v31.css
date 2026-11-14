@@ -11,3 +11,6 @@
 .v31pl-b i{display:block;height:100%;border-radius:3px;background:var(--good)}.v31pl-b i.neg{background:var(--bad)}
 .v31pl-s{margin:10px 0}
 @media(max-width:520px){.v31pl-b{display:none}.v31pl-t th,.v31pl-t td{padding-left:5px;padding-right:5px;font-size:.84rem}.v31pl-t thead th{font-size:.68rem}}
+/* v31: back up everything */
+.v31bk{display:flex;align-items:center;justify-content:space-between;gap:12px 16px;flex-wrap:wrap;margin:12px 0 8px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-sm,10px);background:var(--surface2)}
+.v31bk>div{flex:1 1 280px;min-width:0}.v31bk b{display:flex;align-items:center;gap:6px}.v31bk p{margin:4px 0 0}
