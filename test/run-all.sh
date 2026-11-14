@@ -19,8 +19,8 @@ for s in $SUITES; do
   kill $SP 2>/dev/null; wait $SP 2>/dev/null; rm -rf "$D"
 done
 
-# Self-contained suites start their own servers (seo, exposure). They must not use the shared e2e port.
-for s in seo exposure v20-e2e v21-e2e v22-e2e v23-e2e v24-e2e v25-e2e v26-e2e v27-e2e v28-e2e v29-e2e v30-e2e; do
+# Self-contained suites start their own servers (seo, exposure). bundle-sync (v31) rebuilds from source in a temp dir and diffs the committed bundles. They must not use the shared e2e port.
+for s in bundle-sync seo exposure v20-e2e v21-e2e v22-e2e v23-e2e v24-e2e v25-e2e v26-e2e v27-e2e v28-e2e v29-e2e v30-e2e; do
   [ -f "test/$s.js" ] || continue
   if timeout 180 node "test/$s.js" >"$LOG/$s.log" 2>&1 && ! grep -q "^FAIL" "$LOG/$s.log"; then st=PASS; else st=FAIL; rc=1; fi
   echo "$st $s ($(grep -c -E '^ok |^PASS' "$LOG/$s.log") pass lines, $(grep -c '^FAIL' "$LOG/$s.log") FAIL lines)"
