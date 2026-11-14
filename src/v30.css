@@ -21,3 +21,7 @@
 .v30rn-soon .v30rn-i,.v30rn-warn .v30rn-i{background:var(--gold-bg);color:var(--acc)}
 .v30rn-more{display:inline-block;margin-top:8px;font-weight:700;font-size:.9rem}.v30rn-n{margin:10px 0 0;font-size:13px}
 @media(max-width:520px){.v30rn-c{font-size:0;gap:0}.v30rn-c svg{width:18px;height:18px}}
+/* v30: per-trade fill on PM project cards */
+.v30tr{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px;font-size:.8rem}
+.v30tr li{display:flex;justify-content:space-between;gap:8px}.v30tr li span{color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v30tr li b{white-space:nowrap;font-weight:700}.v30tr li.done b{color:var(--good)}.v30tr li.open b{color:var(--hot)}.v30tr li.part b{color:var(--acc)}

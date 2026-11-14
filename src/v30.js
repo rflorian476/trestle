@@ -38,3 +38,13 @@ function v30RenewCard(m){const all=v30Renew(m);if(!all.length)return"";const ex=
    if(j>0)h=h.slice(0,j+10)+rn+h.slice(j+10);else{const k=h.indexOf('<div class="v13-dtop">');h=k>=0?h.slice(0,k+22)+rn+h.slice(k+22):rn+h}}
  }catch(e){console.warn(e)}return h}}
 
+/* (3) Project managers see, on each project card on their dashboard, how each trade is filling: "Concrete finishers ·
+   1 of 3 filled", so they know exactly which slots are still open without opening the project. */
+function v30Roles(p){const rs=(p.roles||[]).map(r=>({label:r.label||r.trade,need:+r.need||0,f:Math.min(+r.need||0,(r.filled||[]).length)})).filter(r=>r.need>0);
+ rs.sort((a,b)=>(a.f>=a.need)-(b.f>=b.need));const sh=rs.slice(0,4);
+ return`<ul class="v30tr">${sh.map(r=>`<li class="${r.f>=r.need?"done":r.f?"part":"open"}"><span>${esc(r.label)}</span><b>${r.f} of ${r.need} filled</b></li>`).join("")}${rs.length>4?`<li class="more"><span>+${rs.length-4} more trade${rs.length-4===1?"":"s"}</span></li>`:""}</ul>`}
+
+{const ov=VIEWS.dash;VIEWS.dash=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||m.staff||(typeof v12Staff==="function"&&v12Staff(m)))return h;
+  if(m.role==="pm")for(const p of (DB.projects||[]).filter(p=>p.pm===m.id)){const a=h.indexOf('<a class="upm" href="'+href("project",p.id)+'"');if(a<0)continue;const k=h.indexOf('<div class="meter">',a),e=k<0?-1:h.indexOf("</div>",k);if(e<0)continue;h=h.slice(0,e+6)+v30Roles(p)+h.slice(e+6)}
+ }catch(e){console.warn(e)}return h}}
+
