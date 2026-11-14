@@ -4627,5 +4627,7 @@ function v30InvYear(m,y){return v7Mine("bills",m).filter(b=>b.type==="inv"&&b.st
 {const oc=v9TaxCard;v9TaxCard=function(m,y){let h=oc.apply(this,arguments);try{const ys=v9TaxYears(m);const yy=ys.includes(y)?y:ys[0];const n=v30InvYear(m,String(yy)).length;
   h=h.replace("Not tax advice.</p>",`Also lists the ${n} invoice${n===1?"":"s"} you issued in ${esc(String(yy))}, with what's paid and still owed. Not tax advice.</p>`)}catch(e){}return h}}
 
+/* v31 layer (see the commits that follow) */
+
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};

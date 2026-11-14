@@ -1,0 +1,3 @@
+/* v31 (SW-065): button labels keep visible word gaps. Plus Jakarta's narrow space plus the body's negative tracking made
+   "Download 2026 tax file (CSV)" paint as "Download2026 tax file(CSV)". Same treatment the v27 buttons already had. */
+.btn{letter-spacing:0;word-spacing:.12em}
