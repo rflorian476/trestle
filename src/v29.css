@@ -1,0 +1,4 @@
+/* v29: space under the "How Sawyer compares" table so the dated note reads as a footnote */
+table.compare+.v28cmp-n,.v28cmp-n{margin:12px 2px 0;padding:0;font-size:13px;line-height:1.5;color:var(--muted)}
+/* v29: dated, hedged note under the savings calculator sliders */
+.v29calc-n{margin:2px 0 12px;font-size:13px;line-height:1.5;color:var(--muted)}

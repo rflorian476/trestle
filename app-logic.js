@@ -4541,5 +4541,11 @@ function v28NewJobs(m){const t=v28Base(m);return DB.jobs.filter(j=>j.status==="p
    if(ui>=0&&ui<end)h=h.slice(0,ui+u.length)+'<li class="v28tag">New</li>'+h.slice(ui+u.length)})}catch(e){}return h}}
 {const oa=AFTER.dash;AFTER.dash=function(){const r=oa&&oa.apply(this,arguments);try{const m=me();if(m&&m.role==="contractor"&&!m.staff&&V28BASE&&V28BASE.uid===m.id&&!V28BASE.marked){V28BASE.marked=true;setTimeout(()=>{try{A.seenJobs28()}catch(e){}},600)}}catch(e){}return r}}
 
+/* ===== v29 ===== */
+/* (1) SW-063 is fixed in place: every quote amount (job-page "You quoted" callout, the homeowner's "sent a quote" bell,
+   quote list, Compare bids, "Hire for", pipeline card, CRM card, Earned/Booked/Invoices, quote check) goes through v28$,
+   so $308.51 reads $308.51 and whole dollars still read $309. */
+
+
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
