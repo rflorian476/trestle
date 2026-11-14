@@ -15,7 +15,7 @@ function v26TradeOf(k){if(v26Trades().includes(k))return k;return v26Trades().fi
 function v26Range(k,urg,zip){k=v26Key(k);const ur=(EST_URG[urg]||EST_URG.soon)[0],st=ZIPS[zip]?ZIPS[zip][0].slice(-2):"",rg=EST_REGION[st]||1;
  if(V25SUB[k]&&!v26Trades().includes(k)){const b=V25SUB[k],rd=n=>n<1000?Math.round(n/10)*10:Math.round(n/50)*50;return{low:rd(b[0]*ur*rg),high:rd(b[1]*ur*rg),what:k.replace(/\b[A-Z][a-z]+/g,w=>w.toLowerCase())}}
  const r=estimateRange({cat:k,size:"medium",urg:EST_URG[urg]?urg:"soon",zip});return{low:r.low,high:r.high,what:"a typical "+(/^[A-Z]{2,}$/.test(k)?k:k.toLowerCase())+" job"}}
-function v26Amt(s){s=String(s||"").replace(/[\s$,]/g,"");const k=/k$/i.test(s);const n=Number(s.replace(/k$/i,""));return n>0&&isFinite(n)?Math.round(n*(k?1000:1)):0}
+function v26Amt(s){s=String(s||"").replace(/[\s$,]/g,"");const k=/k$/i.test(s);const n=Number(s.replace(/k$/i,""));return n>0&&isFinite(n)?Math.round(n*(k?1000:1)*100)/100:0}
 const V26ASK={ok:["Is it written and itemized (labor, materials, permit)?","Who pulls the permit, and is cleanup and haul-away included?","Is the pro licensed and insured for this work, and when do those expire?"],
  hi:["What's in it that a standard job wouldn't have (brand, size, extra work)?","Can they split labor and materials so you can compare line by line?","A second or third quote is the easiest check. Sawyer gets you up to 3, free."],
  lo:["Are materials, permits and disposal in the price?","How much is due before work starts? Avoid paying most of it up front.","Is the pro licensed and insured? Very low bids sometimes skip both."]};
@@ -25,7 +25,7 @@ function v26Out(k,urg,amt,zip){const r=v26Range(k,urg,zip),town=townOf(zip),a=v2
  const max=Math.max(r.high*2.3,a*1.08),pc=n=>Math.max(0,Math.min(100,n/max*100)).toFixed(1);
  const asks=V26ASK[f.k==="hi2"?"hi":f.k]||V26ASK.ok,t=v26TradeOf(v26Key(k)),sub=v26Key(k)!==t?v26Key(k):"";
  return head+`<div class="v26q-m" aria-hidden="true"><i style="left:${pc(r.low)}%;width:${(pc(r.high)-pc(r.low)).toFixed(1)}%"></i><em class="v26q-${f.k}" style="left:${pc(a)}%"></em></div>
-  <p class="v26q-v"><span class="v26q-c v26q-${f.k}">${I(f.k==="ok"?"check":"info",13)}${esc(f.t)}</span><span>Your quote: <b>${money(a)}</b>. ${esc(f.tip)}</span></p>
+  <p class="v26q-v"><span class="v26q-c v26q-${f.k}">${I(f.k==="ok"?"check":"info",13)}${esc(f.t)}</span><span>Your quote: <b>${v28$(a)}</b>. ${esc(f.tip)}</span></p>
   <h3 class="v26q-h3">Ask before you hire</h3><ul class="v26q-l">${asks.map(x=>`<li>${I("check",14)}<span>${esc(x)}</span></li>`).join("")}</ul>
   <div class="v26q-a"><a class="btn primary" href="${href("post",null,Object.assign({cat:t},sub?{sub}:{}))}">Get up to 3 quotes, free</a><small>Pros on Sawyer pay no lead fees, so nobody pays to reach you and your number stays private.</small></div>`}
 function v26Card(q,zip){const k=v26Key(V26Q.k||q.qc),u=EST_URG[V26Q.u||q.qu]?(V26Q.u||q.qu):"soon",a=V26Q.a||"";
