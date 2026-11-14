@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.10.0
+# Sawyer (beta) — v2.11.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.10.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.11.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,17 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v28: new-work notices, quotes with cents, a dated comparison
+Builds on v27 (live as `cae7316`).
+- **"New job in your area" (in-app, no email yet).** When a customer posts a job that matches a pro's trade or a service they list, inside their service radius, that pro gets a bell notice "New job in your area: <title>" that opens the job. The dashboard's "New jobs in your area" card says how many matching jobs were posted since the pro's last dashboard visit ("2 new since your last visit") and tags those cards **New**; jobs the pro already quoted or marked interest in don't count. The last-visit time (`jobsSeen28`, set by the pro-only `seenJobs28` action) is in `PRO_PRIVATE`, so it never reaches other users, signed-out `/api/state` or prerendered HTML; notices go only to that pro. Code: `src/v28.js`, `src/v28.css`.
+- **SW-061: quotes from an Office estimate keep the cents.** Picking an estimate sets the price to the exact estimate total (for example 308.51, not 309), the picker label shows cents, and the note lists line items, subtotal, tax and total that add up to that price (optional add-ons are marked "not in the price"). Cards read "You quoted $308.51".
+- **SW-062: one tap, one quote, one toast.** The two-tap quote sheet and the job-page quote modal disable Send on the first submit and ignore a second tap or Enter while it's sending; Send comes back only if the price was refused.
+- **"Set a starting price" means a price.** The Finish-your-profile step is done only when at least one service has a from-price above $0; blank or $0 rows keep it open with a note.
+- **/jobs SEO parity (66 → 69 target).** The signed-out job board header (prerendered too) has a small labeled stock photo (Pexels carpenter, credited on `/credits`; lazy, width/height set, fixed box, no layout shift). Signed-in pros don't see it.
+- **Dated, hedged "How Sawyer compares" table** (/pros, /pricing, dashboard): "checked November 2026" in the caption and a visible note; exact third-party prices replaced with "pay per lead, varies" style wording. Sawyer's own terms stay exact.
+- Tests: `node test/v28-e2e.js` (self-contained, incl. privacy of the new-work data) is part of `test/run-all.sh`. `e2e` now expects the `package.json` version and `v27-e2e` accepts any Sawyer version / SW cache name.
 
 
 ## v27: a pipeline for pros, no second signup, Thumbtack vs Jobber

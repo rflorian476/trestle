@@ -23,7 +23,7 @@ const toasts=p=>p.evaluate(()=>[...document.querySelectorAll("#toasts .toast")].
 // Covers: /join for a signed-in pro (server 302 + in-app) and the dashboard "Finish your profile" guided flow; the job board
 // as a pipeline (why it fits, distance, spots left, two-tap quote, Office-estimate prefill); "not hired" notices with the
 // owner's optional reason (visible only to that pro); /pros Thumbtack and Jobber columns; the /prices labeled example photo
-// (SEO image-alt parity); health 2.10.0-sawyer and SW cache sawyer-v27.
+// (SEO image-alt parity); health and SW cache (any Sawyer version, checked exactly in the current release suite).
 let LOCAL=null,PUB=null,br=null;
 const pre=h=>(h.match(/<div id="pre11">[\s\S]*$/)||[""])[0].replace(/<script[\s\S]*?<\/script>/g,"");
 const login=async(port,email,pw)=>{const r=await req(port,"POST","/api/login",JH,J({email,password:pw||"sawyer-demo-2026"}));return {ck:(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0],st:(r.json&&r.json.state)||{}}};
@@ -37,8 +37,8 @@ const act=async(port,ck,name,args)=>{const r=await req(port,"POST","/api/act",Ob
  const page=async(w,js,cookie,S)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},javaScriptEnabled:js!==false});
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:(S||LOCAL).B}])}
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.10.0-sawyer","healthz reports 2.10.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v27"/.test(sw.body),"service worker cache is sawyer-v27");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
 
  // ===== 1. /join for a signed-in pro + guided setup =====
  const pro=await login(LOCAL.port,"demo-pro@sawyer.test"),ho=await login(LOCAL.port,"demo-homeowner@sawyer.test");
