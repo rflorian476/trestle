@@ -505,6 +505,8 @@ const server=http.createServer(async(req,res)=>{
    if(v==="pro"){const pm=/^\/pro\/([A-Za-z0-9_-]{1,40})\/?$/.exec(p);if(pm){const html=SEO_PAGE(req,"p",pm[1]);if(html)return sendHtml(res,req,200,html)}}
    if(v==="job"||v==="compare"){const jm=/^\/(?:job|compare)\/([\w.%~@+-]{1,120})\/?$/.exec(p);let jid=null;try{jid=jm&&decodeURIComponent(jm[1])}catch(e){}
     const j=jid&&(DB().jobs||[]).find(x=>x.id===jid);if(j){const html=withMeta(req,{title:jobTitle(v,j),desc:v==="compare"?"Compare bids side by side: price, timing, reviews and license, on Sawyer.":`${j.cat?j.cat+" job":"Job"} on Sawyer. Local pros quote free, and the customer compares bids side by side.`,path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="job"?preJob(req,html,j.id):html)}}
+   // v27: a signed-in pro opening /join goes to the dashboard setup flow, not a second (blank) signup wizard
+   if(v==="join"){const su=sessionUid(req);const su_=su&&(DB().users||[]).find(x=>x.id===su);if(su_&&su_.role==="contractor"){res.writeHead(302,{Location:"/dash?setup=1","Cache-Control":"no-store"});return res.end()}}
    if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:TITLE(v,(/^\/[a-z0-9]{2,20}\/([^/?]{1,120})/.exec(p)||[])[1]||null),desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="prices"?prePrices(req,html):v==="find"&&/^\/find\/?$/.test(p)?preFind(req,html,url.search):html)}
    return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/\">Go to the home page</a></p>")}
   return send(res,404,{error:"Not found"})}
