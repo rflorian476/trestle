@@ -114,3 +114,15 @@ function v27Vs(){return`<section class="wrap sec v27vs" id="vs"><span class="eye
  <p class="muted small v27vs-n">From each company's public pages, checked November 2026. Plans and features change, so check their sites for current details. Thumbtack and Jobber are trademarks of their owners; Sawyer isn't affiliated with either.</p></div></section>`}
 {const ov=VIEWS.pros;VIEWS.pros=function(){let h=ov.apply(this,arguments);try{const k=h.indexOf('<section class="wrap t5pros');if(k>=0)return h.slice(0,k)+v27Vs()+h.slice(k);
   const e=h.indexOf('<section class="v7cmp"');return e>=0?h.slice(0,e)+v27Vs()+h.slice(e):h+v27Vs()}catch(e){return h}}}
+
+/* (4) /prices SEO parity. Lighthouse's image-alt audit doesn't apply to a page with no images, so the beta noindex weighed
+   more on /prices (66 vs 69 elsewhere, the same cause as /job in v24). The quote check now carries a small, labeled real
+   photo of the kind of work picked (an example photo, never a pro's portfolio), which also helps people see what they're
+   pricing. It follows the job picker. noindex stays until SAWYER_INDEXABLE=1. */
+function v27QcPic(k){try{const t=v26TradeOf(v26Key(k));const sub=/water heater/i.test(k)?"/img/g-water-heater.webp":/ev charger|panel/i.test(k)?"/img/tr-panel.webp":"";
+  const src=(sub||(typeof v19ExList==="function"?v19ExList(t)[0]:"")||"/img/home-ext.webp").replace(/\.webp$/,"-sm.webp");
+  return{src,alt:"Example of "+(/^[A-Z]{2,}$/.test(t)?t:t.toLowerCase())+" work (stock photo)"}}catch(e){return{src:"/img/home-ext-sm.webp",alt:"Example of home repair work (stock photo)"}}}
+{const ov=VIEWS.prices;VIEWS.prices=function(p,q){let h=ov.apply(this,arguments);try{q=q||{};const k=v26Key(V26Q.k||q.qc),ph=v27QcPic(k);
+  return h.replace('<div class="v26q-hd">',()=>`<div class="v26q-hd"><img class="v27qc-ph" id="v27qcPh" src="${ph.src}" alt="${esc(ph.alt)}" width="400" height="300" loading="lazy" decoding="async">`)}catch(e){return h}}}
+{const oa=AFTER.prices;AFTER.prices=function(){const r=oa&&oa.apply(this,arguments);try{const j=document.getElementById("v26qj"),im=document.getElementById("v27qcPh");
+  if(j&&im)j.addEventListener("change",()=>{const ph=v27QcPic(j.value);if(im.getAttribute("src")!==ph.src){im.src=ph.src;im.alt=ph.alt}})}catch(e){}return r}}

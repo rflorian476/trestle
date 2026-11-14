@@ -47,3 +47,6 @@
  .v27vs-t tr{padding:12px 14px;border-bottom:1px solid var(--line)}.v27vs-t tbody th,.v27vs-t td{border:0;padding:4px 0}.v27vs-t tbody th{font-size:15px;margin-bottom:4px}
  .v27vs-t td{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;padding:6px 8px;border-radius:8px}.v27vs-t td::before{content:attr(data-l);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
  .v27vs-t td.us::before{color:#AE4718}.v27vs-t td.us svg{display:none}}
+/* v27: labeled example photo on the /prices quote check */
+.v27qc-ph{float:right;width:112px;height:84px;object-fit:cover;border-radius:12px;margin:0 0 8px 14px;background:#ECE7DC}
+@media(max-width:640px){.v27qc-ph{width:84px;height:63px}}
