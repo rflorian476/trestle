@@ -4426,5 +4426,24 @@ function v27HireModal(jid,u,after){modal(`<div class="v27q"><h2 id="mtitle">Hire
   const box=`<div class="callout v27nh" id="v27nh">${I("info",20)}<div><b>You weren't hired this time.</b> The customer hired another pro${j.hiredAt?" "+ago(j.hiredAt):""}. No lead fee was charged.${q&&q.why?`<span class="v27why">Their note: “${esc(q.why)}”</span>`:""}<div class="v27nh-a"><a class="btn sm" href="${href("jobs",null,{cat:j.cat})}">See open ${esc(j.cat)} jobs</a></div></div></div>`;
   const re=/<div class="callout">(?:<svg[\s\S]*?<\/svg>)?<div>This job has been filled\.<\/div><\/div>/;return re.test(h)?h.replace(re,box):h}catch(e){return h}}}
 
+/* (3) "Is Sawyer like Thumbtack or like Jobber?" Pros ask both. /pros now compares the two side by side with Sawyer:
+   a lead marketplace (Thumbtack: pay per lead, often several pros on a request) and field-service software (Jobber:
+   quotes, scheduling and invoicing, no built-in lead marketplace, monthly plans above $20). General, factual claims from
+   each company's public pages (checked Nov 2026); the one price cited is hedged and dated. */
+const V27VS=[
+ ["What it is","A marketplace for finding work, plus the office tools to run it","A marketplace where customers find and contact pros","Software to run a service business: quotes, scheduling, invoices"],
+ ["How new customers find you","Homeowners post jobs and search; you quote from the job board","Customers find you in search and reach out","No built-in lead marketplace. You bring your own customers"],
+ ["What a lead costs","$0. No lead fees, no credits","You pay per lead, at a price you set inside a weekly budget","Nothing to buy, because it doesn't sell leads"],
+ ["Pros per request","At most 3","Customers often contact several pros","Not a marketplace"],
+ ["Quotes, invoices, records","Included (The Office: estimates, invoices, expenses, timesheets, documents)","Focused on leads and messaging, not a full back office","Yes. That's the core product"],
+ ["Monthly price","$20/mo flat. Founding pros get 3 months free","No membership fee; you pay for leads instead","Monthly plans priced above $20 (Core lists from $29/mo billed annually, Nov 2026)"]];
+function v27Vs(){return`<section class="wrap sec v27vs" id="vs"><span class="eyebrow">${I("target",14)} Thumbtack or Jobber?</span><h2>A lead marketplace and an office app, at one flat price</h2>
+ <p class="muted">Pros ask us whether Sawyer is like Thumbtack or like Jobber. It's both: the jobs come to you without lead fees, and the quoting and billing tools are built in.</p>
+ <div class="card v27vs-c"><table class="v27vs-t"><caption class="sr">Sawyer compared with Thumbtack and Jobber</caption><thead><tr><th scope="col"><span class="sr">Question</span></th><th scope="col" class="us">Sawyer</th><th scope="col">Thumbtack</th><th scope="col">Jobber</th></tr></thead>
+ <tbody>${V27VS.map(([k,a,b,c])=>`<tr><th scope="row">${esc(k)}</th><td class="us" data-l="Sawyer">${I("check",14)}<span>${esc(a)}</span></td><td data-l="Thumbtack"><span>${esc(b)}</span></td><td data-l="Jobber"><span>${esc(c)}</span></td></tr>`).join("")}</tbody></table>
+ <p class="muted small v27vs-n">From each company's public pages, checked November 2026. Plans and features change, so check their sites for current details. Thumbtack and Jobber are trademarks of their owners; Sawyer isn't affiliated with either.</p></div></section>`}
+{const ov=VIEWS.pros;VIEWS.pros=function(){let h=ov.apply(this,arguments);try{const k=h.indexOf('<section class="wrap t5pros');if(k>=0)return h.slice(0,k)+v27Vs()+h.slice(k);
+  const e=h.indexOf('<section class="v7cmp"');return e>=0?h.slice(0,e)+v27Vs()+h.slice(e):h+v27Vs()}catch(e){return h}}}
+
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};

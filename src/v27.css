@@ -34,3 +34,16 @@
 .v27nh-ic{width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;background:#ECE7DC;color:#1B3A5B}
 @media(max-width:640px){.v27p{padding:10px 14px 12px}.v27p-a{width:100%}.v27p-a .btn{flex:1;justify-content:center}.v27q-row{grid-template-columns:1fr}}
 #v27hoF[hidden]{display:none!important}
+/* v27: /pros Sawyer vs Thumbtack vs Jobber */
+.v27vs h2{margin:6px 0 6px}.v27vs>p.muted{max-width:760px;margin:0 0 16px}
+.v27vs-c{padding:6px 0 0;overflow:hidden}
+.v27vs-t{width:100%;border-collapse:collapse;font-size:14.5px;table-layout:fixed}
+.v27vs-t th,.v27vs-t td{padding:12px 16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+.v27vs-t thead th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.v27vs-t thead th.us{color:#AE4718}.v27vs-t tbody th{width:22%;color:#0F2A44;font-weight:700}
+.v27vs-t td.us{background:#FBF8F2;color:#0F2A44;font-weight:600}.v27vs-t td.us svg{color:#1C5E3C;margin-right:6px;vertical-align:-2px}
+.v27vs-n{padding:10px 16px 14px;margin:0}
+@media(max-width:760px){.v27vs-t,.v27vs-t tbody,.v27vs-t tr,.v27vs-t th,.v27vs-t td{display:block;width:auto!important}.v27vs-t thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+ .v27vs-t tr{padding:12px 14px;border-bottom:1px solid var(--line)}.v27vs-t tbody th,.v27vs-t td{border:0;padding:4px 0}.v27vs-t tbody th{font-size:15px;margin-bottom:4px}
+ .v27vs-t td{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;padding:6px 8px;border-radius:8px}.v27vs-t td::before{content:attr(data-l);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+ .v27vs-t td.us::before{color:#AE4718}.v27vs-t td.us svg{display:none}}
