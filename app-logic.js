@@ -2010,7 +2010,11 @@ function oTemplates(m,q){const inv=v7Mine("bills",m).filter(b=>b.type==="inv"&&b
 /* v31 (SW-066): one CSV cell escaper for every export. A value that starts with = + - @ tab or CR (a spreadsheet formula
    trigger) gets a leading ' and is quoted, so Excel / Sheets show it as text; plain numbers such as -12.50 stay numbers.
    Values with a quote, comma or line break are quoted as before. force=true always quotes. */
-function csvCell(v,force){let s=v==null?"":String(v),f=!!force;if(/^[=+\-@\t\r]/.test(s)&&!/^[+-]?\d+(\.\d+)?$/.test(s)){s="'"+s;f=true}return f||/[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+/* v32: defense in depth. A trigger (= + - @ tab CR, or a fullwidth / small-form lookalike) also counts when a BOM, zero-width
+   space or whitespace (spaces, newlines) comes before it. Plain numbers (optionally signed, after that same padding) stay numeric. */
+function csvCell(v,force){let s=v==null?"":String(v),f=!!force;const t=s.replace(/^[\ufeff\u200b\u200c\u200d\u2060\s]+/,"");
+ if(/^[\t\r]/.test(s)&&!/^[+-]?\d+(\.\d+)?$/.test(s)||/^[=+\-@\uff1d\uff0b\uff0d\uff20\ufe66\ufe62\ufe63\ufe6b]/.test(t)&&!/^[+-]?\d+(\.\d+)?$/.test(t)){s="'"+s;f=true}
+ return f||/[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 function v7CSV(rows){return rows.map(r=>r.map(v=>csvCell(v)).join(",")).join("\r\n")}
 function v7Download(name,txt){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
 function oExport(m,kind){const bs=v7Mine("bills",m).filter(b=>b.type==="inv"&&b.status!=="void"),led=v7Mine("ledger",m),d=v7Today();
