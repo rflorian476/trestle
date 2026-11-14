@@ -128,6 +128,17 @@ const act=async(port,ck,name,args)=>{const r=await req(port,"POST","/api/act",Ob
   ok(/t-roofing-sm\.webp$/.test(r.src)&&r.alt==="Example of roofing work (stock photo)",w+" photo follows the job picker (roofing)",J(r));
   await p.fill("#v26qa","1500");await p.waitForTimeout(60);ok(/Your quote: \$1,500/.test(await p.textContent("#v26qO")),w+" quote check still works with the photo");await p.context().close()}
 
+ // ===== 6. perf: signed-out /pros and /jobs arrive prerendered (heading paints before the app JS) =====
+ for(const S of [LOCAL,PUB])for(const v of ["pros","jobs"]){const r=await req(S.port,"GET","/"+v);const h=pre(r.body);
+  ok(r.status===200&&/<div id="pre11">/.test(r.body)&&(h.match(/<h1[\s>]/g)||[]).length===1&&!/<link rel="preload" href="\/js\//.test(r.body),(S===PUB?"public":"local")+" signed-out /"+v+" is prerendered (one H1, app JS not preloaded)",r.status);
+  ok(!/@sawyer\.test|swsid|"me":"/.test(h),(S===PUB?"public":"local")+" /"+v+" prerender has no account data")}
+ {const r=await req(LOCAL.port,"GET","/jobs",{Cookie:pro.ck});ok(!/<div id="pre11">/.test(r.body),"signed-in /jobs is not prerendered");
+  const q=await req(LOCAL.port,"GET","/jobs?cat=Plumbing");ok(!/<div id="pre11">/.test(q.body),"/jobs with a query is not prerendered")}
+ for(const v of ["pros","jobs"])for(const w of [1440,390]){const p=await page(w);await p.addInitScript(()=>{window.__cls=0;try{new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)window.__cls+=e.value}).observe({type:"layout-shift",buffered:true})}catch(e){}});
+  await p.goto(LOCAL.B+"/"+v,{waitUntil:"networkidle"});await p.waitForFunction(()=>!document.getElementById("pre11"));await p.waitForTimeout(300);
+  const o=await p.evaluate(()=>({h1:document.querySelectorAll("h1").length,cls:window.__cls,ow:document.documentElement.scrollWidth>innerWidth+1}));
+  ok(o.h1===1&&o.cls<0.1&&!o.ow,w+" /"+v+" hydrates in place (one H1, CLS < 0.1, no overflow)",J(o));await p.context().close()}
+
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);await stopApp(PUB)}
  console.log(failed?"FAIL v27-e2e: "+failed+" failed":"PASS v27-e2e: all checks passed");process.exit(failed?1:0)})();

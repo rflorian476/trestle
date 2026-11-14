@@ -258,6 +258,19 @@ function prePrices(req,h){if(sessionUid(req)||!PRE_TOP)return h;const body=price
  const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
+// v27 perf: signed-out /pros and /jobs get the same treatment as /prices: the real page (rendered by the same VIEWS.<view>
+// the browser runs, from the public signed-out snapshot only) plus the site header inside <main>, so the heading paints
+// before the app JS. Without it the mobile Lighthouse LCP (the hero subtitle) waits on the app bundle and lands near 3.6 s.
+let PRE_VIEW={v:-1,m:new Map()};const PRE_VIEWS=new Set(["pros","jobs"]);
+function viewHtml(v){if(PRE_VIEW.v!==VER)PRE_VIEW={v:VER,m:new Map()};if(PRE_VIEW.m.has(v))return PRE_VIEW.m.get(v);const save=api.DB;let h=null;
+ try{if(PRE_VIEWS.has(v)&&api.VIEWS&&api.VIEWS[v]){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
+  const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
+  const out=String(api.VIEWS[v](null,{})||"");if(out&&!/<script/i.test(out)&&(out.match(/<h1[\s>]/g)||[]).length===1)h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out)}}
+ catch(e){h=null}finally{api.DB=save}PRE_VIEW.m.set(v,h);return h}
+function preView(req,h,v){if(sessionUid(req)||!PRE_TOP)return h;const body=viewHtml(v);if(!body)return h;
+ const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
+ h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
+ return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 // v22 perf: signed-out /find gets the same treatment as /prices: the real search results (rendered by the same VIEWS.find
 // the browser runs, from the public snapshot, with the same query) and the site header inside <main>, so the page paints
 // before the app JS. Cached per query string and data version; the app re-renders it in place when it mounts.
@@ -507,7 +520,7 @@ const server=http.createServer(async(req,res)=>{
     const j=jid&&(DB().jobs||[]).find(x=>x.id===jid);if(j){const html=withMeta(req,{title:jobTitle(v,j),desc:v==="compare"?"Compare bids side by side: price, timing, reviews and license, on Sawyer.":`${j.cat?j.cat+" job":"Job"} on Sawyer. Local pros quote free, and the customer compares bids side by side.`,path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="job"?preJob(req,html,j.id):html)}}
    // v27: a signed-in pro opening /join goes to the dashboard setup flow, not a second (blank) signup wizard
    if(v==="join"){const su=sessionUid(req);const su_=su&&(DB().users||[]).find(x=>x.id===su);if(su_&&su_.role==="contractor"){res.writeHead(302,{Location:"/dash?setup=1","Cache-Control":"no-store"});return res.end()}}
-   if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:TITLE(v,(/^\/[a-z0-9]{2,20}\/([^/?]{1,120})/.exec(p)||[])[1]||null),desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="prices"?prePrices(req,html):v==="find"&&/^\/find\/?$/.test(p)?preFind(req,html,url.search):html)}
+   if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:TITLE(v,(/^\/[a-z0-9]{2,20}\/([^/?]{1,120})/.exec(p)||[])[1]||null),desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="prices"?prePrices(req,html):v==="find"&&/^\/find\/?$/.test(p)?preFind(req,html,url.search):PRE_VIEWS.has(v)&&/^\/[a-z]+\/?$/.test(p)&&!url.search?preView(req,html,v):html)}
    return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/\">Go to the home page</a></p>")}
   return send(res,404,{error:"Not found"})}
  if(req.method==="POST"&&p==="/api/upload")return upload(req,res);
