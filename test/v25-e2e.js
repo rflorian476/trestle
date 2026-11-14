@@ -36,8 +36,8 @@ const login=async(port,email)=>{const r=await req(port,"POST","/api/login",JH,J(
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:LOCAL.B}])}
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));
   await p.addInitScript(()=>{window.__cls=0;try{new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)window.__cls+=e.value}).observe({type:"layout-shift",buffered:true})}catch(e){}});return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.8.0-sawyer","healthz reports 2.8.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v25"/.test(sw.body),"service worker cache is sawyer-v25");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
 
  // ===== 1. SW-058: founding-pro wording on the public job pitch =====
  for(const S of [LOCAL,PUB]){const tag=S===PUB?"public":"local";for(const id of ["j1","j2"]){const h=pre((await req(S.port,"GET","/job/"+id)).body);

@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.8.0
+# Sawyer (beta) — v2.9.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.8.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.9.0-sawyer"}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -20,6 +20,15 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
+
+
+## v26: check any quote, founding wording, private traveler calls
+Builds on v25 (live as `9308011`).
+- **Quote check on `/prices`.** "Got a quote? See if it's fair." Anyone with a quote in hand, from a pro on Sawyer or anywhere else, picks the job (every sub-trade with its own guide, such as water heaters or ice dam removal, plus "Other … job" per trade), when they need it and the quoted price. Sawyer shows the typical range near them and where the quote lands: **In typical range**, **Above typical**, **Well above typical** or **Well below typical** (the same sub-trade bases as public job pages, the same urgency and regional index, and the same conservative bands as the fair-price check on bids). Each result lists three questions to ask before hiring and a free "Get up to 3 quotes" link. It runs on the page only: the price is never saved, sent to the server or put in the URL. Code: `src/v26.js`, `src/v26.css`.
+- **From a public job page.** The homeowner card's second button is now **Check a quote you got**. It opens the quote check with that job's sub-trade (or trade), ZIP and urgency already picked, so the range matches the card (for example water heaters, within 48 hours, Austin). Trades without a guide keep "See the price guide".
+- **SW-059.** The `/signup` subtitle reads "Customers and PMs are free. Founding pros get 3 months free, then $20/mo." (it promised 3 free months to every pro). Every other 3-month line (pricing, FAQ, /pros, job pitch, plan cards) already sits with founding-pro wording; `v26-e2e` checks that on every public page.
+- **SW-060.** Signed-out `/api/state` traveler calls have `apps: []`: no applicant or hire is named. They carry counts only (`napps`, and new `nhired`), and the spots meter on `/travel` cards and `/t/<id>` uses the hired count, so it still reads "11 of 12 spots open" signed out (prerender and app). Signed-in non-owners still get the hired rows and their own application; owners see everything.
+- Tests: `node test/v26-e2e.js` (self-contained) is part of `test/run-all.sh`. `v25-e2e` now accepts any Sawyer version / SW cache name.
 
 
 ## v25: budget next to the guide, traveler calls paint first, reply times on Find
