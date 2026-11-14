@@ -4585,6 +4585,24 @@ function v30BindCmp(){const l=document.getElementById("v30cl"),c=document.getEle
  }catch(e){console.warn(e)}return h}}
 {const oa=AFTER.dash;AFTER.dash=function(){const r=oa&&oa.apply(this,arguments);try{v30BindCmp()}catch(e){}return r}}
 
+/* (2) Renewals on the dashboard: every license, insurance policy, bond, permit or wallet card that expires within 60 days
+   (or already has) is listed by name with the days left, expired ones first, so a pro or traveler sees it without opening
+   the Office. The bell reminders (60, 30 and 7 days out and on the day) keep working as before. The old one-line
+   "N docs need attention" item in "Here's what's next" is dropped when this card shows, so it isn't said twice. */
+function v30DocName(d){const k=((d.scope==="biz"?BIZ_KINDS:WALLET_KINDS).find(k=>k[0]===d.kind)||[,""])[1];if(d.scope!=="biz"&&k)return d.name&&d.name!==k?k+" · "+d.name:k;return d.name||k||"Document"}
+function v30Renew(m){if(!m)return[];return (DB.bdocs||[]).filter(d=>d&&d.by===m.id&&d.exp&&(d.scope==="biz"?v7Pro(m):true)).map(d=>({d,left:v7DaysTo(d.exp)})).filter(x=>x.left<=60).sort((a,b)=>a.left-b.left)}
+function v30RenewCard(m){const all=v30Renew(m);if(!all.length)return"";const ex=all.filter(x=>x.left<0).length,pro=v7Pro(m);
+ const li=all.slice(0,4).map(({d,left})=>{const bad=left<0,soon=left>=0&&left<=7;const when=bad?`Expired ${fmtD(d.exp)}`:left===0?`Expires today`:`Expires in ${left} day${left===1?"":"s"} · ${fmtD(d.exp)}`;
+  const link=d.scope==="biz"?href("office","compliance"):href("wallet");return`<li class="v30rn-${bad?"bad":soon?"soon":"warn"}"><a href="${link}"><span class="v30rn-i">${I("shield",16)}</span><span class="v30rn-t"><b>${esc(v30DocName(d))}</b><small>${esc(when)}</small></span><span class="v30rn-c">${bad?"Upload renewal":"Renew"}${I("chev",14)}</span></a></li>`}).join("");
+ const more=all.length>4?`<a class="v30rn-more" href="${pro?href("office","compliance"):href("wallet")}">+${all.length-4} more</a>`:"";
+ return`<section class="o7-wrap v30rn-w"><div class="card v30rn" id="v30renew" aria-labelledby="v30rnh"><div class="v30rn-h"><h2 id="v30rnh">${I("shield",18)} Renewals coming up</h2><span class="muted small">${ex?`${ex} expired · `:""}${all.length} in the next 60 days</span></div><ul class="v30rn-l">${li}</ul>${more}<p class="muted small v30rn-n">GCs and customers check these first. We also remind you in the bell 60, 30 and 7 days out and on the day.</p></div></section>`}
+{const on=v8Next;v8Next=function(m){const r=on.apply(this,arguments);try{if(v30Renew(m).length)return r.filter(x=>!/license or insurance doc/.test(x.title))}catch(e){}return r}}
+
+{const ov=VIEWS.dash;VIEWS.dash=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||m.staff||(typeof v12Staff==="function"&&v12Staff(m)))return h;
+  const rn=v30RenewCard(m);if(rn){const i=h.indexOf('<section class="na8"'),j=i<0?-1:h.indexOf("</section>",i);
+   if(j>0)h=h.slice(0,j+10)+rn+h.slice(j+10);else{const k=h.indexOf('<div class="v13-dtop">');h=k>=0?h.slice(0,k+22)+rn+h.slice(k+22):rn+h}}
+ }catch(e){console.warn(e)}return h}}
+
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
