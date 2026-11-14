@@ -4515,5 +4515,31 @@ COMPETE.splice(0,COMPETE.length,
  ["Yelp Ads","Free listing; ads are optional","Ads billed per click, budget varies","Anyone with a Yelp account"]);
 compareTable=function(){return`<div class="tablewrap"><table class="compare"><caption class="sr">How Sawyer compares, checked November 2026</caption><thead><tr><th scope="col">Platform</th><th scope="col">Membership</th><th scope="col">Lead fees</th><th scope="col">Who can review</th></tr></thead><tbody>${COMPETE.map((r,i)=>`<tr class="${i?"":"us"}"><th scope="row">${esc(r[0])}</th><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td></tr>`).join("")}</tbody></table><p class="muted small v28cmp-n">From each company's public pages, checked November 2026. Lead prices and fees vary by trade, area and plan, and they change, so check each company's site for current details. Trademarks belong to their owners; Sawyer isn't affiliated with them.</p></div>`};
 
+/* (6) In-app new-work notice for pros (email comes later). When a customer posts a job that matches a pro's trade or a
+   service they list, inside their service radius, that pro gets a bell notice "New job in your area: <title>" linking
+   to the job. The dashboard's "New jobs in your area" card counts the matching jobs posted since the pro's last
+   dashboard visit and tags them "New". The last-visit time is private to the pro (never in another user's state,
+   signed-out /api/state or prerendered HTML), and notices go only to that pro. */
+const V2_ACTIONS28=["seenJobs28"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS28);
+function v28Fits(j,u){if(!j||!u||u.role!=="contractor"||u.staff||j.cust===u.id)return false;const sub=j.sub&&(u.subs||[]).includes(j.sub);if(j.cat!==u.trade&&!sub)return false;return dist(u.zip,j.zip)<=(+u.radius||0)}
+function v28NoteText(j){return"New job in your area: "+j.title+(j.urgent?" (urgent)":"")}
+{const op=A.postJob;A.postJob=function(o){const before=DB.notifs.length;const r=op.apply(this,arguments);if(!r||!r.ok||!r.id)return r;try{const j=DB.jobs.find(x=>x.id===r.id);if(!j)return r;const told=new Set();
+  DB.notifs.slice(before).forEach(n=>{if(n.link==="job:"+j.id&&/^New (URGENT )?job near you: /.test(n.text)){const u=U(n.to);if(u&&v28Fits(j,u)){n.text=v28NoteText(j);n.kind28="newjob";told.add(n.to)}}});
+  PROS().forEach(u=>{if(!told.has(u.id)&&u.role==="contractor"&&v28Fits(j,u)&&!DB.notifs.slice(before).some(n=>n.to===u.id&&n.link==="job:"+j.id&&/^New /.test(n.text))){notify(u.id,v28NoteText(j),"job:"+j.id);const n=DB.notifs[DB.notifs.length-1];if(n)n.kind28="newjob";told.add(u.id)}});
+  save()}catch(e){}return r}}
+A.seenJobs28=function(){const m=me();if(!m||m.role!=="contractor")return{ok:false,msg:"Pros only"};m.jobsSeen28=Date.now();save();return{ok:true}};
+let V28BASE=null;
+function v28Base(m){if(!V28BASE||V28BASE.uid!==m.id)V28BASE={uid:m.id,t:+m.jobsSeen28||Math.max(+m.joined||0,Date.now()-14*864e5),marked:false};return V28BASE.t}
+function v28NewJobs(m){const t=v28Base(m);return DB.jobs.filter(j=>j.status==="posted"&&!j.hired&&(+j.created||0)>t&&v28Fits(j,m)&&!(j.interested||[]).includes(m.id)&&!DB.quotes.some(q=>q.job===j.id&&q.cid===m.id))}
+{const ov=VIEWS.dash;VIEWS.dash=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||m.role!=="contractor"||m.staff)return h;const nj=v28NewJobs(m),n=nj.length;
+  const a='<div class="ud-h"><h2>New jobs in your area</h2>';const k=h.indexOf(a);if(k<0)return h;
+  const badge=n?`<p class="v28new" id="v28new" role="status">${I("bell",14)}<b>${n} new</b> since your last visit</p>`:`<p class="v28new v28new-0" id="v28new" role="status">${I("check",14)}Nothing new since your last visit</p>`;
+  const e=h.indexOf("</div>",k);if(e<0)return h;h=h.slice(0,e+6)+badge+h.slice(e+6);
+  // tag the new cards ("New" chip on the pipeline strip)
+  nj.forEach(j=>{const at=h.indexOf('href="'+href("job",j.id)+'"');if(at<0)return;const st=h.lastIndexOf('<article class="v27jc',at);if(st<0||h.indexOf("</article>",st)<at)return;
+   const c=st+'<article class="v27jc'.length;h=h.slice(0,c)+" v28isnew"+h.slice(c);const u='<ul class="v27p-f" aria-label="Why this job fits">',ui=h.indexOf(u,at);const end=h.indexOf("</article>",at);
+   if(ui>=0&&ui<end)h=h.slice(0,ui+u.length)+'<li class="v28tag">New</li>'+h.slice(ui+u.length)})}catch(e){}return h}}
+{const oa=AFTER.dash;AFTER.dash=function(){const r=oa&&oa.apply(this,arguments);try{const m=me();if(m&&m.role==="contractor"&&!m.staff&&V28BASE&&V28BASE.uid===m.id&&!V28BASE.marked){V28BASE.marked=true;setTimeout(()=>{try{A.seenJobs28()}catch(e){}},600)}}catch(e){}return r}}
+
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};

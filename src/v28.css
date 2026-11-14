@@ -2,3 +2,9 @@
 /* v28: labeled stock photo in the /jobs header (SEO image-alt parity with /prices) */
 .v28jb-ph{float:right;position:relative;z-index:1;width:132px;height:99px;object-fit:cover;border-radius:12px;margin:0 0 6px 18px;background:#ECE7DC;border:2px solid rgba(255,255,255,.85)}
 @media(max-width:640px){.v28jb-ph{width:84px;height:63px;margin-left:12px}}
+/* v28: new jobs since the last dashboard visit */
+.v28new{display:flex;gap:7px;align-items:center;margin:-4px 0 12px;padding:8px 12px;border-radius:12px;background:#EEF3F8;color:#1B3A5B;font-size:14px}
+.v28new svg{flex:none;color:#AE4718}.v28new b{color:#0F2A44}
+.v28new.v28new-0{background:transparent;padding:0 2px;color:var(--muted);font-size:13px}.v28new.v28new-0 svg{color:#1C5E3C}
+.v27jc.v28isnew{border-color:#9DB4CC;box-shadow:0 0 0 3px rgba(27,58,91,.07),var(--shadow)}
+.v27p-f li.v28tag{background:#AE4718;color:#fff;font-weight:700;font-size:12px;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:99px}
