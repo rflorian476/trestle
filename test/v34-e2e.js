@@ -4,7 +4,7 @@
 // at start), SW-073 (a leftover with pm:null is tidied at boot), SW-074 (staffed owner-delete also clears 'New crew opening'
 // notices for pros who are not crew or applicants), SW-075 (demo GET /api/account/export is 403), persistence readiness
 // (healthz storage flags, boot warnings, DATA_DIR checks including RENDER=true workdir mounts, render.yaml/README), the
-// 'This beta resets' note, 'Export my data' on the delete screen, health 2.17.0-sawyer and SW cache sawyer-v34.
+// 'This beta resets' note, 'Export my data' on the delete screen, health and SW cache (any Sawyer version since v35).
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
 const {chromium}=require("playwright");
@@ -34,8 +34,8 @@ const sigCk=r=>(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0]
 let LOCAL=null,br=null;
 (async()=>{try{
  LOCAL=await startApp(await freePort());const P=()=>LOCAL.port;
- const hz0=(await req(P(),"GET","/healthz")).json||{};ok(hz0.v==="2.17.0-sawyer","healthz reports 2.17.0-sawyer",J(hz0));
- {const sw=await req(P(),"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v34"/.test(sw.body),"service worker cache is sawyer-v34 (client assets changed)")}
+ const hz0=(await req(P(),"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz0.v),"healthz reports a Sawyer version",J(hz0));
+ {const sw=await req(P(),"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker has a Sawyer cache name")}
  const run=Math.random().toString(36).slice(2,8);
  const signupPro=async(tag,trade,zip)=>{const r=await req(P(),"POST","/api/signup",JH,J({kind:"pro",password:"v34-correct-horse",data:{name:"Vee "+tag,biz:"V34 "+tag+" "+run,email:"v34-"+tag+"-"+run+"@example.com",trade:trade||"Plumbing",zip:zip||"78704",phone:"5125550100",plan:"founding"}}));return{ck:sigCk(r),id:stateOf(r).me}};
  const signupHo=async(tag)=>{const r=await req(P(),"POST","/api/signup",JH,J({kind:"customer",password:"v34-correct-horse",data:{name:"Hana "+tag,email:"v34-ho-"+tag+"-"+run+"@example.com",zip:"78704"}}));return{ck:sigCk(r),id:stateOf(r).me}};

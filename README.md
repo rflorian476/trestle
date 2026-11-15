@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.17.0
+# Sawyer (beta) — v2.18.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.17.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.18.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -21,6 +21,15 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v35: a price book, who owes you, lead filters, check your check
+
+- **Price book** (Office → **Price book**). Pros save what they sell at their own price (name, price, per each / hour / job / ft …, category) once, and tap it into any estimate, invoice or change order. **Add from your past invoices** builds it from priced lines already sent (latest price, how often used). Items used on a saved bill rise to the top; the bill editor's **Quick add** chips are the pro's own top 4 (the old fixed chips stay until the book has items), **Price book** opens a searchable picker, and typing a saved name fills its rate. Up to 300 items. The Office backup ZIP adds `price-book.csv` (formula-safe). Private to the pro (`pb35`). The demo pro has 9 seeded items.
+- **Who owes you** (top of Office → Invoices). Open balances by how late they are (not due yet, 1–30, 31–60, 61–90, 90+ days), a colored bar, and one row per customer with the oldest late invoice. **Statement** lists that customer's open invoices (total, paid, balance, days late) and offers **Send in Sawyer** (the customer gets "… sent you a statement: $X open on N invoices" and a `/statement/<pro id>` page with a Pay button per invoice; payments stay in test mode), **Copy text** and a **CSV**. One statement per customer per 24 hours, only for customers on Sawyer with open invoices, checked on the server (`stmt35`).
+- **Lead filters** (pro dashboard, under New jobs in your area, and on `/jobs`). How far (inside the service radius), smallest job by posted budget ($250 … $5,000+), include jobs with no budget, include urgent jobs, and the trade's job types to skip. A job outside them rings no "New job" bell (so no phone alert) and doesn't count as new; on the dashboard and `/jobs` it stays visible with "Outside your filters: budget under $500". Per-unit budgets ("$150 per turn") aren't compared. Private to the pro (`lf35`); **Turn off** clears them.
+- **Check your check** (traveling electricians, on a call they were hired on). Log hours by day (number pad, **Fill 6×10s** from the posting, quarter hours). Sawyer works out what the week should pay from the posted terms: straight time and OT at 1.5× after 40 hours a week (or after 8 a day and 40 a week), and per diem by its posted unit (7 days a week, or days worked). Type the stub's gross wages and per diem and it says **Matches the posting**, **Short $X** or **$X more**, split into wages and per diem. **Message <contractor>** pre-fills a polite summary through Sawyer; **Download hours (CSV)**; **Recent weeks** lists the last 4. A week before the posted start date says so. The traveler dashboard links to it. Private to the traveler (`tlog35`). It checks the math against the posting; it isn't payroll or tax advice. The demo traveler has last week logged with a stub $230 short.
+- **SW-076: invoice editor numbers.** The legacy `.num` step badge (absolute, 2.4rem, pale) leaked into the Office invoice editor, so the "Amount" header and each line's amount floated to the top-right of the page. Office and invoice pages now show them in place (v9 fixed the same leak for tables).
+- Tests: `node test/v35-e2e.js [shots dir]` (self-contained) is part of `test/run-all.sh`. `v34-e2e` now accepts any Sawyer version / SW cache name. SW cache is `sawyer-v35`. Code: `src/v35.js`, `src/v35.css`.
 
 ## v34: deleted accounts leave no listings, wipe detection, a plain beta note, export before you delete
 
