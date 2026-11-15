@@ -30,7 +30,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // 60-day window, no duplicate What's-next item, private), per-trade fill on project managers' dashboard project cards,
 // the tax-year CSV's invoice register, health and SW cache (any Sawyer version, checked exactly in the current release suite).
 let LOCAL=null,br=null;
-const dayISO=n=>{const d=new Date(Date.now()+n*864e5);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const dayISO=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
 (async()=>{try{
  LOCAL=await startApp(await freePort(),{});
  br=await chromium.launch();
