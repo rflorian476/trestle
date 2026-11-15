@@ -139,6 +139,8 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
   ok(fer&&dump&&mi&&hd,"four ledger rows are logged");
   for(const bad of ["-5","\u22125","101","abc"]){r=await act(P(),jp.ck,"mk36",[bad]);ok(r.res.ok===false&&/0% to 100%/.test(r.res.msg),"markup "+JSON.stringify(bad)+" is refused",J(r.res))}
   r=await act(P(),jp.ck,"mk36",["15%"]);ok(r.res.ok&&meOf(r.st).mk36===15,"markup 15% is saved for the pro",J(r.res));
+  for(const [inp,want] of [["33.33",33.33],["12.5%",12.5],[" 7.25 ",7.25],["33.335",33.34],["100",100]]){const x=await act(P(),jp.ck,"mk36",[inp]);ok(x.res.ok&&meOf(x.st).mk36===want,"SW-085: markup "+JSON.stringify(inp)+" is kept as "+want+"% (integer hundredths)",J(x.res))}
+  r=await act(P(),jp.ck,"mk36",["100.01"]);ok(r.res.ok===false,"SW-085: 100.01% is refused");r=await act(P(),jp.ck,"mk36",["15%"]);
   r=await act(P(),jho.ck,"mk36",[10]);ok(r.res.ok===false,"a homeowner can't set a markup");
   const lines=[{d:"Labor",q:4,r:95},{d:"Materials: Ferguson",q:1,r:244.26,l36:fer.id},{d:"Dump fees",q:1,r:43.87,l36:dump.id},{d:"Mileage",q:24,r:0.7,l36:mi.id}];
   r=await act(P(),jp.ck,"saveBill",[{type:"inv",cust:cid,title:"Kitchen remodel",job:"Kitchen remodel",lines,tax:0}]);JBILL=r.res.id;
@@ -189,12 +191,15 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
  const noOverflow=async(p,lbl)=>{const ov=await p.evaluate(()=>document.documentElement.scrollWidth-innerWidth);ok(ov<=0,lbl+": no sideways scroll",ov)};
  const font=async(p,sel)=>p.evaluate(s=>{const e=document.querySelector(s);return e?getComputedStyle(e).fontFamily:""},sel);
  {const {c,p}=await page(1440,JP.ck);await go(p,"/office/money");
-  const sw=await p.evaluate(()=>{const want=(amt,mk)=>Math.round(Math.round(amt*100)*(100+mk)/100)/100;const bad=[];
+  const sw=await p.evaluate(()=>{// SW-085: reference is pure integer math (BigInt), the markup read from its text as hundredths of a percent
+   const H=mk=>{const [w,f=""]=String(mk).split(".");return BigInt(w)*100n+BigInt((f+"00").slice(0,2))};
+   const want=(amt,mk)=>{const t=BigInt(Math.round(amt*100))*(10000n+H(mk));return Number(t/10000n+(t%10000n>=5000n?1n:0n))/100};const bad=[];
    const ten=v36CostLine({kind:"exp",amt:10.10,date:"2026-11-15",cat:"Materials",vendor:"Penny"},15).r;
-   for(let n=1;n<=50000;n++){const amt=n/100;for(const mk of [10,15,20,25]){const got=v36CostLine({kind:"exp",amt,date:"2026-11-15",cat:"Materials",vendor:"x"},mk).r;if(got!==want(amt,mk)){bad.push({amt,mk,got,want:want(amt,mk)});if(bad.length>=8)return{ten,n:bad.length,bad,checked:n}}}}
-   return{ten,n:bad.length,bad,checked:50000*4}});
+   for(let n=1;n<=50000;n++){const amt=n/100;for(const mk of [0,10,15,20,25,33.33,12.5,7.25]){const got=v36CostLine({kind:"exp",amt,date:"2026-11-15",cat:"Materials",vendor:"x"},mk).r;if(got!==want(amt,mk)){bad.push({amt,mk,got,want:want(amt,mk)});if(bad.length>=8)return{ten,n:bad.length,bad,checked:n}}}}
+   return{ten,n:bad.length,bad,checked:50000*8,c50:v36CostLine({kind:"exp",amt:50,date:"2026-11-15"},33.33).r}});
   ok(sw.ten===11.62,"SW-083: $10.10 at 15% bills $11.62 through v36CostLine (not $11.61)",JSON.stringify(sw.ten));
-  ok(sw.n===0,"SW-083: $0.01–$500 at 10/15/20/25% matches integer-cent math ("+sw.checked+" checks)",J(sw.bad));
+  ok(sw.n===0,"SW-083/SW-085: $0.01–$500 at 0/10/15/20/25/33.33/12.5/7.25% matches integer-cent math ("+sw.checked+" checks)",J(sw.bad));
+  ok(sw.c50===66.67,"SW-085: $50 at 33.33% bills $66.67 (not $66.66)",sw.c50);
   await c.close()}
  for(const w of [390,1440]){
   const JOB="Bath refresh "+w;for(const o of [{kind:"exp",amt:"126.80",cat:"Materials",vendor:"Ferguson Supply",job:JOB,date:addD(iso(new Date()),-1)},{kind:"exp",amt:"42.50",cat:"Permits",vendor:"City of Austin",job:JOB,date:addD(iso(new Date()),-1)},{kind:"mile",miles:"18.5",from:"Shop",to:"Oak St",job:JOB,date:iso(new Date())}])await act(P(),JP.ck,"addLedger",[o]);

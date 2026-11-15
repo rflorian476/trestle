@@ -5248,7 +5248,15 @@ if(v35OnServer()&&typeof DB!=="undefined"&&DB&&DB.users){seedTlog35()}
 const V2_ACTIONS36=["mk36","billPhotos36"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS36);
 function v36Now(){return typeof __now==="function"?__now():Date.now()}
 const v36r2=n=>Math.round((Number(n)||0)*100)/100;
-const v36Markup=(amt,mk)=>Math.round(Math.round((Number(amt)||0)*100)*(100+(Number(mk)||0))/100)/100;
+/* SW-085: money-plus-percent in integers only. The markup is read from its text as hundredths of a percent (33.33% -> 3333,
+   12.5% -> 1250; a third decimal rounds half-up), the amount as whole cents, and the product is rounded half-up in cents:
+   $50 at 33.33% = 5000 x 13333 / 10000 = 6666.5 -> $66.67. No float multiply, so no value lands a cent low. */
+function v36MkH(mk){const s=String(mk==null?"":mk).replace(/[%\s]/g,"");const x=/^\+?(\d{1,4})(?:\.(\d*))?$/.exec(s);
+ if(!x){const n=Number(s);return Number.isFinite(n)&&n>0?Math.round(n*100):0}const f=(x[2]||"")+"000";return +x[1]*100+ +f.slice(0,2)+(+f[2]>=5?1:0)}
+function v36Cents(amt){const s=String(amt==null?"":amt).trim().replace(/^\$/,""),x=/^(-?)(\d{1,12})(?:\.(\d*))?$/.exec(s);
+ if(!x){const n=Number(amt);return Number.isFinite(n)?Math.round(n*100):0}const f=(x[3]||"")+"000",c=+x[2]*100+ +f.slice(0,2)+(+f[2]>=5?1:0);return x[1]?-c:c}
+function v36MkCents(c,h){const t=Math.abs(c)*(10000+h),q=Math.floor(t/10000)+(t%10000>=5000?1:0);return c<0?-q:q}
+const v36Markup=(amt,mk)=>v36MkCents(v36Cents(amt),v36MkH(mk))/100;
 
 /* (1) QA SW-082: a deleted contractor's traveler calls leave the catalog, the same tidy as SW-072 for crew projects.
    A call nobody was hired on (open, or filled and later emptied) is deleted outright, with the notices that pointed at it
@@ -5289,7 +5297,7 @@ function v36CostLine(L,mk){const dt=v35Fmt(String(L.date||"").slice(0,10));
  if(L.kind==="mile")return{d:v35Desc(`Mileage: ${L.from||"Shop"} → ${L.to||"job site"}, ${dt}`).slice(0,160),q:v36r2(L.miles),r:MILE_RATE,l36:L.id};
  return{d:v35Desc(`${L.cat||"Materials"}: ${L.vendor||"receipt"}, ${dt}`).slice(0,160),q:1,r:v36Markup(L.amt,mk),l36:L.id}}
 A.mk36=function(p){const m=me();if(!v7Pro(m))return{ok:false,msg:"Job costs are part of The Office for pro accounts."};const n=parseFloat(String(p==null?"":p).replace(/[%\s]/g,""));
- if(!Number.isFinite(n)||n<0||n>100||/^[\s]*[-\u2212]/.test(String(p)))return{ok:false,msg:"Markup must be from 0% to 100%."};m.mk36=v36r2(n);save();return{ok:true,msg:"Markup saved: "+m.mk36+"%"}};
+ if(!Number.isFinite(n)||n<0||n>100||/^[\s]*[-\u2212]/.test(String(p)))return{ok:false,msg:"Markup must be from 0% to 100%."};const h=v36MkH(p);if(h>10000)return{ok:false,msg:"Markup must be from 0% to 100%."};m.mk36=h/100;save();return{ok:true,msg:"Markup saved: "+m.mk36+"%"}};
 {const os=A.saveBill;A.saveBill=function(o){const m=me();const src=(o&&Array.isArray(o.lines)?o.lines:[]).slice(0,40);
   const want=src.filter(l=>v7Lines([l]).length===1).map(l=>l&&typeof l.l36==="string"&&/^l[a-z0-9]{1,30}$/i.test(l.l36)?l.l36:null);
   const r=os.apply(this,arguments);if(!r||!r.ok||!r.id)return r;
@@ -5318,7 +5326,7 @@ function v36JcModal(){const m=me(),b=BED;if(!m||!b)return;const all=v36Unbilled(
  <div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button type="button" class="btn primary" id="v36jcGo">${I("plus",16)}Add to invoice</button></div></div>`,"v33sheet");
  document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);
  const J=document.getElementById("v36jcJ");J.onchange=()=>{st.job=J.value;pre();draw()};
- const M=document.getElementById("v36jcM");const setMk=v=>{const n=parseFloat(String(v).replace(/[%\s]/g,""));st.mk=Number.isFinite(n)&&n>=0&&n<=100&&!/^\s*[-\u2212]/.test(String(v))?n:0;draw()};M.oninput=()=>setMk(M.value);
+ const M=document.getElementById("v36jcM");const setMk=v=>{const n=parseFloat(String(v).replace(/[%\s]/g,""));st.mk=Number.isFinite(n)&&n>=0&&n<=100&&!/^\s*[-\u2212]/.test(String(v))&&v36MkH(v)<=10000?v36MkH(v)/100:0;draw()};M.oninput=()=>setMk(M.value);
  document.querySelectorAll("[data-v36mk]").forEach(x=>x.onclick=()=>{M.value=x.dataset.v36mk;setMk(M.value)});
  document.getElementById("v36jcGo").onclick=()=>{const pick=rows().filter(L=>st.sel.has(L.id)).sort((a,b)=>String(a.date).localeCompare(String(b.date))||(a.kind==="mile")-(b.kind==="mile"));if(!pick.length)return;try{const f=document.getElementById("bedF");f&&f.oninput&&f.oninput({target:f})}catch(e){}
   b.lines=(b.lines||[]).filter(l=>l.d||l.r);pick.forEach(L=>b.lines.push(Object.assign(v36CostLine(L,st.mk),{opt:false,on:true})));if(!b.job&&st.job)b.job=st.job;
