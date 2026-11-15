@@ -1,0 +1,10 @@
+/* v33: quote follow-ups */
+.v33fu-w{margin-top:14px}
+.v33fu-h{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px 12px}.v33fu-h h2{display:flex;align-items:center;gap:8px;margin:0;font-size:1.1rem}
+.v33fu-s{margin:4px 0 10px}.v33fu-m{margin:8px 0 0}
+.v33fu-l{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.v33fu-l li{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);min-height:44px}
+.v33fu-t{flex:1;min-width:0;display:grid}.v33fu-t a{color:inherit;text-decoration:none}.v33fu-t a:hover b{text-decoration:underline}.v33fu-t b{overflow-wrap:anywhere}.v33fu-t small{color:var(--muted)}
+.v33fu-l .btn{flex:none;white-space:nowrap}
+.v33fm textarea{width:100%;min-height:150px;line-height:1.5}
+@media(max-width:520px){.v33fu-l li{flex-wrap:wrap}.v33fu-l .btn{width:100%;justify-content:center}}

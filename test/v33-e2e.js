@@ -105,7 +105,58 @@ const sigCk=r=>(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0]
   LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"},dir);
   d=new DatabaseSync(path.join(dir,"sawyer.db"));const rows=d.prepare("SELECT endpoint,url,uid FROM pushsubs ORDER BY created").all();d.close();
   ok(rows.length===2&&rows[0].endpoint===E&&rows[0].uid==="u-first"&&rows[0].url===E+"/"&&rows[1].endpoint===PS.origin+"/send/mig2-"+run&&rows[1].url===rows[1].endpoint,"migration: raw v32 rows move to the canonical key, the first-registered owner keeps a duplicated device, junk is dropped",J(rows))}
-//@@FEATURES@@
+ // ===== 2. Quote follow-ups =====
+ const SH=process.argv[2]||os.tmpdir();br=await chromium.launch();const errs=[];
+ const page=async(w,cookie)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900}});
+  if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:LOCAL.B}])}
+  const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
+ const P=()=>LOCAL.port;
+ const HO=await signupHo("fu"),PA=await signupPro("fua"),PB=await signupPro("fub"),PC=await signupPro("fuc"),PH=await signupPro("fuh","HVAC");
+ ok(HO.ck&&PA.ck&&PB.ck&&PC.ck,"follow-ups: a homeowner and three plumbers sign up");
+ const T1="V33 kitchen drain "+run;
+ const pj=(await act(P(),HO.ck,"postJob",[{title:T1,cat:"Plumbing",sub:"Drain cleaning",desc:"Kitchen sink drains slowly.",zip:"78704",budget:"$100–400",when:"This week"}])).res;
+ const JID=pj.id||((await act(P(),HO.ck,"seenJobs28",[])).st.jobs||[]).find(j=>j.title===T1)?.id;
+ const qa=await act(P(),PA.ck,"quote",[JID,1234.5,"Snake and camera the line."]),qb=await act(P(),PB.ck,"quote",[JID,980,"Flat price."]),qc=await act(P(),PC.ck,"quote",[JID,1100,"Includes cleanout."]);
+ ok(JID&&qa.res.ok&&qb.res.ok&&qc.res.ok,"homeowner posts a job and three pros quote",J([JID,qa.res,qb.res,qc.res]));
+ const qid=(st,cid)=>((st.quotes||[]).find(q=>q.job===JID&&q.cid===cid)||{}).id;
+ const QA=qid(qa.st,PA.id),QB=qid(qb.st,PB.id),QC=qid(qc.st,PC.id);
+ {const r=(await act(P(),PA.ck,"followUp33",[QA,"Checking in"])).res;ok(r.ok===false&&/2 days/.test(r.msg),"a follow-up right after quoting is refused (give them 2 days)",J(r))}
+ {const d=(await act(P(),PA.ck,"seenJobs28",[])).st;ok(!(d.quotes||[]).some(q=>q.fu33),"no follow-up recorded yet")}
+ // homeowner writes to pro C after the quote: C's quote is answered, no follow-up card for C
+ await act(P(),HO.ck,"send",[PC.id,"Can you come Thursday?"]);
+ // two days pass: the quotes are moved 3 days back in the stored data
+ {const dir=LOCAL.dir;await stopApp(LOCAL,true);const {DatabaseSync}=require("node:sqlite");const d=new DatabaseSync(path.join(dir,"sawyer.db"));
+  const q=JSON.parse(d.prepare("SELECT v FROM appdata WHERE k='quotes'").get().v);for(const x of q)if(x.job===JID)x.date-=3*864e5;d.prepare("UPDATE appdata SET v=? WHERE k='quotes'").run(JSON.stringify(q));
+  const ms=JSON.parse(d.prepare("SELECT v FROM appdata WHERE k='msgs'").get().v);for(const x of ms)if(x.from===HO.id)x.date-=1*864e5;d.prepare("UPDATE appdata SET v=? WHERE k='msgs'").run(JSON.stringify(ms));d.close();
+  LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"},dir)}
+ for(const w of [1440,390]){const p=await page(w,PA.ck);await p.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await p.waitForSelector("#v33fu",{timeout:10000}).catch(()=>{});
+  const o=await p.evaluate(()=>{const c=document.getElementById("v33fu");if(!c)return null;const na=document.querySelector("section.na8");return{t:c.innerText.replace(/\s+/g," "),n:c.querySelectorAll("[data-v33fu]").length,afterNa:!!na&&!!(na.compareDocumentPosition(c)&Node.DOCUMENT_POSITION_FOLLOWING),ow:document.documentElement.scrollWidth>innerWidth+1,h1:document.querySelectorAll("h1").length,font:getComputedStyle(c.querySelector("h2")).fontFamily,btnH:c.querySelector("[data-v33fu]").getBoundingClientRect().height}});
+  ok(o&&/Quotes waiting for an answer/.test(o.t)&&o.t.includes(T1)&&/You quoted \$1,234\.50/.test(o.t)&&/3 days ago/.test(o.t)&&/Hana · /.test(o.t)&&o.n===1,w+" pro dashboard: 'Quotes waiting for an answer' lists the job, the homeowner's first name, the quote with cents and how long ago",J(o));
+  ok(o&&o.afterNa&&!o.ow&&o.h1===1&&/Plus Jakarta Sans/.test(o.font)&&o.btnH>=32,w+" card sits under What's next, no overflow, one H1, Plus Jakarta Sans",J(o));
+  if(w===1440)await (await p.$("#v33fu")).screenshot({path:path.join(SH,"v33-followup-card-1440.png")}).catch(()=>{});
+  if(w===390){await p.click("[data-v33fu]");await p.waitForSelector("#v33ft");const v=await p.$eval("#v33ft",e=>e.value);
+   ok(/^Hi Hana, just checking in on my quote for "V33 kitchen drain/.test(v)&&v.includes("($1,234.50)")&&/- Vee, V33 fua/.test(v),"Follow up opens an editable, friendly message with the first name, job and price",v);
+   await sleep(700);await p.screenshot({path:path.join(SH,"v33-followup-modal-390.png")}).catch(()=>{});
+   await p.fill("#v33ft",v+"\nI can also do Saturday.");await p.click("#v33fs");await p.waitForSelector("#v33fu",{state:"detached",timeout:8000}).catch(()=>{});
+   const gone=await p.evaluate(()=>!document.getElementById("v33fu")&&/Follow-up sent to Hana/.test(document.getElementById("toasts").innerText));ok(gone,"sending shows 'Follow-up sent to Hana.' and the card goes away")}
+  await p.context().close()}
+ {const p=await page(1440,PC.ck);await p.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await sleep(300);ok(!(await p.$("#v33fu")),"a pro the homeowner already wrote back to has no follow-up card");await p.context().close()}
+ {const st=stateOf(await req(P(),"GET","/api/state",{Cookie:HO.ck}));const m=(st.msgs||[]).filter(x=>x.from===PA.id);const n=(st.notifs||[]).find(x=>/New message from V33 fua/.test(x.text||""));const q=(st.quotes||[]).find(x=>x.id===QA);
+  ok(m.length===1&&/I can also do Saturday\./.test(m[0].text)&&n,"homeowner gets it as a normal message, with the 'New message' notice",J({m,n}));
+  ok(q&&q.fu33>0,"the homeowner (job owner) can see the follow-up time on the quote")}
+ {const st=stateOf(await req(P(),"GET","/api/state",{Cookie:PB.ck}));const q=(st.quotes||[]).find(x=>x.id===QA);ok(q&&q.fu33===undefined,"another pro's copy of that quote has no follow-up field",J(q))}
+ {const st=stateOf(await req(P(),"GET","/api/state"));const q=(st.quotes||[]).find(x=>x.id===QA);ok(!q||q.fu33===undefined,"signed-out state has no follow-up field")}
+ {const r=(await act(P(),PA.ck,"followUp33",[QA,"Again?"])).res;ok(r.ok===false&&/already followed up/.test(r.msg),"one follow-up per quote (a second one is refused)",J(r))}
+ {const r=(await act(P(),PB.ck,"followUp33",[QA,"Hi"])).res;ok(r.ok===false&&/wasn't found/.test(r.msg),"a pro can't follow up on someone else's quote",J(r))}
+ {const r=(await act(P(),HO.ck,"followUp33",[QA,"Hi"])).res;ok(r.ok===false&&/Only pros/.test(r.msg),"homeowners can't use it",J(r))}
+ {const r=await post(P(),PB.ck,"/api/act",{name:"followUp33",args:[QB,"x".repeat(1001)]});ok(r.status===400&&/1,000/.test(r.json.error),"a message over 1,000 characters is refused by the server",r.status+" "+J(r.json))}
+ {const r=(await act(P(),PB.ck,"followUp33",[QB,"   "])).res;ok(r.ok===false&&/Type a message/.test(r.msg),"an empty message is refused",J(r))}
+ await act(P(),HO.ck,"hire",[JID,PC.id]);
+ {const r=(await act(P(),PB.ck,"followUp33",[QB,"Still interested?"])).res;ok(r.ok===false&&/isn't open/.test(r.msg),"after the homeowner hires someone, follow-ups on that job are refused",J(r))}
+ {const p=await page(1440,PB.ck);await p.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await sleep(300);ok(!(await p.$("#v33fu")),"…and the card is gone for the other pros");await p.context().close()}
+ {const hp=await page(1440,HO.ck);await hp.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await sleep(300);ok(!(await hp.$("#v33fu"))&&!(await hp.$("#v33ql")),"homeowner dashboard has neither pro card");await hp.context().close()}
+
+ ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);try{PS&&PS.srv.close()}catch(e){}}
  console.log(failed?"FAIL v33-e2e: "+failed+" failed":"PASS v33-e2e: all checks passed");process.exit(failed?1:0)})();
