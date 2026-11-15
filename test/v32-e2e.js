@@ -5,7 +5,7 @@
 // payload decrypted, new matching job -> pro, new quote -> homeowner, hired / job filled -> pros, per-kind switches,
 // test alert, sign-out and account delete drop devices, dead endpoints removed, private key never leaves the server),
 // the dashboard / Inbox cards at 1440 and 390 (turn on, test, kinds, turn off, Not now), the service worker's push and
-// notification handlers (Chromium's DevTools push), health 2.15.0-sawyer and SW cache sawyer-v32.
+// notification handlers (Chromium's DevTools push), health 2.15.1-sawyer and SW cache sawyer-v32.
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
 const {chromium}=require("playwright");
@@ -16,7 +16,7 @@ function freePort(){return new Promise((res,no)=>{const s=http.createServer();s.
 function startApp(port,extra){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),"sawyer-v32-"));
  const env=Object.assign({},process.env,{HOST:"127.0.0.1",PORT:String(port),DATA_DIR:dir,RATE_X:"50"});
- for(const k of ["NODE_ENV","RENDER","AUTH_TEST_MODE","STAFF_DEMO_PASSWORD","RESEND_API_KEY","SENDGRID_API_KEY","EMAIL_FROM","MAIL_FROM","RESEND_API_URL","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_FROM","TWILIO_MESSAGING_SERVICE_SID","TEST_NOW","SAWYER_BASE_URL","PUBLIC_URL","GOOGLE_CLIENT_ID","GOOGLE_CLIENT_SECRET","APPLE_CLIENT_ID","MICROSOFT_CLIENT_ID","FACEBOOK_APP_ID","VAPID_PRIVATE_KEY","VAPID_PUBLIC_KEY","VAPID_SUBJECT","PUSH_DEBUG","PUSH_TEST_ORIGIN"])if(!extra||!(k in extra))delete env[k];
+ for(const k of ["NODE_ENV","RENDER","AUTH_TEST_MODE","STAFF_DEMO_PASSWORD","RESEND_API_KEY","SENDGRID_API_KEY","EMAIL_FROM","MAIL_FROM","RESEND_API_URL","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_FROM","TWILIO_MESSAGING_SERVICE_SID","TEST_NOW","SAWYER_BASE_URL","PUBLIC_URL","GOOGLE_CLIENT_ID","GOOGLE_CLIENT_SECRET","APPLE_CLIENT_ID","MICROSOFT_CLIENT_ID","FACEBOOK_APP_ID","VAPID_PRIVATE_KEY","VAPID_PUBLIC_KEY","VAPID_SUBJECT","PUSH_DEBUG","PUSH_TEST_ORIGIN","PUSH_RETRY_MS"])if(!extra||!(k in extra))delete env[k];
  if(extra)Object.assign(env,extra);
  const child=spawn(process.execPath,[path.join(ROOT,"server.js")],{env,stdio:["ignore","pipe","pipe"]});
  let log="";child.stdout.on("data",d=>{log+=d});child.stderr.on("data",d=>{log+=d});
@@ -52,13 +52,13 @@ function pushService(){const got=[];const srv=http.createServer((rq,rs)=>{const 
 let LOCAL=null,br=null,PS=null;
 (async()=>{try{
  PS=await pushService();
- LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin});
+ LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"});
  br=await chromium.launch();
  const errs=[];
  const page=async(w,cookie,init)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},acceptDownloads:true});
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:LOCAL.B}])}if(init)await c.addInitScript(init.fn,init.arg);
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.15.0-sawyer","healthz reports 2.15.0-sawyer",J(hz));
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.15.1-sawyer","healthz reports 2.15.1-sawyer",J(hz));
  const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v32"/.test(sw.body),"service worker cache is sawyer-v32");
  ok(/addEventListener\("push"/.test(sw.body)&&/showNotification\(/.test(sw.body)&&/addEventListener\("notificationclick"/.test(sw.body)&&/openWindow\(/.test(sw.body)&&/addEventListener\("pushsubscriptionchange"/.test(sw.body),"service worker handles push, notification clicks and subscription changes");
  const run=Math.random().toString(36).slice(2,8);
@@ -160,7 +160,11 @@ let LOCAL=null,br=null,PS=null;
   ok(pw.status===200&&PS.got.filter(to("g")).length===0,"after a password change signs other sessions out, their devices stop getting alerts",J({pw:pw.status,n:PS.got.filter(to("g")).length}))}
  // dead endpoint (410) is removed
  {const dX=device();await post(LOCAL.port,H1.ck,"/api/push/subscribe",{sub:{endpoint:PS.origin+"/gone/h-"+run,keys:dX.keys}});const r=await post(LOCAL.port,H1.ck,"/api/push/test",{endpoint:PS.origin+"/gone/h-"+run});
-  const st=(await post(LOCAL.port,H1.ck,"/api/push/status",{endpoint:PS.origin+"/gone/h-"+run})).json||{};ok(r.json&&r.json.sent===1&&st.on===false&&st.devices===1,"a 410 Gone from the push service removes that device (the other one stays)",J([r.json,st]))}
+  const tries=PS.got.filter(g=>g.path==="/gone/h-"+run).length;const st0=(await post(LOCAL.port,H1.ck,"/api/push/status",{endpoint:PS.origin+"/gone/h-"+run})).json||{};
+  ok(r.json&&r.json.sent===1&&tries===2&&st0.on===true&&st0.devices===2,"a brand-new device that reads 410 is retried once and kept (push services can lag right after subscribing)",J([r.json,tries,st0]));
+  {const {DatabaseSync}=require("node:sqlite");const db=new DatabaseSync(path.join(LOCAL.dir,"sawyer.db"));db.prepare("UPDATE pushsubs SET created=? WHERE endpoint=?").run(Date.now()-3600e3,PS.origin+"/gone/h-"+run);db.close()}
+  const r2=await post(LOCAL.port,H1.ck,"/api/push/test",{endpoint:EP("h")});
+  const st=(await post(LOCAL.port,H1.ck,"/api/push/status",{endpoint:PS.origin+"/gone/h-"+run})).json||{};ok(r2.json&&r2.json.sent===1&&st.on===false&&st.devices===1,"an older device that reads 410 Gone is removed (the other one stays)",J([r2.json,st]))}
  // unsubscribe
  {const r=(await post(LOCAL.port,H1.ck,"/api/push/unsubscribe",{endpoint:EP("h")})).json||{};ok(r.ok&&r.on===false&&r.devices===0,"Turn off: unsubscribe removes the device",J(r))}
  // privacy: nothing about devices or keys in state; private key never served or logged

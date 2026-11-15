@@ -229,7 +229,10 @@ function pushSubject(){const s=String(process.env.VAPID_SUBJECT||"").trim();if(/
 let PUSH_SENT=0;
 async function pushTo(uid,payload,opts){const subs=db.prepare("SELECT * FROM pushsubs WHERE uid=?").all(uid);if(!subs.length)return{sent:0,devices:0};const live=liveSessHashes(uid);let sent=0;
  for(const s of subs){if(!live.has(s.sess)){db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(s.endpoint);continue}
-  const r=await WEBPUSH.send(VAPID,{endpoint:s.endpoint,keys:{p256dh:s.p256dh,auth:s.auth}},payload,Object.assign({subject:pushSubject()},opts||{}));
+  const sub={endpoint:s.endpoint,keys:{p256dh:s.p256dh,auth:s.auth}},o=Object.assign({subject:pushSubject()},opts||{});let r=await WEBPUSH.send(VAPID,sub,payload,o);
+  // A brand-new subscription can briefly read as 404/410 at the push service while it propagates (seen with FCM right
+  // after subscribing). Retry once after a short wait, and never delete a subscription younger than 10 minutes for it.
+  const young=Date.now()-s.created<10*60e3;if(r.gone&&young){await new Promise(z=>setTimeout(z,+process.env.PUSH_RETRY_MS||3000));r=await WEBPUSH.send(VAPID,sub,payload,o);if(r.gone)r={ok:false,status:r.status,gone:false}}
   if(process.env.PUSH_DEBUG)console.log("push: "+new URL(s.endpoint).hostname+" -> "+r.status);
   if(r.ok){sent++;PUSH_SENT++;db.prepare("UPDATE pushsubs SET last_ok=?,fails=0 WHERE endpoint=?").run(Date.now(),s.endpoint)}
   else if(r.gone)db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(s.endpoint);
