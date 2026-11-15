@@ -5,7 +5,7 @@
 // payload decrypted, new matching job -> pro, new quote -> homeowner, hired / job filled -> pros, per-kind switches,
 // test alert, sign-out and account delete drop devices, dead endpoints removed, private key never leaves the server),
 // the dashboard / Inbox cards at 1440 and 390 (turn on, test, kinds, turn off, Not now), the service worker's push and
-// notification handlers (Chromium's DevTools push), health 2.15.1-sawyer and SW cache sawyer-v32.
+// notification handlers (Chromium's DevTools push), health 2.15.2-sawyer and SW cache sawyer-v32. SW-068: subscribe cannot take over another account's endpoint.
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
 const {chromium}=require("playwright");
@@ -58,7 +58,7 @@ let LOCAL=null,br=null,PS=null;
  const page=async(w,cookie,init)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},acceptDownloads:true});
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:LOCAL.B}])}if(init)await c.addInitScript(init.fn,init.arg);
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.15.1-sawyer","healthz reports 2.15.1-sawyer",J(hz));
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.15.2-sawyer","healthz reports 2.15.2-sawyer",J(hz));
  const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v32"/.test(sw.body),"service worker cache is sawyer-v32");
  ok(/addEventListener\("push"/.test(sw.body)&&/showNotification\(/.test(sw.body)&&/addEventListener\("notificationclick"/.test(sw.body)&&/openWindow\(/.test(sw.body)&&/addEventListener\("pushsubscriptionchange"/.test(sw.body),"service worker handles push, notification clicks and subscription changes");
  const run=Math.random().toString(36).slice(2,8);
@@ -105,6 +105,25 @@ let LOCAL=null,br=null,PS=null;
  ok(sA.ok&&sA.on&&sA.devices===1&&J(sA.cats)===J({jobs:true,hires:true,quotes:false,msgs:true}),"pro subscribes: on, 1 device, pro defaults (new jobs, hires, messages)",J(sA));
  ok(sHO.ok&&sHO.on&&J(sHO.cats)===J({jobs:false,hires:false,quotes:true,msgs:true}),"homeowner subscribes: homeowner default (new quotes, messages)",J(sHO));
  {const r=(await post(LOCAL.port,B1.ck,"/api/push/status",{endpoint:EP("a")})).json||{};ok(r.on===false&&r.devices===1,"another account can't see someone else's device as its own",J(r))}
+ // SW-068: a signed-in caller cannot take over an endpoint already registered to someone else
+ {const C=await signupPro("c","Plumbing"),D=await signupPro("d","Plumbing");const dC=device(),dD=device(),dC2=device();
+  const sC=await post(LOCAL.port,C.ck,"/api/push/subscribe",{sub:{endpoint:EP("c"),keys:dC.keys}});
+  const sD=await post(LOCAL.port,D.ck,"/api/push/subscribe",{sub:{endpoint:EP("d"),keys:dD.keys}});
+  ok(sC.status===200&&sD.status===200&&sC.json&&sC.json.devices===1&&sD.json&&sD.json.devices===1,"SW-068 setup: two accounts each have one device",J([sC.json,sD.json]));
+  const steal=await post(LOCAL.port,C.ck,"/api/push/subscribe",{sub:{endpoint:EP("d"),keys:dC2.keys}});
+  const err=String((steal.json&&steal.json.error)||"");
+  ok(steal.status===409&&err&&!/another|already|account|user|owner|belong|taken|exists|registered/i.test(err),"SW-068: taking over another account's endpoint is refused with a generic 409 (no hint it belongs to someone)",J({s:steal.status,j:steal.json}));
+  const stD=(await post(LOCAL.port,D.ck,"/api/push/status",{endpoint:EP("d")})).json||{};
+  const stC=(await post(LOCAL.port,C.ck,"/api/push/status",{endpoint:EP("c")})).json||{};
+  const stCOnD=(await post(LOCAL.port,C.ck,"/api/push/status",{endpoint:EP("d")})).json||{};
+  ok(stD.on===true&&stD.devices===1,"SW-068: the original owner's device count and ownership are unchanged",J(stD));
+  ok(stC.on===true&&stC.devices===1&&stCOnD.on===false,"SW-068: the caller does not gain the endpoint and keeps only their own device",J({stC,stCOnD}));
+  const {DatabaseSync}=require("node:sqlite");const db=new DatabaseSync(path.join(LOCAL.dir,"sawyer.db"));
+  const rowD=db.prepare("SELECT uid,p256dh,auth FROM pushsubs WHERE endpoint=?").get(EP("d"));
+  ok(rowD&&rowD.uid===D.id&&rowD.p256dh===dD.keys.p256dh&&rowD.auth===dD.keys.auth,"SW-068: the original row's uid and keys are left alone",J(rowD));
+  const again=await post(LOCAL.port,C.ck,"/api/push/subscribe",{sub:{endpoint:EP("c"),keys:dC2.keys}});
+  const rowC=db.prepare("SELECT uid,p256dh,auth FROM pushsubs WHERE endpoint=?").get(EP("c"));db.close();
+  ok(again.status===200&&again.json&&again.json.on&&again.json.devices===1&&rowC&&rowC.uid===C.id&&rowC.p256dh===dC2.keys.p256dh&&rowC.auth===dC2.keys.auth,"SW-068: the same account can resubscribe and update its device keys",J({s:again.status,j:again.json,rowC}))}
  const wait=async(pred,ms)=>{const t=Date.now();while(Date.now()-t<(ms||4000)){const x=PS.got.filter(pred);if(x.length)return x;await sleep(60)}return PS.got.filter(pred)};
  const to=n=>g=>g.path==="/send/"+n+"-"+run;
  const open=(g,dev)=>{try{return decrypt(dev,g.body).json}catch(e){return{err:e.message}}};

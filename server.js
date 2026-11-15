@@ -247,7 +247,8 @@ async function pushApi(req,res,p,uid,b){
  if(p==="/api/push/subscribe"){if(limited("pushsub:"+uid,20,3600e3))return send(res,429,{error:"Too many tries. Try again later."});
   const sub=b.sub&&typeof b.sub==="object"?b.sub:{};const ep=String(sub.endpoint||"");
   if(!WEBPUSH.endpointOk(ep)||!WEBPUSH.keysOk(sub.keys))return send(res,400,{error:"This browser's push service isn't supported."});
-  const t=cookies(req).swsid;db.prepare("INSERT INTO pushsubs(endpoint,uid,p256dh,auth,sess,created,fails) VALUES(?,?,?,?,?,?,0) ON CONFLICT(endpoint) DO UPDATE SET uid=excluded.uid,p256dh=excluded.p256dh,auth=excluded.auth,sess=excluded.sess,created=excluded.created,fails=0").run(ep,uid,String(sub.keys.p256dh),String(sub.keys.auth),sessHash(t),Date.now());
+  const t=cookies(req).swsid;const up=db.prepare("INSERT INTO pushsubs(endpoint,uid,p256dh,auth,sess,created,fails) VALUES(?,?,?,?,?,?,0) ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh,auth=excluded.auth,sess=excluded.sess,created=excluded.created,fails=0 WHERE pushsubs.uid=excluded.uid").run(ep,uid,String(sub.keys.p256dh),String(sub.keys.auth),sessHash(t),Date.now());
+  if(!up.changes)return send(res,409,{error:"Couldn't turn alerts on for this device. Try again."});
   // at most 10 devices per account: the oldest drops off
   const all=db.prepare("SELECT endpoint FROM pushsubs WHERE uid=? ORDER BY created DESC").all(uid);for(const r of all.slice(10))db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(r.endpoint);
   if(b.cats&&typeof b.cats==="object"){const o={};for(const k of PUSH_CATS)o[k]=!!b.cats[k];db.prepare("INSERT INTO pushprefs(uid,cats) VALUES(?,?) ON CONFLICT(uid) DO UPDATE SET cats=excluded.cats").run(uid,JSON.stringify(o))}
