@@ -244,18 +244,21 @@ try{db.exec("ALTER TABLE pushsubs ADD COLUMN url TEXT")}catch(e){}
   db.exec("COMMIT")}catch(e){try{db.exec("ROLLBACK")}catch(x){}throw e}}
 const pushKey=ep=>{const c=WEBPUSH.canonEndpoint(ep);return c?c.key:""};
 const VAPID=WEBPUSH.makeVapid(db);
-const PUSH_CATS=["jobs","hires","quotes","msgs"];
+const PUSH_CATS=["jobs","hires","quotes","msgs","visits"];
 const sessHash=t=>crypto.createHash("sha256").update(String(t||"")).digest("base64url").slice(0,32);
-function pushDefaults(uid){const u=DB().users.find(x=>x.id===uid)||{};return u.role==="contractor"?{jobs:true,hires:true,quotes:false,msgs:true}:{jobs:false,hires:false,quotes:true,msgs:true}}
+function pushDefaults(uid){const u=DB().users.find(x=>x.id===uid)||{};return u.role==="contractor"?{jobs:true,hires:true,quotes:false,msgs:true,visits:true}:{jobs:false,hires:false,quotes:true,msgs:true,visits:true}}
 function pushPrefs(uid){const r=db.prepare("SELECT cats FROM pushprefs WHERE uid=?").get(uid);let o=null;try{o=r&&JSON.parse(r.cats)}catch(e){}const d=pushDefaults(uid);const out={};for(const k of PUSH_CATS)out[k]=o&&typeof o[k]==="boolean"?o[k]:d[k];return out}
 function pushKind(n){const t=String(n&&n.text||"");if(n&&n.kind28==="newjob"||/^New (URGENT )?job (near you|in your area): /i.test(t))return "jobs";
  if(/^You're hired: /.test(t)||/^This job was filled: /.test(t)||/the contractor went another way/.test(t))return "hires";
  if(/ sent a quote: /.test(t)&&/^job:/.test(String(n.link||"")))return "quotes";
  // msgs: only "New message from <name>". The message itself never goes in the push (lock screens are public).
- if(/^New message from /.test(t)&&/^chat:/.test(String(n.link||"")))return "msgs";return null}
-function pushUrl(link){const m=/^(job|tcall|project|profile|traveler|chat):([\w.-]{1,60})$/.exec(String(link||""));if(!m)return "/inbox";return "/"+(m[1]==="profile"?"pro":m[1]==="chat"?"msgs":m[1])+"/"+encodeURIComponent(m[2])}
-const PUSH_TITLE={jobs:"New job in your area",hires:"Job update",quotes:"New quote",msgs:"New message"};
-function pushPayload(n,k){let title=PUSH_TITLE[k];const t=String(n.text||"");if(/^You're hired/.test(t))title="You're hired";else if(/^This job was filled/.test(t))title="Job filled";
+ if(/^New message from /.test(t)&&/^chat:/.test(String(n.link||"")))return "msgs";
+ // v37: appointment updates (scheduled, moved, confirmed, reschedule asked, on the way, arrived, canceled). The text names the
+ // business and the visit title only; a customer's reschedule note never goes in a push.
+ if(/^visit:/.test(String(n.link||""))&&/ (scheduled|moved|confirmed|asked to move|is on the way|has arrived|finished|canceled)\b/.test(t))return "visits";return null}
+function pushUrl(link){const m=/^(job|tcall|project|profile|traveler|chat|visit):([\w.-]{1,60})$/.exec(String(link||""));if(!m)return "/inbox";return "/"+(m[1]==="profile"?"pro":m[1]==="chat"?"msgs":m[1]==="visit"?"track":m[1])+"/"+encodeURIComponent(m[2])}
+const PUSH_TITLE={jobs:"New job in your area",hires:"Job update",quotes:"New quote",msgs:"New message",visits:"Appointment update"};
+function pushPayload(n,k){let title=PUSH_TITLE[k];const t=String(n.text||"");if(/^You're hired/.test(t))title="You're hired";else if(/^This job was filled/.test(t))title="Job filled";else if(k==="visits"&&/ is on the way/.test(t))title="On the way";
  return{title,body:t.slice(0,240),url:pushUrl(n.link),tag:k+":"+String(n.link||"").slice(0,60)}}
 let pushAny=!!db.prepare("SELECT 1 FROM pushsubs LIMIT 1").get();
 function pushBefore(){return pushAny?new Set((DB().notifs||[]).map(n=>n.id)):null}

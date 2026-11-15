@@ -102,8 +102,8 @@ let LOCAL=null,br=null,PS=null;
   const r2=await post(LOCAL.port,A1.ck,"/api/push/subscribe",{sub:{endpoint:EP("a"),keys:{p256dh:"AAAA",auth:"BBBB"}}});ok(r2.status===400,"subscribe refuses malformed device keys",r2.status)}
  const sub=async(who,dev,name,cats)=>(await post(LOCAL.port,who.ck,"/api/push/subscribe",Object.assign({sub:{endpoint:EP(name),keys:dev.keys}},cats?{cats}:{}))).json||{};
  const sA=await sub(A1,dA,"a"),sB=await sub(B1,dB,"b"),sH=await sub(H1,dH,"h"),sHO=await sub(HO,dHO,"ho");
- ok(sA.ok&&sA.on&&sA.devices===1&&J(sA.cats)===J({jobs:true,hires:true,quotes:false,msgs:true}),"pro subscribes: on, 1 device, pro defaults (new jobs, hires, messages)",J(sA));
- ok(sHO.ok&&sHO.on&&J(sHO.cats)===J({jobs:false,hires:false,quotes:true,msgs:true}),"homeowner subscribes: homeowner default (new quotes, messages)",J(sHO));
+ ok(sA.ok&&sA.on&&sA.devices===1&&J(sA.cats)===J({jobs:true,hires:true,quotes:false,msgs:true,visits:true}),"pro subscribes: on, 1 device, pro defaults (new jobs, hires, messages, appointments since v37)",J(sA));
+ ok(sHO.ok&&sHO.on&&J(sHO.cats)===J({jobs:false,hires:false,quotes:true,msgs:true,visits:true}),"homeowner subscribes: homeowner default (new quotes, messages, appointments since v37)",J(sHO));
  {const r=(await post(LOCAL.port,B1.ck,"/api/push/status",{endpoint:EP("a")})).json||{};ok(r.on===false&&r.devices===1,"another account can't see someone else's device as its own",J(r))}
  // SW-068: a signed-in caller cannot take over an endpoint already registered to someone else
  {const C=await signupPro("c","Plumbing"),D=await signupPro("d","Plumbing");const dC=device(),dD=device(),dC2=device();

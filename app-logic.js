@@ -5505,6 +5505,9 @@ function v37ProCard(j,m){const vs=v37JobVisits(j,m);
 /* dashboard: an appointment waiting for the customer comes first */
 {const on=v8Next;v8Next=function(m){let out=on.apply(this,arguments);try{if(!m||v7Pro(m))return out;const vs=(DB.visits||[]).filter(v=>v&&v.cuid===m.id&&v37Open(v)&&v37Conf(v).s==="pending").sort((a,b)=>(a.date+a.start)<(b.date+b.start)?-1:1);
   if(vs.length){const v=vs[0],l=href("track",v.id);out=out.filter(x=>x.link!==l);out.unshift({icon:"cal",tone:"gold",title:`Confirm ${v37When(v)}`,sub:`${v.bizName} · ${v.title}${vs.length>1?` · +${vs.length-1} more`:""}`,link:l,cta:"Confirm"});out=out.slice(0,5)}}catch(e){}return out}}
+/* phone alerts (v32): appointment updates are their own switch, on by default for everyone */
+if(typeof v32Cats==="function"){const oc=v32Cats;v32Cats=function(m){const L=oc.apply(this,arguments);return L.some(x=>x[0]==="visits")?L:L.concat([["visits",m&&m.role==="contractor"?"A customer confirms or asks to move a visit":"My pro is on the way, or my appointment is set or moved"]])}}
+
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
