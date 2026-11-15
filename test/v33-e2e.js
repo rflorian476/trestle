@@ -1,6 +1,6 @@
 // v33 end-to-end. Self-contained: starts its own Sawyer server (local test mode) and a local stand-in push service.
 // Covers: SW-069 (push endpoints are canonicalized: lowercase scheme/host, no trailing slash, odd spellings refused, one
-// key for subscribe / conflict / unsubscribe / status / test; v32 rows migrated at start), health 2.16.0-sawyer and the
+// key for subscribe / conflict / unsubscribe / status / test; v32 rows migrated at start; SW-070: the first-registered owner keeps a duplicated device even when a later row already stores the canonical key), health 2.16.0-sawyer and the
 // v33 features (see the sections below). No real push service or email provider is contacted: deliveries go to the local
 // stand-in (PUSH_TEST_ORIGIN); the fcm.googleapis.com endpoints below are only subscribed / checked / removed, never sent to.
 "use strict";
@@ -106,6 +106,27 @@ const sigCk=r=>(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0]
   LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"},dir);
   d=new DatabaseSync(path.join(dir,"sawyer.db"));const rows=d.prepare("SELECT endpoint,url,uid FROM pushsubs ORDER BY created").all();d.close();
   ok(rows.length===2&&rows[0].endpoint===E&&rows[0].uid==="u-first"&&rows[0].url===E+"/"&&rows[1].endpoint===PS.origin+"/send/mig2-"+run&&rows[1].url===rows[1].endpoint,"migration: raw v32 rows move to the canonical key, the first-registered owner keeps a duplicated device, junk is dropped",J(rows))}
+ // ===== 1c. SW-070: first owner keeps the device even when a later row already has the canonical key =====
+ {const dir=LOCAL.dir;await stopApp(LOCAL,true);
+  const {DatabaseSync}=require("node:sqlite");let d=new DatabaseSync(path.join(dir,"sawyer.db"));const k=device().keys,t=Date.now();
+  const ins=d.prepare("INSERT INTO pushsubs(endpoint,url,uid,p256dh,auth,sess,created,fails) VALUES(?,NULL,?,?,?,?,?,0)");
+  const K=PS.origin+"/send/mig70-"+run,R=PS.origin+"/send/mig70r-"+run,T=PS.origin+"/send/mig70t-"+run,C=PS.origin+"/send/mig70c-"+run;
+  const Khttp="HTTP://"+K.slice("http://".length),Thttp="HTTP://"+T.slice("http://".length);
+  // later row already stores the canonical key; a third later variant is in the same group
+  ins.run(K+"/","u-early",k.p256dh,k.auth,"s70a",t-4000);ins.run(K,"u-late",k.p256dh,k.auth,"s70b",t);ins.run(Khttp,"u-later2",k.p256dh,k.auth,"s70c",t+1000);
+  // reverse: the earlier row already stores the canonical key
+  ins.run(R,"u-rev-early",k.p256dh,k.auth,"s70d",t-4000);ins.run(R+"/","u-rev-late",k.p256dh,k.auth,"s70e",t);
+  // timestamp tie: same created, two spellings; the lexicographically earlier original endpoint wins
+  ins.run(T+"/","u-tie-slash",k.p256dh,k.auth,"s70f",t);ins.run(Thttp,"u-tie-http",k.p256dh,k.auth,"s70g",t);
+  ins.run(C,"u-ok",k.p256dh,k.auth,"s70h",t);ins.run("not a url","u-junk",k.p256dh,k.auth,"s70i",t);ins.run("https://user:pw@fcm.googleapis.com/fcm/send/x","u-odd",k.p256dh,k.auth,"s70j",t);d.close();
+  LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"},dir);
+  d=new DatabaseSync(path.join(dir,"sawyer.db"));const by=Object.fromEntries(d.prepare("SELECT endpoint,url,uid,created FROM pushsubs WHERE endpoint IN (?,?,?,?)").all(K,R,T,C).map(r=>[r.endpoint,r]));
+  const leftovers=d.prepare("SELECT endpoint,uid FROM pushsubs WHERE endpoint LIKE ? OR uid IN ('u-late','u-later2','u-rev-late','u-tie-slash','u-tie-http','u-junk','u-odd')").all("%mig70%");d.close();
+  ok(by[K]&&by[K].uid==="u-early"&&by[K].url===K+"/","SW-070: when a later row already has the canonical key, the earlier owner keeps it (later variants, including a third, are dropped)",J({row:by[K],leftovers}));
+  ok(by[R]&&by[R].uid==="u-rev-early"&&by[R].url===R,"SW-070 reverse: when the earlier row already has the canonical key, that owner keeps it",J(by[R]));
+  const tieWin=Thttp<T+"/"?{uid:"u-tie-http",url:T,ep:Thttp}:{uid:"u-tie-slash",url:T+"/",ep:T+"/"};
+  ok(by[T]&&by[T].uid===tieWin.uid&&by[T].url===tieWin.url,"SW-070: a created-time tie keeps the lexicographically earlier original endpoint",J({row:by[T],tieWin,Thttp,Tslash:T+"/"}));
+  ok(by[C]&&by[C].uid==="u-ok"&&by[C].url===C&&!leftovers.some(r=>r.uid!=="u-ok"&&r.endpoint!==K&&r.endpoint!==R&&r.endpoint!==T),"SW-070: a unique already-canonical row keeps its url, junk/odd rows are dropped",J({ok:by[C],leftovers}))}
  // ===== 2. Quote follow-ups =====
  const SH=process.argv[2]||os.tmpdir();br=await chromium.launch();const errs=[];
  const page=async(w,cookie)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900}});

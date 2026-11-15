@@ -208,15 +208,25 @@ function run(uid,name,args){const d=DB();d.me=uid;const pb=pushBefore();let r;tr
 db.exec(`CREATE TABLE IF NOT EXISTS pushsubs(endpoint TEXT PRIMARY KEY,uid TEXT NOT NULL,p256dh TEXT NOT NULL,auth TEXT NOT NULL,sess TEXT NOT NULL,created INTEGER NOT NULL,last_ok INTEGER,fails INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS pushprefs(uid TEXT PRIMARY KEY,cats TEXT NOT NULL);`);
 // SW-069: `endpoint` holds the canonical key (WEBPUSH.canonEndpoint().key); `url` is where alerts are POSTed. Rows from
-// v32 (raw endpoint, no url) are moved to the canonical key once at start; if two rows turn out to be the same device,
-// the one turned on first keeps it.
+// v32 (raw endpoint, no url) are moved to the canonical key once at start; if two or more rows turn out to be the same
+// device, the one turned on first keeps it (SW-070: even when a later row already stores the canonical key). Ties
+// (same created) keep the lexicographically earlier original endpoint.
 try{db.exec("ALTER TABLE pushsubs ADD COLUMN url TEXT")}catch(e){}
-{const rows=db.prepare("SELECT endpoint,created FROM pushsubs WHERE url IS NULL ORDER BY created").all();
+{const rows=db.prepare("SELECT endpoint,created FROM pushsubs WHERE url IS NULL").all();
+ const groups=new Map();
  for(const r of rows){const c=WEBPUSH.canonEndpoint(r.endpoint);
   if(!c){db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(r.endpoint);continue}
-  if(c.key===r.endpoint){db.prepare("UPDATE pushsubs SET url=? WHERE endpoint=?").run(c.url,r.endpoint);continue}
-  if(db.prepare("SELECT 1 FROM pushsubs WHERE endpoint=?").get(c.key))db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(r.endpoint);
-  else db.prepare("UPDATE pushsubs SET endpoint=?,url=? WHERE endpoint=?").run(c.key,c.url,r.endpoint)}}
+  const g=groups.get(c.key);if(g)g.push({r,c});else groups.set(c.key,[{r,c}])}
+ const del=db.prepare("DELETE FROM pushsubs WHERE endpoint=?"),move=db.prepare("UPDATE pushsubs SET endpoint=?,url=? WHERE endpoint=?"),setUrl=db.prepare("UPDATE pushsubs SET url=? WHERE endpoint=?"),get=db.prepare("SELECT endpoint,created FROM pushsubs WHERE endpoint=?");
+ db.exec("BEGIN");
+ try{for(const[key,g]of groups){
+   g.sort((a,b)=>a.r.created-b.r.created||(a.r.endpoint<b.r.endpoint?-1:a.r.endpoint>b.r.endpoint?1:0));
+   const keep=g[0];for(const x of g.slice(1))del.run(x.r.endpoint);
+   if(keep.r.endpoint===key)setUrl.run(keep.c.url,key);
+   else{const occ=get.get(key);if(!occ)move.run(key,keep.c.url,keep.r.endpoint);
+    else if(occ.created<keep.r.created||(occ.created===keep.r.created&&occ.endpoint<=keep.r.endpoint))del.run(keep.r.endpoint);
+    else{del.run(key);move.run(key,keep.c.url,keep.r.endpoint)}}}
+  db.exec("COMMIT")}catch(e){try{db.exec("ROLLBACK")}catch(x){}throw e}}
 const pushKey=ep=>{const c=WEBPUSH.canonEndpoint(ep);return c?c.key:""};
 const VAPID=WEBPUSH.makeVapid(db);
 const PUSH_CATS=["jobs","hires","quotes","msgs"];
