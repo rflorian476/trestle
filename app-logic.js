@@ -4943,7 +4943,7 @@ if(typeof document!=="undefined"){const oa=AFTER.account;AFTER.account=function(
    const z=document.getElementById("v34zip");if(z)z.onclick=()=>v34Export(z)}catch(e){}return x}}catch(e){}return r}}
 
 /* ===== v35 ===== */
-const V2_ACTIONS35=["pbSave35","pbDel35","pbImport35"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS35);
+const V2_ACTIONS35=["pbSave35","pbDel35","pbImport35","stmt35"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS35);
 function v35Now(){return typeof __now==="function"?__now():Date.now()}
 const v35r2=n=>Math.round((Number(n)||0)*100)/100;
 const v35OnServer=()=>typeof navigator!=="undefined"&&navigator&&navigator.userAgent==="node";
@@ -5035,6 +5035,56 @@ if(v35OnServer()&&typeof DB!=="undefined"&&DB&&DB.users){seedPb35()}
 {const oa=AFTER.office;AFTER.office=(tab,q)=>{oa&&oa(tab,q);try{if(tab==="pricebook")v35PbBind()}catch(e){console.warn(e)}}}
 // the Office backup ZIP carries the price book too
 if(typeof v31Backup==="function"){const ob=v31Backup;v31Backup=function(m){const r=ob.apply(this,arguments);try{const L=v35PbSorted(m);if(L.length&&r&&Array.isArray(r.files))r.files.push(["price-book.csv","\ufeff"+v7CSV([["Item","Price","Per","Category","Times used"],...L.map(x=>[x.d,Number(x.r).toFixed(2),x.unit,x.cat,x.n||0])])])}catch(e){}return r}}
+
+/* (2) Who owes you. Office -> Invoices opens with an aging card: open balances by how late they are (not due yet, 1-30,
+   31-60, 61-90, 90+ days) and one row per customer with the oldest late invoice. "Statement" lists that customer's open
+   invoices with totals; send it in Sawyer (the customer gets a notice and a statement page with Pay buttons), copy it as
+   text, or download a CSV. One statement per customer per day, checked on the server. Payments stay in test mode. */
+const V35_BK=[["cur","Not due yet"],["d30","1–30 days late"],["d60","31–60 days late"],["d90","61–90 days late"],["d90p","90+ days late"]];
+function v35Late(b){const d=b.due?v7DaysTo(b.due):null;return d==null||d>=0?0:-d}
+function v35Bk(n){return n<=0?"cur":n<=30?"d30":n<=60?"d60":n<=90?"d90":"d90p"}
+function v35Open(by,cust){return(DB.bills||[]).filter(b=>b.by===by&&b.type==="inv"&&b.status!=="draft"&&b.status!=="void"&&(!cust||b.cust===cust)&&billCalc(b).bal>0.004)}
+function v35Aging(m){const open=v35Open(m.id),bk={cur:0,d30:0,d60:0,d90:0,d90p:0},cs=new Map();let tot=0,late=0;
+ open.forEach(b=>{const bal=billCalc(b).bal,n=v35Late(b);bk[v35Bk(n)]+=bal;tot+=bal;if(n>0)late+=bal;const c=cs.get(b.cust)||{id:b.cust,name:b.cname,bal:0,late:0,oldest:0,n:0};c.bal+=bal;if(n>0)c.late+=bal;c.oldest=Math.max(c.oldest,n);c.n++;cs.set(b.cust,c)});
+ const rows=[...cs.values()].map(c=>Object.assign(c,{cu:v7Cust(c.id)||{}})).sort((a,b)=>b.oldest-a.oldest||b.bal-a.bal);Object.keys(bk).forEach(k=>bk[k]=v35r2(bk[k]));return{bk,tot:v35r2(tot),late:v35r2(late),rows,n:open.length}}
+function v35AgingCard(m){const a=v35Aging(m);if(!a.n)return`<div class="card v35ar v35ar-0" id="v35ar"><h2>${I("wallet",18)} Who owes you</h2><p class="muted small">Nothing outstanding. Every invoice you sent is paid.</p></div>`;
+ const bar=V35_BK.filter(([k])=>a.bk[k]>0).map(([k,t])=>`<i class="v35b-${k}" style="flex:${Math.max(a.bk[k]/a.tot,0.02).toFixed(4)}" title="${esc(t+": "+v7$(a.bk[k]))}"></i>`).join("");
+ const rows=a.rows.slice(0,6).map(c=>`<li><div class="v35ar-c"><b>${esc(c.name)}</b><small class="muted">${c.n} open invoice${c.n===1?"":"s"}${c.oldest?` · oldest ${c.oldest} day${c.oldest===1?"":"s"} late`:" · not due yet"}${c.cu.stmt35?` · statement sent ${esc(v35Fmt(new Date(c.cu.stmt35).toISOString().slice(0,10)))}`:""}</small></div><b class="v35n ${c.late?"v35late":""}">${esc(v7$(c.bal))}</b><button type="button" class="btn sm" data-v35st="${esc(c.id)}">${I("doc",14)}Statement</button></li>`).join("");
+ return`<div class="card v35ar" id="v35ar" aria-labelledby="v35arh"><div class="v35ar-h"><div><h2 id="v35arh">${I("wallet",18)} Who owes you</h2><p class="muted small">${a.n} open invoice${a.n===1?"":"s"} · ${esc(v7$(a.late))} of it late</p></div><b class="v35ar-t v35n">${esc(v7$(a.tot))}</b></div>
+ <div class="v35bar" role="img" aria-label="${esc(V35_BK.filter(([k])=>a.bk[k]>0).map(([k,t])=>t+" "+v7$(a.bk[k])).join(", "))}">${bar}</div>
+ <dl class="v35bk">${V35_BK.map(([k,t])=>`<div class="${a.bk[k]?"":"z"}"><dt><i class="v35b-${k}"></i>${esc(t)}</dt><dd class="v35n">${esc(v7$(a.bk[k]))}</dd></div>`).join("")}</dl>
+ <ul class="v35ar-l">${rows}</ul>${a.rows.length>6?`<p class="muted small">+${a.rows.length-6} more customers with an open balance.</p>`:""}</div>`}
+function v35StmtRows(by,cust){return v35Open(by,cust).sort((a,b)=>(a.date||0)-(b.date||0)).map(b=>{const c=billCalc(b);return{b,no:b.no,title:b.title||"",issued:v31D?v31D(b.date):new Date(b.date).toISOString().slice(0,10),due:b.due||"",total:c.total,paid:v35r2(c.total-c.bal),bal:c.bal,late:v35Late(b)}})}
+function v35StmtText(m,c,rows){const tot=rows.reduce((a,r)=>a+r.bal,0);return`Statement from ${m.biz||nameOf(m)} for ${c.name}, ${v7Today()}\n\n`+rows.map(r=>`${r.no} · ${r.title} · issued ${r.issued}${r.due?" · due "+r.due:""} · total ${v7$(r.total)} · paid ${v7$(r.paid)} · balance ${v7$(r.bal)}${r.late?" ("+r.late+" days late)":""}`).join("\n")+`\n\nTotal open: ${v7$(tot)}\nThank you!`}
+A.stmt35=function(cid){const m=me();if(!v7Pro(m))return{ok:false,msg:"Statements are part of The Office for pro accounts."};const c=v7Cust(cid);if(!c||c.by!==m.id)return{ok:false,msg:"That customer wasn't found."};
+ if(!c.uid||!U(c.uid))return{ok:false,msg:c.name+" isn't on Sawyer yet. Copy the statement and text or email it."};
+ const rows=v35StmtRows(m.id,c.id);if(!rows.length)return{ok:false,msg:c.name+" has no open invoices."};
+ if(c.stmt35&&v35Now()-c.stmt35<864e5)return{ok:false,msg:"You sent "+c.name+" a statement in the last 24 hours. One a day keeps it friendly."};
+ const tot=rows.reduce((a,r)=>a+r.bal,0);notify(c.uid,`${m.biz||nameOf(m)} sent you a statement: ${v7$(tot)} open on ${rows.length} invoice${rows.length===1?"":"s"}`,"stmt35:"+m.id);c.stmt35=v35Now();save();
+ return{ok:true,msg:"Statement sent to "+c.name+" in Sawyer"}};
+function v35Csv(name,rows){try{const blob=new Blob(["\ufeff"+v7CSV(rows)],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}catch(e){toast("Couldn't download the file","err")}}
+function v35StmtModal(cid){const m=me(),c=v7Cust(cid);if(!m||!c)return;const rows=v35StmtRows(m.id,cid),tot=v35r2(rows.reduce((a,r)=>a+r.bal,0)),txt=v35StmtText(m,c,rows);
+ const sentAt=c.stmt35&&v35Now()-c.stmt35<864e5;
+ modal(`<div class="v35sm"><h2 id="mtitle">Statement for ${esc(c.name)}</h2><p class="muted small">${esc(m.biz||nameOf(m))} · ${esc(v7Today())}</p>
+ <div class="tablewrap"><table class="v35st"><thead><tr><th scope="col">Invoice</th><th scope="col">Due</th><th scope="col" class="v35n v35st-x">Total</th><th scope="col" class="v35n v35st-x">Paid</th><th scope="col" class="v35n">Balance</th></tr></thead><tbody>${rows.map(r=>`<tr><th scope="row">${esc(r.no)}<small class="muted">${esc(r.title)}</small></th><td>${esc(r.due?v35Fmt(r.due):"—")}${r.late?`<small class="v35late">${r.late} days late</small>`:""}</td><td class="v35n v35st-x">${esc(v7$(r.total))}</td><td class="v35n v35st-x">${esc(v7$(r.paid))}</td><td class="v35n"><b>${esc(v7$(r.bal))}</b></td></tr>`).join("")}</tbody><tfoot><tr><th scope="row" colspan="2">Total open</th><td class="v35st-x"></td><td class="v35st-x"></td><td class="v35n"><b>${esc(v7$(tot))}</b></td></tr></tfoot></table></div>
+ <label class="sr" for="v35stx">Statement text</label><textarea id="v35stx" class="v35stx" rows="4" readonly>${esc(txt)}</textarea>
+ <p class="err" id="v35stE" role="alert"></p><div class="actions v35sm-a">${c.uid?`<button type="button" class="btn primary" id="v35stS" ${sentAt?"disabled":""}>${I("send",16)}${sentAt?"Sent today":"Send in Sawyer"}</button>`:`<span class="muted small v35sm-n">${esc(c.name)} isn't on Sawyer. Copy it and text or email it.</span>`}<button type="button" class="btn" id="v35stC">${I("copy",16)}Copy text</button><button type="button" class="btn" id="v35stD">${I("download",16)}CSV</button><button type="button" class="btn ghost" data-close>Close</button></div></div>`);
+ document.querySelectorAll("#modal [data-close]").forEach(b=>b.onclick=closeModal);const $=s=>document.getElementById(s);
+ if($("v35stS"))$("v35stS").onclick=()=>{const b=$("v35stS");b.disabled=true;const r=A.stmt35(cid);if(r&&r.ok){closeModal();act(r,()=>{const y=scrollY;render();scrollTo(0,y)})}else{$("v35stE").textContent=(r&&r.msg)||"That didn't send.";b.disabled=false}};
+ $("v35stC").onclick=()=>{const t=$("v35stx");const done=()=>toast("Statement copied");try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,()=>{t.select();document.execCommand("copy");done()});else{t.select();document.execCommand("copy");done()}}catch(e){t.select()}};
+ $("v35stD").onclick=()=>v35Csv("statement-"+String(c.name).replace(/[^a-z0-9]+/gi,"-").toLowerCase().replace(/^-|-$/g,"")+"-"+v7Today()+".csv",[["Invoice","Title","Issued","Due","Total","Paid","Balance","Days late"],...rows.map(r=>[r.no,r.title,r.issued,r.due,r.total.toFixed(2),r.paid.toFixed(2),r.bal.toFixed(2),r.late]),["Total open","","","","","",tot.toFixed(2),""]])}
+// customer side: /statement/<pro id> lists what's open with that pro, with Pay buttons (test mode)
+VIEWS.statement=function(pid){const m=me();if(!m)return VIEWS.signup(null,{next:"/statement/"+(pid||"")});const p=U(pid);
+ const bs=(DB.bills||[]).filter(b=>b.by===pid&&b.cuid===m.id&&b.type==="inv"&&b.status!=="draft"&&b.status!=="void"&&billCalc(b).bal>0.004).sort((a,b)=>(a.date||0)-(b.date||0));
+ const tot=v35r2(bs.reduce((a,b)=>a+billCalc(b).bal,0)),biz=(bs[0]&&bs[0].bizName)||(p&&nameOf(p))||"Your pro";
+ return`<section class="page narrow v35cs"><a class="backlink" href="${href("bills")}">${I("back",16)}My invoices</a><h1>Statement from ${esc(biz)}</h1><p class="muted">${esc(v7Today())} · ${bs.length} open invoice${bs.length===1?"":"s"}</p>
+ ${bs.length?`<div class="card"><ul class="v35cs-l">${bs.map(b=>{const c=billCalc(b),n=v35Late(b);return`<li><div><b>${esc(b.no)} · ${esc(b.title||"Invoice")}</b><small class="muted">${b.due?"Due "+esc(b.due):""}${n?` · <span class="v35late">${n} days late</span>`:""}</small></div><b class="v35n">${esc(v7$(c.bal))}</b><a class="btn sm primary" href="${href("pay",b.id)}">${I("lock",14)}Pay</a></li>`}).join("")}</ul><div class="v35cs-t"><span>Total open</span><b class="v35n">${esc(v7$(tot))}</b></div></div><p class="muted small">Payments are in test mode during the beta. No real money moves.</p>`
+ :`<div class="card">${empty("check","You're all paid up","Nothing is open with "+esc(biz)+".","")}</div>`}</section>`};
+if(typeof TITLES!=="undefined")Object.assign(TITLES,{statement:"Statement"});
+{const ol=linkTo;linkTo=function(l){const[a,b]=String(l||"").split(":");if(a==="stmt35"&&b)return go("statement",b);return ol(l)}}
+
+{const ov=VIEWS.office;VIEWS.office=(tab,q)=>{const m=me();if(m&&v7Pro(m)&&tab==="invoices"){const h=ov(tab,q);const a='<div class="o7-bar">',i=h.indexOf(a);return i<0?h:h.slice(0,i)+v35AgingCard(m)+h.slice(i)}return ov(tab,q)}}
+{const oa=AFTER.office;AFTER.office=(tab,q)=>{oa&&oa(tab,q);try{document.querySelectorAll("[data-v35st]").forEach(b=>b.onclick=()=>v35StmtModal(b.dataset.v35st))}catch(e){console.warn(e)}}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
