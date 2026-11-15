@@ -137,10 +137,10 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
   const led=[];for(const o of [{kind:"exp",amt:"212.40",cat:"Materials",vendor:"Ferguson",job:"Kitchen remodel",date:day(3)},{kind:"exp",amt:"38.15",cat:"Dump fees",vendor:"City transfer station",job:"Kitchen remodel",date:day(2)},{kind:"mile",miles:"24",from:"Shop",to:"12 Oak St",job:"Kitchen remodel",date:day(2)},{kind:"exp",amt:"55",cat:"Materials",vendor:"Home Depot",job:"Other job",date:day(1)}]){r=await act(P(),jp.ck,"addLedger",[o]);ok(r.res.ok,"log "+o.kind+" "+(o.vendor||o.to),J(r.res))}
   const L=(r.st.ledger||[]).filter(x=>x.by===jp.id);const fer=L.find(x=>x.vendor==="Ferguson"),dump=L.find(x=>x.vendor==="City transfer station"),mi=L.find(x=>x.kind==="mile"),hd=L.find(x=>x.vendor==="Home Depot");
   ok(fer&&dump&&mi&&hd,"four ledger rows are logged");
-  for(const bad of ["-5","\u22125","101","abc"]){r=await act(P(),jp.ck,"mk36",[bad]);ok(r.res.ok===false&&/0% to 100%/.test(r.res.msg),"markup "+JSON.stringify(bad)+" is refused",J(r.res))}
+  for(const bad of ["-5","\u22125","501","abc"]){r=await act(P(),jp.ck,"mk36",[bad]);ok(r.res.ok===false&&/0% to 500%/.test(r.res.msg),"markup "+JSON.stringify(bad)+" is refused",J(r.res))}
   r=await act(P(),jp.ck,"mk36",["15%"]);ok(r.res.ok&&meOf(r.st).mk36===15,"markup 15% is saved for the pro",J(r.res));
-  for(const [inp,want] of [["33.33",33.33],["12.5%",12.5],[" 7.25 ",7.25],["33.335",33.34],["100",100]]){const x=await act(P(),jp.ck,"mk36",[inp]);ok(x.res.ok&&meOf(x.st).mk36===want,"SW-085: markup "+JSON.stringify(inp)+" is kept as "+want+"% (integer hundredths)",J(x.res))}
-  r=await act(P(),jp.ck,"mk36",["100.01"]);ok(r.res.ok===false,"SW-085: 100.01% is refused");r=await act(P(),jp.ck,"mk36",["15%"]);
+  for(const [inp,want] of [["33.33",33.33],["12.5%",12.5],[" 7.25 ",7.25],["33.335",33.34],["100",100],["150",150],["300",300],["500",500]]){const x=await act(P(),jp.ck,"mk36",[inp]);ok(x.res.ok&&meOf(x.st).mk36===want,"SW-085: markup "+JSON.stringify(inp)+" is kept as "+want+"% (integer hundredths)",J(x.res))}
+  r=await act(P(),jp.ck,"mk36",["500.01"]);ok(r.res.ok===false,"SW-085: 500.01% is refused");r=await act(P(),jp.ck,"mk36",["15%"]);
   r=await act(P(),jho.ck,"mk36",[10]);ok(r.res.ok===false,"a homeowner can't set a markup");
   const lines=[{d:"Labor",q:4,r:95},{d:"Materials: Ferguson",q:1,r:244.26,l36:fer.id},{d:"Dump fees",q:1,r:43.87,l36:dump.id},{d:"Mileage",q:24,r:0.7,l36:mi.id}];
   r=await act(P(),jp.ck,"saveBill",[{type:"inv",cust:cid,title:"Kitchen remodel",job:"Kitchen remodel",lines,tax:0}]);JBILL=r.res.id;
@@ -195,10 +195,10 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
    const H=mk=>{const [w,f=""]=String(mk).split(".");return BigInt(w)*100n+BigInt((f+"00").slice(0,2))};
    const want=(amt,mk)=>{const t=BigInt(Math.round(amt*100))*(10000n+H(mk));return Number(t/10000n+(t%10000n>=5000n?1n:0n))/100};const bad=[];
    const ten=v36CostLine({kind:"exp",amt:10.10,date:"2026-11-15",cat:"Materials",vendor:"Penny"},15).r;
-   for(let n=1;n<=50000;n++){const amt=n/100;for(const mk of [0,10,15,20,25,33.33,12.5,7.25]){const got=v36CostLine({kind:"exp",amt,date:"2026-11-15",cat:"Materials",vendor:"x"},mk).r;if(got!==want(amt,mk)){bad.push({amt,mk,got,want:want(amt,mk)});if(bad.length>=8)return{ten,n:bad.length,bad,checked:n}}}}
-   return{ten,n:bad.length,bad,checked:50000*8,c50:v36CostLine({kind:"exp",amt:50,date:"2026-11-15"},33.33).r}});
+   for(let n=1;n<=50000;n++){const amt=n/100;for(const mk of [0,10,15,20,25,33.33,12.5,7.25,150,300]){const got=v36CostLine({kind:"exp",amt,date:"2026-11-15",cat:"Materials",vendor:"x"},mk).r;if(got!==want(amt,mk)){bad.push({amt,mk,got,want:want(amt,mk)});if(bad.length>=8)return{ten,n:bad.length,bad,checked:n}}}}
+   return{ten,n:bad.length,bad,checked:50000*10,c50:v36CostLine({kind:"exp",amt:50,date:"2026-11-15"},33.33).r}});
   ok(sw.ten===11.62,"SW-083: $10.10 at 15% bills $11.62 through v36CostLine (not $11.61)",JSON.stringify(sw.ten));
-  ok(sw.n===0,"SW-083/SW-085: $0.01–$500 at 0/10/15/20/25/33.33/12.5/7.25% matches integer-cent math ("+sw.checked+" checks)",J(sw.bad));
+  ok(sw.n===0,"SW-083/SW-085: $0.01–$500 at 0/10/15/20/25/33.33/12.5/7.25/150/300% matches integer-cent math ("+sw.checked+" checks)",J(sw.bad));
   ok(sw.c50===66.67,"SW-085: $50 at 33.33% bills $66.67 (not $66.66)",sw.c50);
   await c.close()}
  for(const w of [390,1440]){

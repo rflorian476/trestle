@@ -1,12 +1,16 @@
 /* ===== v37 ===== */
 const V2_ACTIONS37=["visitConfirm37","visitAsk37","visitPick37","home37Prop","home37PropDel","home37Assign","home37Note","home37NoteDel"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS37);
 function v37Now(){return typeof __now==="function"?__now():Date.now()}
+function v37Today(){return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Detroit",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(v37Now()))}
+function v37DayAdd(iso,n){const[y,m,d]=String(iso).split("-").map(Number);return new Date(Date.UTC(y,m-1,d+n)).toISOString().slice(0,10)}
+function v37MaxDay(){return v37DayAdd(v37Today(),180)}
 
 /* (1) Appointments customers can count on (competitor-flaws #12: no-shows and unreliable scheduling).
    The pro's visit (v8 Schedule) gets an arrival window ("Arrive 8-10am"), can be tied to a hired job, and the customer sees it
    on that job's page, on the tracker and on their dashboard. The customer taps Confirm, or Ask to reschedule with up to 3 times
-   that work for them plus a note; the pro picks one in a tap and the visit moves. Any time change by the pro asks the customer
-   to confirm again. "On my way" (v8) keeps its live ETA. Everything stays between that pro and that customer: visits only reach
+   per request (and up to 6 requests in all) plus a note; the pro picks one in a tap and the visit moves. Any time change by the
+   pro asks the customer to confirm again. "On my way" (v8) keeps its live ETA. Offered days use the Eastern business date
+   (America/Detroit), from today to 180 days out. Everything stays between that pro and that customer: visits only reach
    their two parties in /api/state (server.js), and alerts go through the normal in-app notices (+ phone alerts when on). */
 const V37_WIN=[[0,"Exact time"],[60,"1-hour window"],[120,"2-hour window"],[180,"3-hour window"],[240,"4-hour window"]];
 function v37Win(v){const w=+(v&&v.win37);return V37_WIN.some(x=>x[0]===w)?w:0}
@@ -14,7 +18,7 @@ function v37Add(t,min){const[h,m]=String(t||"00:00").split(":").map(Number);cons
 function v37Range(v){const w=v37Win(v);if(!w)return"at "+v8Fmt12(v.start);const a=v8Fmt12(v.start),b=v8Fmt12(v37Add(v.start,w)),am=s=>s.slice(-2);return"arrive "+(am(a)===am(b)?a.slice(0,-2):a)+"–"+b}
 function v37When(v){return v7DateNice(v.date)+", "+v37Range(v)}
 function v37Conf(v){const c=v&&v.conf37;return c&&["pending","ok","ask"].includes(c.s)?c:{s:"pending"}}
-function v37Open(v){return v&&v.status==="scheduled"&&v.date>=v7Today()}
+function v37Open(v){return v&&v.status==="scheduled"&&v.date>=v37Today()}
 const V37CF={pending:["Waiting for the customer","b7-gold"],ok:["Confirmed","b7-good"],ask:["Asked to reschedule","b7-bad"]};
 function v37Badge(v,cust){if(!v37Open(v))return v8Badge(v.status);const c=v37Conf(v);const t=cust?{pending:"Please confirm",ok:"You confirmed",ask:"Reschedule asked"}[c.s]:V37CF[c.s][0];return`<span class="b7 ${V37CF[c.s][1]}">${t}</span>`}
 {const os=A.saveVisit;A.saveVisit=function(o){const m=me();o=o||{};
@@ -35,7 +39,7 @@ A.visitConfirm37=function(id){const m=me(),v=v8Visit(id);if(!m)return{ok:false,n
  v.conf37={s:"ok",at:v37Now(),by:"cust"};notify(v.by,`${v37Who(m)} confirmed ${v37When(v)}: ${v.title}`,"visit:"+v.id);save();return{ok:true,msg:"Confirmed. "+v.bizName+" can see it."}};
 A.visitAsk37=function(id,slots,note){const m=me(),v=v8Visit(id);if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!v||v.cuid!==m.id)return{ok:false,msg:"That appointment isn't yours."};
  if(!v37Open(v))return{ok:false,msg:"This visit isn't waiting on a time any more."};if((v.ask37n||0)>=6)return{ok:false,msg:"You've asked a few times already. Message "+v.bizName+" instead."};
- const today=v7Today(),max=new Date(Date.now()+180*864e5).toISOString().slice(0,10),seen=new Set(),out=[];
+ const today=v37Today(),max=v37MaxDay(),seen=new Set(),out=[];
  for(const s of (Array.isArray(slots)?slots:[]).slice(0,6)){const d=v7Date(s&&s.date),t=v8T(s&&s.start);if(!d&&!t)continue;if(!d||!t)return{ok:false,msg:"Give each time you offer a day and a time."};
   if(d<today||d>max)return{ok:false,msg:"Pick days from today up to 6 months out."};const k=d+" "+t;if(seen.has(k)||k===v.date+" "+v.start)continue;seen.add(k);out.push({date:d,start:t})}
  if(!out.length)return{ok:false,msg:"Offer at least one other time that works for you."};if(out.length>3)return{ok:false,msg:"Offer up to 3 times."};
@@ -43,7 +47,7 @@ A.visitAsk37=function(id,slots,note){const m=me(),v=v8Visit(id);if(!m)return{ok:
  notify(v.by,`${v37Who(m)} asked to move "${v.title}" (${v7DateNice(v.date)}) and offered ${out.length} other time${out.length===1?"":"s"}.`,"visit:"+v.id);save();return{ok:true,msg:"Sent. "+v.bizName+" will pick one of your times."}};
 A.visitPick37=function(id,i){const m=me(),v=v8Visit(id);if(!m||!v||v.by!==m.id)return{ok:false,msg:"Not your visit"};const c=v37Conf(v);
  if(v.status!=="scheduled"||c.s!=="ask")return{ok:false,msg:"There's no reschedule request on this visit."};const s=(c.slots||[])[+i];if(!s)return{ok:false,msg:"Pick one of the customer's times."};
- if(s.date<v7Today())return{ok:false,msg:"That day has passed. Edit the visit to pick a new time."};
+ if(s.date<v37Today())return{ok:false,msg:"That day has passed. Edit the visit to pick a new time."};
  v.date=s.date;v.start=s.start;v.conf37={s:"ok",at:v37Now(),by:"pick"};if(v.cuid)notify(v.cuid,`${v.bizName} moved "${v.title}" to ${v37When(v)}, a time you offered. You're all set.`,"visit:"+v.id);
  save();return{ok:true,msg:"Moved to "+v37When(v)+". Customer told."}};
 /* the customer's appointment card (job page, tracker) */
@@ -56,9 +60,13 @@ function v37Card(v){const c=v37Conf(v),open=v37Open(v),pro=U(v.by)||{},id=esc(v.
  <p class="v37ap-w"><b>${esc(v7DateNice(v.date))}</b> · ${esc(v37Range(v).replace(/^a/,"A"))}</p><small class="muted">${esc(v.bizName)}${v.hrs?" · about "+esc(String(v.hrs))+" hr"+(+v.hrs===1?"":"s"):""}</small></div>${v37Badge(v,true)}</div>
  <p class="v37ap-s" role="status" aria-live="polite">${line}</p>${open&&c.s==="ask"?`<ul class="v37ap-sl" aria-label="Times you offered">${(c.slots||[]).map(s=>`<li>${esc(v7DateNice(s.date))}, ${esc(v8Fmt12(s.start))}</li>`).join("")}</ul>`:""}
  <div class="v37ap-a">${acts}${["enroute","arrived"].includes(v.status)||open?`<a class="btn ${acts?"ghost sm":"primary"}" href="${href("track",v.id)}">${I("route",14)}${v.status==="enroute"?"Track":"Details"}</a>`:""}${pro.id?`<a class="btn ghost sm" href="${href("msgs",v.by)}">${I("chat",14)}Message</a>`:""}</div></section>`}
-function v37JobVisits(j,m){if(!j||!m)return[];const today=v7Today();return(DB.visits||[]).filter(v=>v&&v.status!=="canceled"&&((j.cust===m.id&&v.cuid===m.id&&v.by===j.hired)||(j.hired===m.id&&v.by===m.id&&v.cuid===j.cust))&&(!v.job37||v.job37===j.id)&&(v.date>=today||["enroute","arrived"].includes(v.status))).sort((a,b)=>(a.date+a.start)<(b.date+b.start)?-1:1)}
-function v37AskModal(v){const today=v7Today(),c=v37Conf(v),pre=c.s==="ask"?(c.slots||[]):[];const row=i=>{const s=pre[i]||{};return`<div class="v37as-r"><div class="fld"><label for="v37d${i}">Option ${i+1}: day</label><input id="v37d${i}" type="date" min="${today}" value="${esc(s.date||"")}" ${i?"":"required"}></div><div class="fld"><label for="v37t${i}">Time</label><input id="v37t${i}" type="time" step="900" value="${esc(s.start||"")}" ${i?"":"required"}></div></div>`};
- modal(`<form class="v37as" id="v37as" novalidate><h2 id="mtitle">${I("cal",20)} Ask to reschedule</h2><p class="muted small">Now: <b>${esc(v37When(v))}</b>. Offer up to 3 times that work for you; ${esc(v.bizName)} picks one and you're both set.</p>
+function v37JobVisits(j,m){if(!j||!m)return[];const today=v37Today();return(DB.visits||[]).filter(v=>v&&v.status!=="canceled"&&((j.cust===m.id&&v.cuid===m.id&&v.by===j.hired)||(j.hired===m.id&&v.by===m.id&&v.cuid===j.cust))&&(!v.job37||v.job37===j.id)&&(v.date>=today||["enroute","arrived"].includes(v.status))).sort((a,b)=>(a.date+a.start)<(b.date+b.start)?-1:1)}
+const v37ExpandJobs=new Set();
+function v37NeedsOk(v,m){return!!(v&&m&&v37Open(v)&&v37Conf(v).s==="pending"&&v.cuid===m.id)}
+function v37ShownVisits(vs,m,jid){if(!vs.length)return{show:[],more:0};if(v37ExpandJobs.has(jid)||vs.length<=3)return{show:vs,more:0};
+ const show=[],ids=new Set();vs.slice(0,3).forEach(v=>{show.push(v);ids.add(v.id)});vs.forEach(v=>{if(!ids.has(v.id)&&v37NeedsOk(v,m)){show.push(v);ids.add(v.id)}});return{show,more:vs.length-show.length}}
+function v37AskModal(v){const today=v37Today(),max=v37MaxDay(),c=v37Conf(v),pre=c.s==="ask"?(c.slots||[]):[];const row=i=>{const s=pre[i]||{};return`<div class="v37as-r"><div class="fld"><label for="v37d${i}">Option ${i+1}: day</label><input id="v37d${i}" type="date" min="${today}" max="${max}" value="${esc(s.date||"")}" ${i?"":"required"}></div><div class="fld"><label for="v37t${i}">Time</label><input id="v37t${i}" type="time" step="900" value="${esc(s.start||"")}" ${i?"":"required"}></div></div>`};
+ modal(`<form class="v37as" id="v37as" novalidate><h2 id="mtitle">${I("cal",20)} Ask to reschedule</h2><p class="muted small">Now: <b>${esc(v37When(v))}</b>. Offer up to 3 times per request (6 requests in all); ${esc(v.bizName)} picks one and you're both set.</p>
  ${[0,1,2].map(row).join("")}<div class="fld"><label for="v37n">Anything ${esc(v.bizName)} should know? <span class="muted">(optional)</span></label><textarea id="v37n" rows="2" maxlength="300" placeholder="Mornings are best, gate code changes Friday">${esc(c.s==="ask"?c.note||"":"")}</textarea></div>
  <p class="small v37as-e" id="v37asE" role="alert"></p><div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" id="v37asGo">${I("send",15)}Send times</button></div></form>`,"v33sheet");
  document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);
@@ -71,9 +79,9 @@ function v37ProCard(j,m){const vs=v37JobVisits(j,m);
  return`<section class="card v37pj" id="v37pj" aria-labelledby="v37pjh"><div class="o7-sh"><h2 class="h-sub" id="v37pjh">${I("cal",16)} Visits for this job</h2><button type="button" class="btn sm primary" id="v37new" data-job="${esc(j.id)}">${I("plus",14)}Schedule a visit</button></div>
  ${vs.length?`<ul class="v37pj-l">${vs.map(v=>`<li><a href="${href("schedule",null,{v:v.id})}"><b>${esc(v7DateNice(v.date))}</b><span>${esc(v37Range(v))} · ${esc(v.title)}</span></a>${v37Badge(v,false)}</li>`).join("")}</ul>`:`<p class="muted small">Give ${esc(String((U(j.cust)||{}).name||"the customer").split(" ")[0])} a day and an arrival window. They confirm in one tap or offer other times, and "On my way" tells them you're coming.</p>`}</section>`}
 {const ov=VIEWS.job;VIEWS.job=function(id,q){let h=ov.apply(this,arguments);try{const m=me(),j=(DB.jobs||[]).find(x=>x&&x.id===id);if(!m||!j||!j.hired||!["hired","completed"].includes(j.status))return h;let card="";
-  if(j.cust===m.id){const vs=v37JobVisits(j,m);if(!vs.length)return h;card=`<div class="v37aps">${vs.slice(0,3).map(v37Card).join("")}</div>`}else if(j.hired===m.id&&j.status==="hired"&&v7Pro(m))card=v37ProCard(j,m);else return h;
+  if(j.cust===m.id){const vs=v37JobVisits(j,m);if(!vs.length)return h;const L=v37ShownVisits(vs,m,j.id);card=`<div class="v37aps">${L.show.map(v37Card).join("")}${L.more?`<button type="button" class="linkbtn v37more" id="v37more" data-job="${esc(j.id)}">and ${L.more} more</button>`:""}</div>`}else if(j.hired===m.id&&j.status==="hired"&&v7Pro(m))card=v37ProCard(j,m);else return h;
   const k=h.lastIndexOf("</section>");return k<0?h+card:h.slice(0,k)+card+h.slice(k)}catch(e){return h}}}
-{const oa=AFTER.job;AFTER.job=function(id,q){const r=oa&&oa.apply(this,arguments);try{v37Bind(document.getElementById("app"));const b=document.getElementById("v37new");
+{const oa=AFTER.job;AFTER.job=function(id,q){const r=oa&&oa.apply(this,arguments);try{v37Bind(document.getElementById("app"));const more=document.getElementById("v37more");if(more)more.onclick=()=>{v37ExpandJobs.add(more.dataset.job);const y=scrollY;render();scrollTo(0,y)};const b=document.getElementById("v37new");
   if(b)b.onclick=()=>{const j=(DB.jobs||[]).find(x=>x.id===b.dataset.job);const r=A.custFromJob(b.dataset.job);if(!r||!r.ok)return act(r);const pre={cust:r.id,title:j?j.title:"",job:b.dataset.job};go("schedule",null,Object.assign({new:1},pre));
    // the route change closes any open sheet (hashchange) and clears it 180 ms later, so open ours once that has run
    let n=0;const t=setInterval(()=>{if(++n>25)return clearInterval(t);if(n<3||ROUTE.v!=="schedule"||!document.querySelector(".sc8-desk,.sc8-mob"))return;clearInterval(t);if(!document.querySelector("#modal.on #vm8f"))v8VisitModal(null,pre)},100)}}catch(e){console.warn(e)}return r}}
@@ -150,7 +158,7 @@ VIEWS.myhome=function(pid){const m=me();if(!m)return VIEWS.signup(null,{next:"/m
   <small class="muted">${esc(fmtDate(x.at))} · ${esc(x.pro?(x.pro.biz||nameOf(x.pro)).replace(/ \(demo\)$/,""):"Pro")} · ${esc(x.j.cat||"")}${x.amt?" · "+esc(v28$(x.amt)):""}</small>
   ${x.bills.length?`<div class="v37bl">${x.bills.map(b=>{const c=billCalc(b);return`<a class="v37b" href="${href("invoice",b.id)}">${I("receipt",12)}${esc(b.no)} · ${esc(v7$(c.total))}${b.type==="inv"?(c.bal<0.005?" · paid":" · "+esc(v7$(c.bal))+" due"):""}</a>`}).join("")}</div>`:""}
   ${v37Thumbs(x.photos,4)}${x.rv?`<small class="h12-rv">${starStr(x.rv.stars)} You reviewed this job</small>`:""}</div>${v37Sel(m,props,"job",x.j.id,cur.id)}</li>`};
- const tabs=`<nav class="v37tabs" aria-label="Your properties">${props.map(p=>`<a href="${href("myhome",p.main?null:p.id)}" class="${p.id===cur.id?"on":""}" ${p.id===cur.id?'aria-current="page"':""}>${I(p.main?"house":p.loc?"brief":"pin",14)}<span>${esc(p.name)}</span><small>${F.by[p.id].jobs.length}</small></a>`).join("")}<button type="button" class="v37add" id="v37addP">${I("plus",14)}<span>Add a property</span></button></nav>`;
+ const tabs=`<div class="v37tabbar"><div class="v37tabs-sc" id="v37tabsSc"><nav class="v37tabs" aria-label="Your properties" id="v37tabs">${props.map(p=>`<a href="${href("myhome",p.main?null:p.id)}" class="${p.id===cur.id?"on":""}" ${p.id===cur.id?'aria-current="page"':""}>${I(p.main?"house":p.loc?"brief":"pin",14)}<span>${esc(p.name)}</span><small>${F.by[p.id].jobs.length}</small></a>`).join("")}</nav></div><button type="button" class="v37add" id="v37addP">${I("plus",14)}<span>Add a property</span></button></div>`;
  const notes=`<section class="card v37sec v37notes" aria-labelledby="v37nh"><div class="o7-sh"><h2 class="h-sub" id="v37nh">${I("pen",16)} Notes about this place</h2><span class="muted small">${X.notes.length}</span></div>
   <form id="v37nf" class="v37nf no-print"><div class="fld"><label for="v37nt">Add a note</label><textarea id="v37nt" rows="2" maxlength="500" placeholder="Paint: Agreeable Gray SW 7029 · furnace filter 16x25x1 · water shutoff behind the laundry panel"></textarea></div>
   <div class="v37nf-a"><label class="btn sm" for="v37np">${I("camera",14)}Add a photo</label><input id="v37np" type="file" accept="image/jpeg,image/png,image/webp" class="r10-in" hidden><span class="muted small" id="v37npS" role="status"></span><button class="btn sm primary" id="v37nGo">Save note</button></div></form>
@@ -166,11 +174,12 @@ VIEWS.myhome=function(pid){const m=me();if(!m)return VIEWS.signup(null,{next:"/m
  ${X.jobs.length?`<ol class="v37jl">${X.jobs.map(jobRow).join("")}</ol>`:`<p class="muted small">${props.length>1?"No jobs filed under this property yet. Move one here with the picker next to it.":"Jobs you hire a pro for on __BRAND__ show up here with their bills and photos."}</p><a class="btn sm no-print" href="${href("post")}">Request a pro</a>`}</section>
  ${free}${ws}${notes}<p class="muted small v37ft">${I("lock",13)} Only you can see this page. Nothing here is shared with pros or buyers unless you print or send it yourself.</p></div></section>`};
 if(typeof TITLES!=="undefined")TITLES.myhome="My home";
-function v37Csv(m,cur,X){const c=typeof csvCell==="function"?csvCell:(x=>'"'+String(x==null?"":x).replace(/"/g,'""')+'"');const rows=[["Property",cur.name],["Address",cur.addr],[],["Date","Type","What","Pro / from","Trade","Amount","Bills","Photos"]];
- X.jobs.forEach(x=>rows.push([new Date(x.at).toISOString().slice(0,10),x.j.status==="completed"?"Job done":"Job in progress",x.j.title==="Past job"?(x.j.sub||x.j.cat):x.j.title,x.pro?(x.pro.biz||nameOf(x.pro)):"",x.j.cat||"",x.amt!=null?(+x.amt).toFixed(2):"",x.bills.map(b=>b.no).join(" "),x.photos.length]));
- X.free.forEach(b=>rows.push([new Date(b.date).toISOString().slice(0,10),"Bill",b.no+" "+(b.title||""),b.bizName||"","",billCalc(b).total.toFixed(2),b.no,(b.ph36||[]).length]));
- X.ws.forEach(w=>rows.push([new Date(w.start).toISOString().slice(0,10),"Warranty",w.name,w.pro||"","","",w.src||"","until "+new Date(w.end).toISOString().slice(0,10)]));
- X.notes.forEach(n=>rows.push([new Date(n.date).toISOString().slice(0,10),"Note",n.text,"","","","",n.photo?1:0]));
+function v37Csv(m){const c=typeof csvCell==="function"?csvCell:(x=>'"'+String(x==null?"":x).replace(/"/g,'""')+'"');const F=v37File(m);const rows=[["Date","Property","Type","What","Pro / from","Trade","Amount","Bills","Photos"]];
+ const add=(name,X)=>{X.jobs.forEach(x=>rows.push([new Date(x.at).toISOString().slice(0,10),name,x.j.status==="completed"?"Job done":"Job in progress",x.j.title==="Past job"?(x.j.sub||x.j.cat):x.j.title,x.pro?(x.pro.biz||nameOf(x.pro)):"",x.j.cat||"",x.amt!=null?(+x.amt).toFixed(2):"",x.bills.map(b=>b.no).join(" "),x.photos.length]));
+  X.free.forEach(b=>rows.push([new Date(b.date).toISOString().slice(0,10),name,"Bill",b.no+" "+(b.title||""),b.bizName||"","",billCalc(b).total.toFixed(2),b.no,(b.ph36||[]).length]));
+  X.ws.forEach(w=>rows.push([new Date(w.start).toISOString().slice(0,10),name,"Warranty",w.name,w.pro||"","","",w.src||"","until "+new Date(w.end).toISOString().slice(0,10)]));
+  X.notes.forEach(n=>rows.push([new Date(n.date).toISOString().slice(0,10),name,"Note",n.text,"","","","",n.photo?1:0]))};
+ (F.props||[]).forEach(prop=>add(prop.name,F.by[prop.id]));
  return"\ufeff"+rows.map(r=>r.map(c).join(",")).join("\r\n")}
 function v37PropModal(p){p=p||{};modal(`<form id="v37pf" class="v37pf"><h2 id="mtitle">${I("house",20)} ${p.id?"Edit property":"Add a property"}</h2><p class="muted small">A rental, a cabin, a parent's house you look after. Jobs in its ZIP file here by themselves.</p>
  <div class="fld"><label for="v37pn">Name</label><input id="v37pn" maxlength="60" required value="${esc(p.name||"")}" placeholder="Lake cabin"></div><div class="fld"><label for="v37pa">Address <span class="muted">(optional)</span></label><input id="v37pa" maxlength="160" autocomplete="street-address" value="${esc(p.addr||"")}" placeholder="410 Lakeshore Dr, Manistee, MI"></div>
@@ -180,9 +189,10 @@ function v37PropModal(p){p=p||{};modal(`<form id="v37pf" class="v37pf"><h2 id="m
  document.getElementById("v37pf").onsubmit=e=>{e.preventDefault();const r=A.home37Prop({id:p.id,name:document.getElementById("v37pn").value,addr:document.getElementById("v37pa").value,zip:document.getElementById("v37pz").value});if(r&&r.ok===false){document.getElementById("v37pfE").textContent=r.msg;return}closeModal();act(r,()=>go("myhome",r.id))};
  const d=document.getElementById("v37pDel");if(d)d.onclick=()=>{closeModal();act(A.home37PropDel(p.id),()=>go("myhome"))}}
 AFTER.myhome=function(pid){const m=me();if(!m||!v37HomeOk(m))return;const F=v37File(m),cur=F.props.find(p=>p.id===pid)||F.props[0],X=F.by[cur.id];const $=id=>document.getElementById(id);
+ const sc=$("v37tabsSc"),nav=$("v37tabs");if(sc&&nav){const paint=()=>{const l=nav.scrollLeft>2,r=nav.scrollLeft+nav.clientWidth<nav.scrollWidth-2;sc.classList.toggle("has-l",l);sc.classList.toggle("has-r",r)};nav.addEventListener("scroll",paint,{passive:true});if(typeof ResizeObserver==="function")new ResizeObserver(paint).observe(nav);requestAnimationFrame(paint)}
  const ap=$("v37addP");if(ap)ap.onclick=()=>v37PropModal(null);const ed=$("v37edit");if(ed)ed.onclick=()=>v37PropModal(v37H(m).props.find(p=>p.id===ed.dataset.id));
  const pr=$("v37print");if(pr)pr.onclick=()=>window.print();
- const cv=$("v37csv");if(cv)cv.onclick=()=>{const blob=new Blob([v37Csv(m,cur,X)],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="home-history-"+String(cur.name).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")+".csv";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
+ const cv=$("v37csv");if(cv)cv.onclick=()=>{const blob=new Blob([v37Csv(m)],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="home-history.csv";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
  document.querySelectorAll("[data-v37mv]").forEach(s=>s.onchange=()=>act(A.home37Assign(s.dataset.v37mv,s.dataset.id,s.value),()=>{const y=scrollY;render();scrollTo(0,y)}));
  document.querySelectorAll("[data-v37nd]").forEach(b=>b.onclick=()=>act(A.home37NoteDel(b.dataset.v37nd),()=>{const y=scrollY;render();scrollTo(0,y)}));
  let photo="";const np=$("v37np"),ns=$("v37npS");if(np)np.onchange=async()=>{const f0=np.files&&np.files[0];if(!f0)return;if(ns)ns.textContent="Uploading…";try{const f=typeof r10shrink==="function"?await r10shrink(f0):f0;photo=await v2upload(f);if(ns)ns.textContent="Photo ready"}catch(e){photo="";if(ns)ns.textContent="";toast(e.message||"Upload failed","err")}};

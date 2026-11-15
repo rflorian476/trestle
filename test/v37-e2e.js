@@ -1,8 +1,9 @@
 // v37 end-to-end. Self-contained: starts its own Sawyer server (local test mode, local stand-in push service). Covers health
 // 2.20.0-sawyer / SW cache sawyer-v37, SW-085 (job-cost markup in integer hundredths of a percent: $0.01–$500 at 33.33%,
-// 12.5%, 7.25% and the presets against BigInt math, saved markups, the Bill job costs sheet), Appointments (arrival windows,
+// 12.5%, 7.25%, 150%, 300% and the presets against BigInt math, saved markups, the Bill job costs sheet), Appointments (arrival windows,
 // customer Confirm / Ask to reschedule, the pro picks a time, a moved visit asks again, "On my way", phone alerts, job page /
-// tracker / dashboard / schedule UI) and My home (properties, filing by ZIP and by hand, notes with photos, print and CSV),
+// tracker / dashboard / schedule UI, SW-086 confirm-needed visits stay visible, 3 times per request / 6 requests in all,
+// Eastern 180-day window) and My home (properties, filing by ZIP and by hand, notes with photos, print and all-property CSV),
 // with privacy checks (signed out, other customers, other pros, the hired pro) at 390 and 1440.
 // Usage: node test/v37-e2e.js [shots dir]
 "use strict";
@@ -32,6 +33,7 @@ const post=(port,ck,p,o)=>req(port,"POST",p,Object.assign(ck?{Cookie:ck}:{},JH),
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const sigCk=r=>(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0];
 const iso=d=>d.toISOString().slice(0,10);
+const bizToday=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Detroit",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const addD=(s,n)=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return iso(d)};
 function device(){const e=crypto.createECDH("prime256v1");e.generateKeys();return{keys:{p256dh:e.getPublicKey().toString("base64url"),auth:crypto.randomBytes(16).toString("base64url")}}}
 function pushService(){const got=[];const srv=http.createServer((rq,rs)=>{const ch=[];rq.on("data",c=>ch.push(c));rq.on("end",()=>{got.push({path:rq.url,headers:rq.headers});rs.writeHead(201);rs.end()})});
@@ -50,12 +52,12 @@ let LOCAL=null,br=null,PS=null;
  const stateFor=async ck=>stateOf(await req(P(),"GET","/api/state",{Cookie:ck}));
  const meOf=st=>(st.users||[]).find(u=>u.id===st.me)||{};
  const up=async(ck,file)=>{const buf=fs.readFileSync(path.join(ROOT,file));const r=await req(P(),"POST","/api/upload",{Cookie:ck,"Content-Type":"image/webp","Content-Length":buf.length},buf);return r.json&&r.json.url};
- const today=iso(new Date());
+ const today=bizToday();
 
  // ===== 1. SW-085: markup in integer hundredths of a percent =====
  const mp=await signupPro("mk","Plumbing","78704");
- for(const [inp,want] of [["33.33",33.33],["12.5%",12.5],["7.25",7.25],["33.335",33.34],["0",0],["25",25]]){const r=await act(P(),mp.ck,"mk36",[inp]);ok(r.res.ok&&meOf(r.st).mk36===want,"SW-085: markup "+J(inp)+" is saved as "+want+"%",J(r.res))}
- for(const bad of ["100.01","-1","\u221233.33","abc"]){const r=await act(P(),mp.ck,"mk36",[bad]);ok(r.res.ok===false,"SW-085: markup "+J(bad)+" is refused",J(r.res))}
+ for(const [inp,want] of [["33.33",33.33],["12.5%",12.5],["7.25",7.25],["33.335",33.34],["0",0],["25",25],["150",150],["300",300],["500",500]]){const r=await act(P(),mp.ck,"mk36",[inp]);ok(r.res.ok&&meOf(r.st).mk36===want,"SW-085: markup "+J(inp)+" is saved as "+want+"%",J(r.res))}
+ for(const bad of ["500.01","-1","\u221233.33","abc"]){const r=await act(P(),mp.ck,"mk36",[bad]);ok(r.res.ok===false,"SW-085: markup "+J(bad)+" is refused",J(r.res))}
 
  // ===== 2. Appointments: API, rules and privacy =====
  const pro=await signupPro("ap","Plumbing","78704"),ho=await signupHo("ap"),ho2=await signupHo("ap2"),pro2=await signupPro("ap2","Plumbing","78704");
@@ -82,6 +84,11 @@ let LOCAL=null,br=null,PS=null;
  r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:addD(today,-1),start:"09:00"}],""]);ok(r.res.ok===false&&/from today/.test(r.res.msg),"a time in the past is refused",J(r.res));
  r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:D2,start:""}],""]);ok(r.res.ok===false&&/day and a time/.test(r.res.msg),"a day without a time is refused",J(r.res));
  r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:D2,start:"09:00"},{date:D2,start:"10:00"},{date:D3,start:"08:00"},{date:D3,start:"12:00"}],""]);ok(r.res.ok===false&&/up to 3/.test(r.res.msg),"more than 3 times is refused",J(r.res));
+ {const cap=addD(today,180),over=addD(today,181);
+  r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:over,start:"09:00"}],""]);ok(r.res.ok===false&&/6 months/.test(r.res.msg),"a day past the 180-day Eastern cap is refused",J({over,msg:r.res.msg}));
+  r=await act(P(),pro.ck,"saveVisit",[{cust:CID,title:"Cap day check",date:D2,start:"11:00",hrs:"1",win:"0",job:JID}]);const VCAP=r.res.id;
+  r=await act(P(),ho.ck,"visitAsk37",[VCAP,[{date:cap,start:"09:00"}],""]);ok(r.res.ok,"the exact 180-day Eastern cap day is accepted",J({cap,res:r.res}));
+  await act(P(),pro.ck,"delVisit",[VCAP])}
  const NOTE="Mornings only, the dog is out after noon "+run;
  r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:D2,start:"09:00"},{date:D3,start:"07:30"}],NOTE]);v=(r.st.visits||[]).find(x=>x.id===VID);
  ok(r.res.ok&&v.conf37.s==="ask"&&v.conf37.slots.length===2&&v.conf37.note===NOTE,"the customer asks to reschedule with 2 times and a note",J(r.res));
@@ -125,6 +132,15 @@ let LOCAL=null,br=null,PS=null;
   const ps=await pub();ok(!J(ps).includes(NOTE)&&!J(ps).includes(VID),"signed out: neither the visit nor the reschedule note appear anywhere");
   const s3=await stateFor(pro2.ck);ok(!J(s3).includes(NOTE),"another pro never sees the reschedule note")}
 
+ // ===== 2b. SW-086: a later visit waiting for confirm stays on the job page =====
+ const j86=await act(P(),ho.ck,"postJob",[{title:"V37 many visits "+run,cat:"Plumbing",sub:"Water heaters",desc:"Several upcoming visits on one job.",zip:"78704",budget:"$800",when:"This month"}]);
+ const J86=j86.res.id;await act(P(),pro.ck,"quote",[J86,900,"Yes"]);await act(P(),ho.ck,"hire",[J86,pro.id]);
+ const c86=await act(P(),pro.ck,"custFromJob",[J86]);const C86=c86.res.id;ok(c86.res.ok&&C86,"SW-086 setup: a second hired job",J(c86.res));
+ const EARLY=[];
+ for(let i=0;i<4;i++){r=await act(P(),pro.ck,"saveVisit",[{cust:C86,title:"Early visit "+(i+1),date:addD(today,40+i),start:"09:00",hrs:"1",win:"0",job:J86}]);ok(r.res.ok,"SW-086: early visit "+(i+1)+" is scheduled",J(r.res));EARLY.push(r.res.id);r=await act(P(),ho.ck,"visitConfirm37",[r.res.id]);ok(r.res.ok,"SW-086: early visit "+(i+1)+" is confirmed")}
+ r=await act(P(),pro.ck,"saveVisit",[{cust:C86,title:"Needs confirm last",date:addD(today,50),start:"10:00",hrs:"1",win:"60",job:J86}]);const VLAST=r.res.id;
+ ok(r.res.ok&&((r.st.visits||[]).find(x=>x.id===VLAST)||{}).conf37.s==="pending","SW-086: the 5th visit, last by date, is waiting for confirm",J(r.res));
+
  // ===== 3. My home: API, rules and privacy =====
  r=await act(P(),ho.ck,"home37Prop",[{name:"Lake house",addr:"1200 N Lincoln Memorial Dr, Milwaukee, WI 53202",zip:""}]);const CAB=r.res.id;
  ok(r.res.ok&&CAB&&(meOf(r.st).home37.props||[]).some(p=>p.id===CAB&&p.zip==="53202"),"the homeowner adds a property; the ZIP is read from the address",J(r.res));
@@ -164,9 +180,9 @@ let LOCAL=null,br=null,PS=null;
  {const {c,p}=await page(1440,mp.ck);await go(p,"/office/money");
   const sw=await p.evaluate(()=>{const H=mk=>{const [w,f=""]=String(mk).split(".");return BigInt(w)*100n+BigInt((f+"00").slice(0,2))};
    const want=(c,mk)=>{const t=BigInt(c)*(10000n+H(mk));return Number(t/10000n+(t%10000n>=5000n?1n:0n))};const bad=[];let n=0;
-   for(const mk of ["33.33","12.5","7.25","0","10","15","20","25"])for(let c=1;c<=50000;c++){n++;const got=Math.round(v36CostLine({kind:"exp",amt:c/100,date:"2026-11-15",cat:"Materials",vendor:"x"},Number(mk)).r*100);if(got!==want(c,mk)){bad.push([c,mk,got,want(c,mk)]);if(bad.length>8)break}}
+   for(const mk of ["33.33","12.5","7.25","0","10","15","20","25","150","300"])for(let c=1;c<=50000;c++){n++;const got=Math.round(v36CostLine({kind:"exp",amt:c/100,date:"2026-11-15",cat:"Materials",vendor:"x"},Number(mk)).r*100);if(got!==want(c,mk)){bad.push([c,mk,got,want(c,mk)]);if(bad.length>8)break}}
    const five=[50,150,250,350,450].map(a=>v36CostLine({kind:"exp",amt:a,date:"2026-11-15"},33.33).r);return{n,bad,five,str:v36Markup("50.00","33.33%")}});
-  ok(!sw.bad.length&&sw.n===400000,"SW-085: $0.01–$500 at 33.33/12.5/7.25% and 0/10/15/20/25% match integer half-up cents (400,000 checks)",J(sw.bad));
+  ok(!sw.bad.length&&sw.n===500000,"SW-085: $0.01–$500 at 33.33/12.5/7.25/150/300% and 0/10/15/20/25% match integer half-up cents (500,000 checks)",J(sw.bad));
   ok(J(sw.five)===J([66.67,200,333.33,466.66,599.99]),"SW-085: $50/$150/$250/$350/$450 at 33.33% bill $66.67 / $200.00 / $333.33 / $466.66 / $599.99",J(sw.five));
   ok(sw.str===66.67,"SW-085: text inputs (\"50.00\", \"33.33%\") give the same answer",sw.str);await c.close()}
  {await act(P(),mp.ck,"addLedger",[{kind:"exp",amt:"50",cat:"Materials",vendor:"Ferguson",job:"Markup check",date:today}]);await act(P(),mp.ck,"addLedger",[{kind:"exp",amt:"450",cat:"Materials",vendor:"Supply house",job:"Markup check",date:today}]);
@@ -184,7 +200,7 @@ let LOCAL=null,br=null,PS=null;
    await noOverflow(p,w+" job page with appointments");await card.scrollIntoViewIfNeeded();await p.waitForTimeout(150);
    await shot(p,"v37-appointment-customer-"+w+".png",w===390?{}:{clip:await card.boundingBox().then(b=>({x:Math.max(0,b.x-16),y:b.y-16,width:Math.min(1440,b.width+32),height:b.height+32}))});
    await axe(p,".v37aps",w+" appointment cards");
-   await card.locator("[data-v37ask]").click();await p.waitForSelector("#v37as");ok(await p.locator("#v37as label[for=v37d0]").count()===1&&await p.locator("#v37as label[for=v37n]").count()===1,w+": the reschedule sheet has labeled fields");
+   await card.locator("[data-v37ask]").click();await p.waitForSelector("#v37as");ok(await p.locator("#v37as label[for=v37d0]").count()===1&&await p.locator("#v37as label[for=v37n]").count()===1,w+": the reschedule sheet has labeled fields");ok(/3 times per request/.test(await p.textContent("#v37as"))&&/6 requests in all/.test(await p.textContent("#v37as")),w+": the sheet copy says 3 times per request and 6 requests in all");
    const fx=await p.evaluate(()=>document.activeElement&&document.activeElement.id);ok(fx==="v37d0",w+": focus starts on the first day field",fx);
    await p.fill("#v37d0",addD(today,10));await p.fill("#v37t0","09:00");await p.fill("#v37d1",addD(today,11));await p.fill("#v37t1","13:30");await p.fill("#v37n","Any morning works, side gate");
    if(w===390){await p.waitForTimeout(400);await shot(p,"v37-reschedule-sheet-390.png")}
@@ -216,6 +232,15 @@ let LOCAL=null,br=null,PS=null;
   ok(/Arriving between/.test(await p.textContent(".tk8-eta")),"tracker: 'Arriving between 2–3pm'",await p.textContent(".tk8-eta"));
   await p.locator(".v37ap [data-v37ok]").focus();await p.keyboard.press("Enter");await p.waitForTimeout(600);
   ok(/You confirmed/.test(await p.textContent(".v37ap")),"tracker: Confirm works from the keyboard");await noOverflow(p,"390 tracker");await c.close()}
+ // SW-086 in the browser: 4 confirmed visits plus a later pending confirm
+ {const {c,p}=await page(390,ho.ck);await go(p,"/job/"+J86);
+  ok(await p.locator("#v37ap-"+VLAST).count()===1,"SW-086: the job page shows the later visit that still needs confirm");
+  ok(/Needs confirm last/.test(await p.locator("#v37ap-"+VLAST).textContent())&&/Please confirm/.test(await p.locator("#v37ap-"+VLAST).textContent()),"SW-086: that card is the pending 'Needs confirm last' visit");
+  ok(await p.locator("#v37more").count()===1&&/and 1 more/.test(await p.textContent("#v37more")),"SW-086: an 'and 1 more' link is shown for the hidden confirmed visit");
+  ok(await p.locator("#v37ap-"+EARLY[3]).count()===0,"SW-086: the 4th confirmed visit is behind the link until it is expanded");
+  await p.click("#v37more");await p.waitForTimeout(400);
+  ok(await p.locator("#v37ap-"+EARLY[3]).count()===1&&await p.locator("#v37ap-"+VLAST).count()===1&&await p.locator("#v37more").count()===0,"SW-086: 'and 1 more' expands the full list");
+  await noOverflow(p,"390 job page with 5 visits");await c.close()}
  // My home
  for(const w of [390,1440]){const {c,p}=await page(w,ho.ck);await go(p,"/myhome");
   ok(await p.locator("h1").first().textContent().then(t=>/Your home/.test(t)),w+": My home opens on 'Your home'");
@@ -227,7 +252,7 @@ let LOCAL=null,br=null,PS=null;
   await p.fill("#v37nt","Septic pumped "+w+": next due 2029");await p.click("#v37nGo");await p.waitForTimeout(500);ok(new RegExp("Septic pumped "+w).test(await p.textContent(".v37nl")),w+": a note is added from the page");
   await p.evaluate(()=>scrollTo(0,0));await p.waitForTimeout(1500);await shot(p,"v37-myhome-"+w+".png",{fullPage:true});
   if(w===1440){const [dl]=await Promise.all([p.waitForEvent("download"),p.click("#v37csv")]);const txt=fs.readFileSync(await dl.path(),"utf8");
-   ok(/^\ufeff/.test(txt)&&/Lake house/.test(txt)&&/cabin deck repair/i.test(txt)&&/crawlspace/.test(txt),"CSV: the cabin's history downloads",txt.slice(0,120));
+   ok(/^\ufeff/.test(txt)&&/^Date,?"?Property"?,?"?Type"?/.test(txt.replace(/^\ufeff/,""))&&/Lake house/.test(txt)&&/Your home/.test(txt)&&/cabin deck repair/i.test(txt)&&/water heater swap/i.test(txt)&&/crawlspace/.test(txt),"CSV: every property is in one file, with a Property column",txt.slice(0,400));
    await go(p,"/myhome");const [d2]=await Promise.all([p.waitForEvent("download"),p.click("#v37csv")]);const t2=fs.readFileSync(await d2.path(),"utf8");ok(/"'=HYPERLINK/.test(t2),"CSV: a note that starts with = is escaped as text",t2.split("\n").find(l=>/HYPERLINK/.test(l)));
    await p.emulateMedia({media:"print"});const pr=await p.evaluate(()=>({tabs:getComputedStyle(document.querySelector(".v37tabs")).display,btn:getComputedStyle(document.getElementById("v37print").closest(".v37act")).display,hdr:getComputedStyle(document.querySelector(".v37pr")).display,form:getComputedStyle(document.getElementById("v37nf")).display}));
    ok(pr.tabs==="none"&&pr.btn==="none"&&pr.form==="none"&&pr.hdr==="block","print: tabs, buttons and the note form are hidden; a 'Home history printed …' line shows",J(pr));
@@ -243,6 +268,17 @@ let LOCAL=null,br=null,PS=null;
  {const {c,p}=await page(390,null);await go(p,"/myhome");ok(await p.locator("#v37home").count()===0&&!(await p.content()).includes("Lake house"),"signed out: /myhome asks to sign in and shows nothing");await c.close()}
  {const {c,p}=await page(390,pro.ck);await go(p,"/myhome");ok(await p.locator("#v37home").count()===0&&/homeowners and businesses/.test(await p.textContent("#app")),"a pro gets a plain 'My home is for homeowners' page");await c.close()}
  {const bz=await login(P(),"demo-business@sawyer.test");const {c,p}=await page(1440,bz.ck);await go(p,"/myhome");ok(await p.locator(".v37tabs a").count()===3,"a business account sees its two locations as properties",await p.locator(".v37tabs a").count());await c.close()}
+ // SW-087: with many properties, the tab rail scrolls and Add a property stays on screen
+ {const have=((meOf(await stateFor(ho.ck)).home37||{}).props||[]).map(x=>x.name);
+  for(let i=2;i<=10;i++){if(have.includes("North shore summer cottage "+i))continue;r=await act(P(),ho.ck,"home37Prop",[{name:"North shore summer cottage "+i,zip:"4966"+String(i%10)}]);ok(r.res.ok||/Up to 10/.test(r.res.msg||""),"SW-087: add cottage "+i,J(r.res))}}
+ for(const w of [390,1440]){const {c,p}=await page(w,ho.ck);await go(p,"/myhome");
+  await noOverflow(p,w+" My home with many property tabs");
+  const add=await p.locator("#v37addP").boundingBox();const vp=p.viewportSize();
+  ok(add&&add.x>=0&&add.x+add.width<=vp.width+1&&add.y>=0&&add.y+Math.min(add.height,40)<=vp.height,"SW-087 "+w+": 'Add a property' stays on screen",J({add,vp}));
+  const rail=await p.evaluate(()=>{const nav=document.getElementById("v37tabs"),sc=document.getElementById("v37tabsSc");if(!nav)return null;nav.scrollLeft=0;const can=nav.scrollWidth>nav.clientWidth+2;nav.scrollLeft=nav.scrollWidth;const last=nav.querySelector("a:last-of-type");const r=last&&last.getBoundingClientRect();const add=document.getElementById("v37addP").getBoundingClientRect();return{can,tabs:nav.querySelectorAll("a").length,hasR:!!(sc&&sc.classList.contains("has-r")||nav.scrollLeft>2),lastX:r&&r.left,addX:add.left}});
+  ok(rail&&rail.tabs>=10&&rail.can,"SW-087 "+w+": the property rail scrolls horizontally when there are many places",J(rail));
+  ok(rail&&rail.lastX!=null&&rail.lastX<rail.addX,"SW-087 "+w+": scrolling the rail reaches the last property without covering Add a property",J(rail));
+  await c.close()}
  ok(!errs.length,"no page errors",errs.join(" | "));
 }catch(e){failed++;console.log("FAIL crashed: "+(e&&e.stack||e))}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);try{PS&&PS.srv.close()}catch(e){}
  console.log(failed?"\n"+failed+" FAILED":"\nALL PASS");process.exit(failed?1:0)}})();
