@@ -147,6 +147,38 @@ let LOCAL=null,br=null;
   {const c=await br.newContext({viewport:{width:390,height:844}});const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));await p.goto(D.B+"/signup",{waitUntil:"networkidle"});await p.waitForSelector("#authBox",{timeout:8000}).catch(()=>{});
    ok(!(await p.$("#v34beta"))&&!!(await p.$("#authBox")),"with persistent storage the note is not shown");await c.close()}
   await stopApp(D)}
+
+ // ===== 4. "Export my data" on the delete screen =====
+ {const unzip=buf=>{const out={};let i=0;while(i+30<=buf.length&&buf.readUInt32LE(i)===0x04034b50){const n=buf.readUInt16LE(i+26),x=buf.readUInt16LE(i+28),sz=buf.readUInt32LE(i+18),crc=buf.readUInt32LE(i+14);const name=buf.subarray(i+30,i+30+n).toString("utf8");out[name]={data:buf.subarray(i+30+n+x,i+30+n+x+sz),crc};i+=30+n+x+sz}return out};
+  const EP=await signupPro("export");ok(!!EP.ck,"a throwaway pro signs up for the export test");
+  ok((await act(P(),EP.ck,"addLedger",[{kind:"exp",amt:12.34,cat:"Materials",vendor:'=HYPERLINK("http://evil.example","x")',date:"2026-11-14"}])).res.ok,"…logs an Office receipt whose vendor looks like a formula");
+  const EH=await signupHo("exporth");{const r=await act(P(),EH.ck,"send",[EP.id,"+1 call me about the drain "+run]);ok(r.res.ok!==false,"…and a homeowner messages them",J(r.res))}
+  for(const w of [390,1440]){const p=await page(w,EP.ck);await p.goto(LOCAL.B+"/account",{waitUntil:"networkidle"});await p.waitForSelector("#delGo",{timeout:8000});await p.click("#delGo");await p.waitForSelector("#v34ex",{timeout:8000}).catch(()=>{});
+   const o=await p.evaluate(()=>{const e=document.getElementById("v34ex"),z=document.getElementById("v34zip"),j=document.getElementById("v34json"),f=document.getElementById("delTxt");if(!e)return null;const r=z.getBoundingClientRect(),box=document.querySelector("#modal .mbox").getBoundingClientRect();
+    return{t:e.innerText.replace(/\s+/g," "),zh:Math.round(r.height),zr:Math.round(r.right),jh:j.getAttribute("href"),jd:j.hasAttribute("download"),before:!!(f&&(e.compareDocumentPosition(f)&Node.DOCUMENT_POSITION_FOLLOWING)),box:[Math.round(box.left),Math.round(box.right)],ow:document.documentElement.scrollWidth>innerWidth+1}});
+   ok(o&&/Take a copy first/.test(o.t)&&/Export my data \(ZIP\)/.test(o.t)&&/and your Office records/.test(o.t)&&o.zh>=44&&o.zr<=w&&o.jh==="/api/account/export"&&o.jd&&o.before&&o.box[0]>=0&&o.box[1]<=w&&!o.ow,w+" the delete dialog offers 'Export my data (ZIP)' and 'JSON only' above the DELETE box (44px+ button, fits)",J(o));
+   if(w===390){await sleep(500);await p.screenshot({path:path.join(SH,"v34-export-delete-390.png")}).catch(()=>{});
+    const [dl]=await Promise.all([p.waitForEvent("download",{timeout:15000}),p.click("#v34zip")]);const fp=path.join(os.tmpdir(),"v34-export-"+run+".zip");await dl.saveAs(fp);const buf=fs.readFileSync(fp);fs.rmSync(fp,{force:true});
+    ok(/^sawyer-data-\d{4}-\d\d-\d\d\.zip$/.test(dl.suggestedFilename()),"the download is sawyer-data-<date>.zip",dl.suggestedFilename());
+    const z=unzip(buf),names=Object.keys(z);
+    ok(["sawyer-data.json","README.txt","jobs.csv","quotes.csv","messages.csv","reviews.csv","office/expenses.csv","office/customers.csv","office/README.txt"].every(n=>names.includes(n)),"the ZIP has the full JSON, a README, jobs/quotes/messages/reviews CSVs and the Office backup files",J(names));
+    const crcOk=names.every(n=>{const t=new Uint32Array(256);for(let k=0;k<256;k++){let c=k;for(let q=0;q<8;q++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[k]=c>>>0}let c=0xFFFFFFFF;for(const b of z[n].data)c=t[(c^b)&255]^(c>>>8);return((c^0xFFFFFFFF)>>>0)===z[n].crc});ok(crcOk,"every file in the ZIP passes its CRC (a valid archive)");
+    const js=JSON.parse(z["sawyer-data.json"].data.toString("utf8"));ok(js.account&&js.account.id===EP.id&&js.profile&&js.profile.id===EP.id&&(js.ledger||[]).length===1,"sawyer-data.json is this account's export (account, profile, the receipt)",J(js.account));
+    const all=names.map(n=>z[n].data.toString("utf8")).join("\n");ok(!/"(hash|salt|token|sess)"\s*:/.test(all)&&!all.includes("v34-correct-horse"),"no password hash, salt, session or password anywhere in the ZIP");
+    const msg=z["messages.csv"].data.toString("utf8");ok(msg.includes("'+1 call me about the drain "+run)&&msg.includes("Hana exporth")&&/,You,/.test(msg),"messages.csv: a message starting with + is formula-safe (leading ') and shows who sent it to whom",msg.slice(0,300));
+    const ex=z["office/expenses.csv"].data.toString("utf8");ok(ex.includes("'=HYPERLINK")&&ex.includes("12.34"),"office/expenses.csv reuses the formula-safe Office backup (leading ', cents kept)",ex.slice(0,200));
+    const st=await p.$eval("#v34exs",e=>e.textContent);ok(/Downloaded sawyer-data-/.test(st),"the dialog confirms the download",st);
+    // the delete still works after exporting
+    await p.fill("#delTxt","DELETE");await p.click("#delYes");await sleep(1500);const lg=await req(P(),"POST","/api/login",JH,J({email:"v34-export-"+run+"@example.com",password:"v34-correct-horse"}));ok(lg.status===401,"after exporting, typing DELETE still deletes the account",lg.status)}
+   await p.context().close();if(w===390)break}
+  // 1440 look with another account (the first was deleted above)
+  {const E2=await signupHo("export2");const p=await page(1440,E2.ck);await p.goto(LOCAL.B+"/account",{waitUntil:"networkidle"});await p.waitForSelector("#delGo");await p.click("#delGo");await p.waitForSelector("#v34ex",{timeout:8000}).catch(()=>{});
+   const o=await p.evaluate(()=>{const e=document.getElementById("v34ex");return e?{t:e.innerText.replace(/\s+/g," "),ow:document.documentElement.scrollWidth>innerWidth+1}:null});ok(o&&/Export my data \(ZIP\)/.test(o.t)&&!/Office records/.test(o.t)&&!o.ow,"1440 a homeowner sees it too (no Office mention without Office records)",J(o));
+   await sleep(500);await p.screenshot({path:path.join(SH,"v34-export-delete-1440.png")}).catch(()=>{});
+   const r=await req(P(),"GET","/api/account/export",{Cookie:E2.ck});ok(r.status===200&&/attachment; filename="sawyer-data-/.test(r.headers["content-disposition"]||"")&&r.json&&r.json.account.id===E2.id,"'JSON only' downloads this account's JSON export");await p.context().close()}
+  // demo accounts can't be deleted, so there is nothing to export first
+  {const dm=await login(P(),"demo-homeowner@sawyer.test");const p=await page(390,dm.ck);await p.goto(LOCAL.B+"/account",{waitUntil:"networkidle"});await p.waitForSelector("#delGo");await p.click("#delGo");await sleep(500);ok(!(await p.$("#v34ex")),"the demo account's dialog (can't delete) doesn't offer the export");await p.context().close()}
+  ok((await req(P(),"GET","/api/account/export")).status===401,"signed out, the export is 401")}
 // @@NEXT@@
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL)}
