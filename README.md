@@ -372,9 +372,20 @@ This repo is deploy-ready, and nothing has been pushed anywhere yet.
    - Render terminates TLS and sends `x-forwarded-proto: https`. The server trusts that header and marks the session cookie `Secure`. Set `TRUST_PROXY=0` to disable this.
    - Rate limits key on the client IP from `x-forwarded-for`.
 4. **Free tier caveats:**
-   - There is no persistent disk. `data/` (`DATA_DIR=./data`) is wiped on every deploy, restart and idle spin-down (after about 15 minutes idle). The demo seed is recreated automatically on the empty DB.
+   - There is no persistent disk. `data/` (`DATA_DIR=./data`) is wiped on every deploy, restart and idle spin-down (after about 15 minutes idle). The demo seed is recreated automatically on the empty DB. Since v34 the server says so: a `WARNING: data is NOT persistent` line at boot, `"persistent": false` in `/healthz`, and a "This beta resets from time to time" note on sign-up and Account. See **Keep data between deploys** below.
    - The first request after an idle period takes about 30–60 seconds while the service wakes up.
 5. `public/index.html` and `app-logic.js` are committed build outputs. To regenerate them from the design source, run `npm run rebuild-ui`; it is skipped when `../ultimate` is missing.
+
+## Keep data between deploys (persistent disk, SW-071)
+Not enabled yet: a Render disk needs a paid instance, so it's an owner decision. `render.yaml` has the disk block written out and commented. Exact steps:
+1. **Decide on the plan.** Render disks only work on paid instances (Starter is about $7/mo; a 1 GB disk is about $0.25/mo). A paid instance also stops the 15-minute idle spin-down and the 30–60 s cold start.
+2. **Pin the push keys first** (optional, recommended). On your own machine run `node tools/vapid-keys.js`, then in the Render dashboard → service → **Environment** add `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` with those values (and `VAPID_SUBJECT=mailto:you@your-domain` if you like). Don't commit them. With both set, phones that turned alerts on keep working across resets. Without them the key pair lives in the database (table `vapid`), so it moves with the disk once the disk exists.
+3. **Attach the disk.** Either in the dashboard (service → **Disks** → **Add disk**: name `sawyer-data`, mount path **`/data`**, size **1 GB**), or in `render.yaml`: change `plan: free` to `plan: starter` and uncomment the four `disk:` lines (`name: sawyer-data`, `mountPath: /data`, `sizeGB: 1`).
+4. **Point the app at it.** Set `DATA_DIR=/data` (dashboard → Environment, or the `DATA_DIR` value in `render.yaml`). The server creates the folder if needed, checks it can write there, and stops with a clear `FATAL: DATA_DIR=/data is not writable …` message if the disk isn't mounted. Uploads go to `/data/uploads`, the database to `/data/sawyer.db`.
+5. **Deploy and check.** `GET /healthz` should show `"persistent": true` and, after the next deploy, `"freshDb": false` with `"boots"` going up and `"dbSince"` unchanged. The boot log no longer prints the `WARNING` line, and the "This beta resets" note disappears from the app.
+6. **Note:** the first boot on the empty disk seeds the demo data once (the current ephemeral data isn't copied over, by design: it is test data). A service with a disk restarts with a few seconds of downtime on each deploy.
+
+**Wipe detection** (works with or without a disk): `/healthz` returns `persistent` (is `DATA_DIR` on its own disk mount, not the image's root filesystem, tmpfs or overlay), `freshDb` (this boot started from an empty database and seeded it), `dbSince` (when this database was first created) and `boots` (how many starts it has survived). An uptime monitor that alerts when `freshDb` is `true` or `dbSince` changes catches a wiped or unmounted disk right away. No paths or secrets are in the response. `SAWYER_PERSISTENT=1` / `0` overrides the mount check on hosts where the mount table is misleading.
 
 ## Email (Resend)
 - `RESEND_API_KEY` — required to send mail. Set it in the Render dashboard; `render.yaml` lists it as `sync: false` so a Blueprint sync will not overwrite it.
@@ -389,7 +400,7 @@ This repo is deploy-ready, and nothing has been pushed anywhere yet.
 ## Making it permanent
 1. **Render:** create a Web Service from this folder.
    - Build: `node build-live.js`. Start: `node server.js`.
-   - Set `PORT` from Render, and add a 1 GB persistent disk mounted at `/data` with `DATA_DIR=/data`.
+   - Set `PORT` from Render, and add a 1 GB persistent disk mounted at `/data` with `DATA_DIR=/data` (step by step: **Keep data between deploys** above).
    - Paid starter instance is about $7/mo. The free tier has no disk.
 2. **Or Fly.io:** `fly launch`, then `fly volumes create data`, mount it at `/data`, and set `DATA_DIR=/data`.
 3. **Domain:** buy one (about $10–12/yr, e.g. Cloudflare Registrar) and add a CNAME to the Render or Fly hostname. HTTPS is automatic.

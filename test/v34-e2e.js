@@ -91,6 +91,43 @@ let LOCAL=null,br=null;
   const cs=await login(P(),"v34-oldcrew-"+run+"@example.com","v34-correct-horse");const pc=(cs.st.projects||[]).find(p=>p.id===a2.res.id);
   ok(!(cs.st.projects||[]).some(p=>p.id===a1.res.id)&&pc&&pc.status==="closed"&&pc.ownerGone34,"the unstaffed one is deleted, the staffed one closed for its crew",J(pc&&pc.status));
   ok(((await pub()).projects||[]).filter(p=>/^Demo: /.test(p.title)).length===4,"the four demo projects are untouched")}
+
+ // ===== 2. Persistence readiness / wipe detection (SW-071 itself needs a paid disk: owner decision) =====
+ {const PS=require(path.join(ROOT,"lib/persist.js"));
+  ok(PS.check("/data",{},"overlay / overlay rw 0 0\n/dev/sdb /data ext4 rw 0 0\n").persistent===true,"mount check: DATA_DIR=/data on its own ext4 disk is persistent");
+  ok(PS.check("/data/sawyer",{},"overlay / overlay rw 0 0\n/dev/sdb /data ext4 rw 0 0\n").persistent===true,"…a folder inside the disk too");
+  ok(PS.check("/opt/render/project/src/data",{},"overlay / overlay rw 0 0\n/dev/sdb /data ext4 rw 0 0\n").persistent===false,"./data in the app folder (Render free) is not persistent");
+  ok(PS.check("/data",{},"overlay / overlay rw 0 0\n").persistent===false,"/data with no disk attached is not persistent");
+  ok(PS.check("/scratch",{},"/dev/a / ext4 rw 0 0\ntmpfs /scratch tmpfs rw 0 0\n").persistent===false,"tmpfs is not persistent");
+  ok(PS.check("/data",{SAWYER_PERSISTENT:"1"},"overlay / overlay rw 0 0\n").persistent===true&&PS.check("/data",{SAWYER_PERSISTENT:"0"},"/dev/a / ext4 rw 0 0\n/dev/b /data ext4 rw 0 0\n").persistent===false,"SAWYER_PERSISTENT=1 / 0 overrides the guess");
+  ok(PS.mountOf("/data2",'/dev/a / ext4 rw 0 0\n/dev/b /data ext4 rw 0 0\n').point==="/","/data2 is not inside /data (prefix match is per path segment)");
+  // a fresh server on a temp dir (root filesystem here)
+  const A1=await startApp(await freePort());
+  let hz=(await req(A1.port,"GET","/healthz")).json||{};
+  ok(hz.persistent===false&&hz.freshDb===true&&hz.boots===1&&/^\d{4}-\d\d-\d\dT/.test(hz.dbSince||""),"/healthz on a fresh temp data dir: persistent false, freshDb true, boots 1, dbSince",J(hz));
+  ok(!/\/tmp|sawyer-v34|DATA_DIR|mount/i.test(J(hz)),"/healthz carries no paths",J(hz));
+  ok(/WARNING: data is NOT persistent \(DATA_DIR is on the root filesystem/.test(A1.log())&&/NOTICE: started from an empty database/.test(A1.log()),"boot log warns clearly (not persistent; fresh database seeded)",A1.log().slice(0,600));
+  ok(stateOf(await req(A1.port,"GET","/api/state")).beta34&&stateOf(await req(A1.port,"GET","/api/state")).beta34.persistent===false,"state tells the app the beta isn't persistent");
+  const since=hz.dbSince;await stopApp(A1,true);
+  const A2=await startApp(await freePort(),null,A1.dir);hz=(await req(A2.port,"GET","/healthz")).json||{};
+  ok(hz.freshDb===false&&hz.boots===2&&hz.dbSince===since&&!/NOTICE: started from an empty database/.test(A2.log()),"a restart on the same data: freshDb false, boots 2, same dbSince, no 'empty database' notice",J(hz));
+  await stopApp(A2);
+  const A3=await startApp(await freePort(),{SAWYER_PERSISTENT:"1"});hz=(await req(A3.port,"GET","/healthz")).json||{};
+  ok(hz.persistent===true&&!/WARNING: data is NOT persistent/.test(A3.log())&&stateOf(await req(A3.port,"GET","/api/state")).beta34.persistent===true,"with a disk (SAWYER_PERSISTENT=1): persistent true, no warning",J(hz));
+  await stopApp(A3);
+  // DATA_DIR must be writable: a clear message, not a stack trace
+  {const blocker=path.join(os.tmpdir(),"sawyer-v34-file-"+run);fs.writeFileSync(blocker,"not a folder");const badDir=blocker+"/data";
+   const bad=spawn(process.execPath,[path.join(ROOT,"server.js")],{env:Object.assign({},process.env,{HOST:"127.0.0.1",PORT:String(await freePort()),DATA_DIR:badDir}),stdio:["ignore","pipe","pipe"]});let o="";bad.stdout.on("data",d=>o+=d);bad.stderr.on("data",d=>o+=d);
+   const code=await new Promise(r=>{bad.on("exit",r);setTimeout(()=>{try{bad.kill("SIGKILL")}catch(e){}},8000)});
+   ok(code===1&&o.includes("FATAL: DATA_DIR="+badDir+" is not writable")&&/attach the persistent disk/.test(o)&&!/\n\s+at /.test(o),"an unwritable DATA_DIR stops the server with a clear FATAL line (no stack trace)",code+" "+o.slice(0,300));fs.rmSync(blocker,{force:true})}
+  // relative DATA_DIR resolves next to server.js
+  {const rel="data-v34-"+run,abs=path.join(ROOT,rel);const A4=await startApp(await freePort(),{DATA_DIR:"./"+rel},abs);ok(fs.existsSync(path.join(abs,"sawyer.db"))&&new RegExp("data: "+abs.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).test(A4.log()),"DATA_DIR=./data style paths resolve next to server.js",A4.log().slice(0,200));await stopApp(A4)}
+  // render.yaml: disk block ready but commented; plan unchanged; README steps
+  const ry=fs.readFileSync(path.join(ROOT,"render.yaml"),"utf8"),rd=fs.readFileSync(path.join(ROOT,"README.md"),"utf8");
+  ok(/^\s+plan: free$/m.test(ry)&&/^\s+# disk:$/m.test(ry)&&/^\s+#\s+mountPath: \/data$/m.test(ry)&&/^\s+#\s+sizeGB: 1$/m.test(ry)&&!/^\s+disk:/m.test(ry),"render.yaml: plan still free, disk block (/data, 1 GB) written out but commented");
+  ok(/VAPID_PRIVATE_KEY/.test(ry)&&!/^\s+- key: VAPID/m.test(ry),"render.yaml documents the VAPID env keys (commented)");
+  ok(/## Keep data between deploys/.test(rd)&&/mount path \*\*`\/data`\*\*/.test(rd)&&/`DATA_DIR=\/data`/.test(rd)&&/"persistent": true/.test(rd)&&/tools\/vapid-keys\.js/.test(rd),"README has the exact disk steps, the healthz check and the VAPID key steps");
+ }
 // @@NEXT@@
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL)}

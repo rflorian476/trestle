@@ -6,12 +6,31 @@ services:
     buildCommand: npm install --omit=dev
     startCommand: npm start
     healthCheckPath: /healthz
+    # ---- Keep data between deploys (v34, SW-071) ----------------------------------------------------------------
+    # Ready to enable, but NOT enabled: Render disks need a paid instance (Starter, about $7/mo + $0.25/GB-month), and
+    # the plan is Robert's call. To turn it on: change `plan: free` above to `plan: starter`, uncomment the 4 disk lines
+    # below, and change DATA_DIR further down to /data. Then check GET /healthz shows "persistent": true.
+    # (A service with a disk restarts with a few seconds of downtime on each deploy; it can't run two copies at once.)
+    # disk:
+    #   name: sawyer-data
+    #   mountPath: /data
+    #   sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "24"
-      # Free tier has no persistent disk: data/ is wiped on every deploy/restart/spin-down (OK for testing)
+      # Free tier has no persistent disk: data/ is wiped on every deploy/restart/spin-down (OK for testing).
+      # /healthz reports "persistent": false and the app shows a "this beta resets" note until a disk is attached.
+      # With the disk block above enabled, set this to /data (the disk's mountPath).
       - key: DATA_DIR
         value: ./data
+      # Push alert keys (v32). Optional: set both in the Render dashboard so phones that turned alerts on keep working
+      # after a database reset or a move to a disk. Generate once on your own machine with: node tools/vapid-keys.js (see README).
+      # - key: VAPID_PUBLIC_KEY
+      #   sync: false
+      # - key: VAPID_PRIVATE_KEY
+      #   sync: false
+      # - key: VAPID_SUBJECT
+      #   value: mailto:you@your-domain
       # One-line index switch. Keep 0 while this temporary domain serves demo listings.
       # At launch, on the custom domain: SAWYER_INDEXABLE=1 and
       # SAWYER_BASE_URL=https://your-domain (origin only, no path).
