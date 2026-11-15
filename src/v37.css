@@ -1,0 +1,21 @@
+/* v37 */
+/* appointments */
+.v37aps{display:grid;gap:12px;margin:16px 0}
+.v37ap{border-left:3px solid #0F2A44}.v37ap.c-pending{border-left-color:#B7791F}.v37ap.c-ask{border-left-color:#AE4718}.v37ap.c-ok{border-left-color:#2F7A4B}
+.v37ap-h{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:start}
+.v37ap-t{min-width:0}.v37ap-t h2{margin:2px 0 4px;font-size:17px;overflow-wrap:anywhere}
+.v37ap-w{margin:0;font-size:15px;color:#14151a}.v37ap-w b{color:#0F2A44}
+.v37ap-s{margin:10px 0 0;font-size:14.5px;color:#2B2F3A}
+.v37ap-sl{margin:6px 0 0;padding-left:18px;font-size:14px;color:#2B2F3A}
+.v37ap-a{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.v37as-r{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:10px}.v37as-r .fld{margin-bottom:8px}
+.v37as-e{color:#A3271F;min-height:1em;margin:4px 0}
+.v37pj-l{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
+.v37pj-l li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid #E2DCCF;border-radius:12px;background:#fff}
+.v37pj-l a{min-width:0;text-decoration:none;color:inherit}.v37pj-l a b{display:block;color:#0F2A44}.v37pj-l a span{display:block;font-size:13.5px;color:#4A4F5C;overflow-wrap:anywhere}
+.v37c{position:absolute;right:4px;top:4px;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:99px;font-style:normal;font-size:11px;font-weight:800;line-height:1;background:#FFF4DB;color:#7A4B00}
+.vc8{position:relative}.v37c-ok{background:#E3F1E7;color:#1F5A35}.v37c-ask{background:#FBE7DD;color:#8A3410}
+.v37cf{margin:10px 0;padding:10px 12px;border-radius:12px;background:#F8F6F1;border:1px solid #E2DCCF}.v37cf b{display:flex;align-items:center;gap:6px;color:#0F2A44}
+.v37cf-l{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}.v37cf-l li{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.v37cf-n{margin:8px 0 0;overflow-wrap:anywhere}
+.v37w small{display:block;margin-top:4px}
