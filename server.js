@@ -85,6 +85,8 @@ if(!getKV.get("consults")){persist();console.log("v12 data seeded")}
 if(typeof ctx.sanitizeUsers==="function"&&ctx.sanitizeUsers())persist();
 // v34 (SW-072): projects left behind by accounts deleted before v34 are removed or closed + unlisted once at start.
 if(typeof ctx.v34Orphans==="function"){const n=ctx.v34Orphans();if(n){persist();console.log("SW-072: tidied",n,"project(s) whose owner deleted their account")}}
+// v36 (SW-081): Office customer rows linked to a staff account before the fix are unlinked once at start.
+if(typeof ctx.v36StaffUnlink==="function"){const n=ctx.v36StaffUnlink();if(n){persist();console.log("SW-081: unlinked",n,"record(s) from staff accounts")}}
 // keep meta flag on later persists
 const _p=persist;persist=function(){_p();setKV.run("meta",JSON.stringify({v:1,seeded:true,labeled:true}),Date.now())};
 

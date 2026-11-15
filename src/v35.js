@@ -115,13 +115,17 @@ function v35StmtRows(by,cust){return v35Open(by,cust).sort((a,b)=>(a.date||0)-(b
 function v35StmtText(m,c,rows){const tot=rows.reduce((a,r)=>a+r.bal,0);return`Statement from ${m.biz||nameOf(m)} for ${c.name}, ${v7Today()}\n\n`+rows.map(r=>`${r.no} · ${r.title} · issued ${r.issued}${r.due?" · due "+r.due:""} · total ${v7$(r.total)} · paid ${v7$(r.paid)} · balance ${v7$(r.bal)}${r.late?" ("+r.late+" days late)":""}`).join("\n")+`\n\nTotal open: ${v7$(tot)}\nThank you!`}
 function v35StmtRecent(proId,target){return!!(target&&(DB.bcust||[]).some(x=>x&&x.by===proId&&x.uid===target&&x.stmt35&&v35Now()-x.stmt35<864e5))}
 A.stmt35=function(cid){const m=me();if(!v7Pro(m))return{ok:false,msg:"Statements are part of The Office for pro accounts."};const c=v7Cust(cid);if(!c||c.by!==m.id)return{ok:false,msg:"That customer wasn't found."};
- if(!c.uid||!U(c.uid))return{ok:false,msg:c.name+" isn't on __BRAND__ yet. Copy the statement and text or email it."};
+ /* v36 (SW-081): a row linked to a staff account (before the fix) gets the same "not on Sawyer" answer; nothing is delivered. */
+ {const tu=c.uid&&U(c.uid);if(!tu||tu.staff||tu.role!=="customer")return{ok:false,msg:c.name+" isn't on __BRAND__ yet. Copy the statement and text or email it."}}
  const rows=v35StmtRows(m.id,c.id);if(!rows.length)return{ok:false,msg:c.name+" has no open invoices."};
  /* SW-077: one in-app statement per (pro, target uid) per 24h — a second customer row for the same person can't bypass it. */
  if(v35StmtRecent(m.id,c.uid))return{ok:false,msg:"You sent "+c.name+" a statement in the last 24 hours. One a day keeps it friendly."};
  const tot=rows.reduce((a,r)=>a+r.bal,0),at=v35Now();notify(c.uid,`${m.biz||nameOf(m)} sent you a statement: ${v7$(tot)} open on ${rows.length} invoice${rows.length===1?"":"s"}`,"stmt35:"+m.id);
  (DB.bcust||[]).forEach(x=>{if(x&&x.by===m.id&&x.uid===c.uid)x.stmt35=at});save();
  return{ok:true,msg:"Statement sent to "+c.name+" in __BRAND__"}};
+/* v36 (SW-081): customer rows (and unpaid bills) that were linked to a staff account before the fix are unlinked once at start. */
+function v36StaffUnlink(){const st=new Set((DB.users||[]).filter(u=>u&&u.staff).map(u=>u.id));if(!st.size)return 0;let n=0;
+ (DB.bcust||[]).forEach(c=>{if(c&&c.uid&&st.has(c.uid)){c.uid=null;n++}});(DB.bills||[]).forEach(b=>{if(b&&b.cuid&&st.has(b.cuid)&&!(b.payments||[]).length){b.cuid=null;n++}});return n}
 function v35Csv(name,rows){try{const blob=new Blob(["\ufeff"+v7CSV(rows)],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}catch(e){toast("Couldn't download the file","err")}}
 function v35StmtModal(cid){const m=me(),c=v7Cust(cid);if(!m||!c)return;const rows=v35StmtRows(m.id,cid),tot=v35r2(rows.reduce((a,r)=>a+r.bal,0)),txt=v35StmtText(m,c,rows);
  const sentAt=v35StmtRecent(m.id,c.uid)||(c.stmt35&&v35Now()-c.stmt35<864e5);

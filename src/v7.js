@@ -57,7 +57,8 @@ saveCust(o){const m=me();if(!v7Pro(m))return{ok:false,msg:"The Office is for pro
  let c=o.id&&v7Cust(o.id);if(c&&c.by!==m.id)return{ok:false,msg:"Not your customer record"};
  /* SW-077: ignore a client-supplied uid. Link only when the email matches a living customer account. The response
     never says whether a uid or email exists — both a known and an unknown supplied uid stay unlinked unless the email matches. */
- const link=(DB.users||[]).find(u=>u.role==="customer"&&liveEmail(u)&&liveEmail(u)===emailKey(o.email));
+ /* v36 (SW-081): Sawyer staff (the Trust team) are never a billable customer, so their email never links. */
+ const link=(DB.users||[]).find(u=>u.role==="customer"&&!u.staff&&liveEmail(u)&&liveEmail(u)===emailKey(o.email));
  const f={name,email:v7S(o.email,120),phone:v7S(o.phone,30),addr:v7S(o.addr,160),site:v7S(o.site,160)},linked=link?link.id:null;
  if(c){Object.assign(c,f);c.uid=linked}else{c=Object.assign({id:"bc"+uid(),by:m.id,uid:linked,notes:[],photos:[],date:Date.now()},f);v7Col("bcust").push(c)}
  save();return{ok:true,msg:"Customer saved",id:c.id}},
