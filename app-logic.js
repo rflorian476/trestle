@@ -4943,7 +4943,7 @@ if(typeof document!=="undefined"){const oa=AFTER.account;AFTER.account=function(
    const z=document.getElementById("v34zip");if(z)z.onclick=()=>v34Export(z)}catch(e){}return x}}catch(e){}return r}}
 
 /* ===== v35 ===== */
-const V2_ACTIONS35=["pbSave35","pbDel35","pbImport35","leadFilters35","stmt35"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS35);
+const V2_ACTIONS35=["pbSave35","pbDel35","pbImport35","leadFilters35","stmt35","tlogDay35","tlogCheck35","tlogSet35"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS35);
 function v35Now(){return typeof __now==="function"?__now():Date.now()}
 const v35r2=n=>Math.round((Number(n)||0)*100)/100;
 const v35OnServer=()=>typeof navigator!=="undefined"&&navigator&&navigator.userAgent==="node";
@@ -5135,6 +5135,88 @@ function v35LfModal(){const m=me();if(!m)return;const f=v35Lf(m)||{mi:0,min:0,no
 {const ov=VIEWS.jobs;VIEWS.jobs=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||m.role!=="contractor"||m.staff)return h;const a='<form class="filterbar" id="jf">',k=h.indexOf(a);if(k<0)return h;return h.slice(0,k)+v35LfBar(m,"jobs")+h.slice(k)}catch(e){}return h}}
 for(const v of ["dash","jobs"]){const oa=AFTER[v];AFTER[v]=function(){const r=oa&&oa.apply(this,arguments);try{const b=document.getElementById("v35lfB");if(b)b.onclick=()=>v35LfModal()}catch(e){}return r}}
 
+
+/* (4) Check your check (traveling electricians). A hired traveler logs hours by day on the call page. Sawyer works out what
+   the week should pay from the posted terms (rate, OT at 1.5x after 40 a week or after 8 a day, per diem by its posted unit)
+   and, once the check stub is typed in, says whether it matches or is short, by how much. "Message <contractor>" sends a
+   plain, polite summary through Sawyer; the log downloads as a CSV. Private to the traveler (m.tlog35). Not payroll or tax
+   advice: it checks the math against the posting. */
+function v35Iso(s){return/^\d{4}-\d{2}-\d{2}$/.test(String(s||""))?String(s):null}
+function v35Add(s,n){const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
+function v35Mon(s){const d=new Date(s+"T12:00:00Z");const k=(d.getUTCDay()+6)%7;d.setUTCDate(d.getUTCDate()-k);return d.toISOString().slice(0,10)}
+function v35Hired(c,m){return!!(c&&m&&(c.apps||[]).some(a=>a&&a.uid===m.id&&a.status==="hired"))}
+function v35Log(m,cid){const L=m&&m.tlog35&&m.tlog35[cid];return L&&typeof L==="object"?L:{d:{},chk:{},ot:"40w"}}
+function v35Shape(c){const s=String(c.hours||"");let x=s.match(/(\d)\s*x\s*(\d{1,2})/i);if(x)return{days:Math.min(7,+x[1]),per:Math.min(16,+x[2])};const h=(typeof tHrs==="function"?tHrs(s):0)||50;const per=h>=50?10:8;return{days:Math.max(1,Math.min(7,Math.round(h/per))),per}}
+function v35Week(c,L,mon){const x=tX(c),days=[0,1,2,3,4,5,6].map(i=>v35Add(mon,i)),hrs=days.map(d=>Math.max(0,+(L.d||{})[d]||0)),tot=hrs.reduce((a,h)=>a+h,0);
+ let ot=0;if(L.ot==="8d"){ot=hrs.reduce((a,h)=>a+Math.max(h-8,0),0);const st0=tot-ot;if(st0>40)ot+=st0-40}else ot=Math.max(tot-40,0);const st=tot-ot;
+ const wage=v35r2(st*c.rate+ot*c.rate*1.5),worked=hrs.filter(h=>h>0).length,u7=String(x.pdUnit||"").startsWith("7"),pdDays=u7?(worked?7:0):worked,pd=v35r2(pdDays*(+c.perDiem||0));
+ const ck=(L.chk||{})[mon]||null;let dw=null,dp=null,diff=null;if(ck){if(ck.g!=null)dw=v35r2(ck.g-wage);if(ck.pd!=null)dp=v35r2(ck.pd-pd);if(dw!=null||dp!=null)diff=v35r2((dw||0)+(dp||0))}
+ return{mon,days,hrs,tot:v35r2(tot),st:v35r2(st),ot:v35r2(ot),wage,worked,pdDays,u7,pd,exp:v35r2(wage+pd),ck,dw,dp,diff,unit:x.pdUnit}}
+function v35Verdict(w){if(w.diff==null)return null;if(Math.abs(w.diff)<1)return{k:"ok",t:"Matches the posting"};return w.diff<0?{k:"short",t:"Short "+v7$(-w.diff)}:{k:"over",t:v7$(w.diff)+" more than expected"}}
+A.tlogDay35=function(cid,date,hrs){const m=me(),c=TC(cid);if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!c||!v35Hired(c,m))return{ok:false,msg:"You can log hours on calls you were hired on."};
+ const d=v35Iso(date);if(!d)return{ok:false,msg:"Pick a day."};const now=new Date(v35Now()).toISOString().slice(0,10);if(d>v35Add(now,1)||d<v35Add(now,-400))return{ok:false,msg:"Log days from the last year, up to today."};
+ const n=hrs===""||hrs==null?0:parseFloat(String(hrs).replace(/[^0-9.]/g,""));if(!Number.isFinite(n)||n<0||n>24)return{ok:false,msg:"Hours must be from 0 to 24."};
+ m.tlog35=m.tlog35&&typeof m.tlog35==="object"?m.tlog35:{};const L=m.tlog35[cid]=Object.assign({d:{},chk:{},ot:"40w"},m.tlog35[cid]||{});L.d=L.d||{};if(n>0)L.d[d]=Math.round(n*4)/4;else delete L.d[d];
+ const ks=Object.keys(L.d).sort();while(ks.length>400)delete L.d[ks.shift()];save();return{ok:true}};
+A.tlogCheck35=function(cid,mon,g,pd){const m=me(),c=TC(cid);if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!c||!v35Hired(c,m))return{ok:false,msg:"You can check pay on calls you were hired on."};
+ const w=v35Iso(mon);if(!w||v35Mon(w)!==w)return{ok:false,msg:"Pick a week."};const num=v=>v===""||v==null?null:parseFloat(String(v).replace(/[$,\s]/g,""));const G=num(g),P=num(pd);
+ if((G!=null&&(!Number.isFinite(G)||G<0||G>100000))||(P!=null&&(!Number.isFinite(P)||P<0||P>20000)))return{ok:false,msg:"Enter the amounts from your check stub (numbers only)."};
+ m.tlog35=m.tlog35&&typeof m.tlog35==="object"?m.tlog35:{};const L=m.tlog35[cid]=Object.assign({d:{},chk:{},ot:"40w"},m.tlog35[cid]||{});L.chk=L.chk||{};
+ if(G==null&&P==null)delete L.chk[w];else L.chk[w]={g:G==null?null:v35r2(G),pd:P==null?null:v35r2(P),at:v35Now()};const ks=Object.keys(L.chk).sort();while(ks.length>60)delete L.chk[ks.shift()];save();
+ return{ok:true,msg:G==null&&P==null?"Check cleared":"Check saved"}};
+A.tlogSet35=function(cid,o){const m=me(),c=TC(cid);if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!c||!v35Hired(c,m))return{ok:false,msg:"Only for calls you were hired on."};o=o||{};
+ m.tlog35=m.tlog35&&typeof m.tlog35==="object"?m.tlog35:{};const L=m.tlog35[cid]=Object.assign({d:{},chk:{},ot:"40w"},m.tlog35[cid]||{});L.ot=o.ot==="8d"?"8d":"40w";save();return{ok:true,msg:L.ot==="8d"?"Overtime after 8 hours a day (and 40 a week)":"Overtime after 40 hours a week"}};
+const V35_DN=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+function v35Fmt(s){try{return new Date(s+"T12:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"})}catch(e){return s}}
+function v35Hrs(n){return(Math.round(n*100)/100).toLocaleString("en-US")}
+function v35Msg(c,w,m){const p=U(c.by)||{},first=String(p.name||nameOf(p)||"there").split(/\s+/)[0];
+ return`Hi ${first}, checking my check for the week of ${v35Fmt(w.mon)} on "${String(c.title||"").replace(/\s*\(demo\)\s*$/i,"")}". I logged ${v35Hrs(w.tot)} hrs (${v35Hrs(w.st)} straight + ${v35Hrs(w.ot)} OT at 1.5x) at ${v7$(c.rate)}/hr = ${v7$(w.wage)} in wages, plus ${v7$(w.pd)} per diem (${w.pdDays} days at ${v7$(c.perDiem||0)}).`+
+ (w.ck?` The check showed ${w.ck.g!=null?v7$(w.ck.g)+" wages":""}${w.ck.g!=null&&w.ck.pd!=null?" and ":""}${w.ck.pd!=null?v7$(w.ck.pd)+" per diem":""}${w.diff!=null&&Math.abs(w.diff)>=1?", "+(w.diff<0?v7$(-w.diff)+" short":v7$(w.diff)+" over"):""}.`:"")+` Could you take a look? Thanks, ${String(m.name||"").split(/\s+/)[0]||"me"}`}
+function v35CheckCard(c,m,q){const L=v35Log(m,c.id),today=new Date(v35Now()).toISOString().slice(0,10),cur=v35Mon(today);const off=Math.max(-52,Math.min(0,parseInt((q||{}).w35,10)||0));const mon=v35Add(cur,off*7);
+ const w=v35Week(c,L,mon),v=v35Verdict(w),sh=v35Shape(c),p=U(c.by)||{};
+ const weeks=[...new Set(Object.keys(L.d||{}).concat(Object.keys(L.chk||{})).map(v35Mon))].sort().reverse().slice(0,4);
+ const grid=w.days.map((d,i)=>`<div class="v35d ${d===today?"today":""} ${d>today?"fut":""}"><label for="v35h${i}">${V35_DN[i]}<small>${esc(v35Fmt(d))}</small></label><input id="v35h${i}" data-v35day="${d}" inputmode="decimal" value="${w.hrs[i]?esc(v35Hrs(w.hrs[i])):""}" placeholder="0" ${d>v35Add(today,1)?"disabled":""} aria-label="Hours worked ${V35_DN[i]} ${esc(v35Fmt(d))}"></div>`).join("");
+ return`<section class="card v35cc" id="v35cc" aria-labelledby="v35cch"><div class="o7-sh"><h2 id="v35cch">${I("calc",18)} Check your check</h2><span class="muted small">${esc(v7$(c.rate))}/hr · ${esc(v7$(c.perDiem||0))} per diem, ${esc(String(w.unit||"").toLowerCase())}</span></div>
+ <p class="muted small">Log your hours each day. Sawyer works out what the week should pay from the posted terms, then checks your stub against it. Only you see this.</p>
+ <div class="v35wk"><a class="btn sm ghost" href="${href("tcall",c.id,{w35:off-1})}" aria-label="Previous week">${I("left",16)}</a><b>Week of ${esc(v35Fmt(mon))}${off===0?" (this week)":""}</b>${off<0?`<a class="btn sm ghost" href="${href("tcall",c.id,off+1?{w35:off+1}:null)}" aria-label="Next week">${I("right",16)}</a>`:`<span class="v35wk-sp"></span>`}</div>
+ ${c.start&&v35Add(mon,6)<c.start?`<p class="v35pre" role="note">${I("info",14)}This week is before the posted start date (${esc(v35Fmt(c.start))}). Log it if you started early or had paid orientation.</p>`:""}<div class="v35days">${grid}</div>
+ <div class="v35tools"><button type="button" class="btn sm" id="v35fill" data-days="${sh.days}" data-per="${sh.per}">${I("timer",14)}Fill ${sh.days}×${sh.per}s</button><label class="v35ot"><span>Overtime</span><select id="v35ot" aria-label="Overtime rule"><option value="40w" ${L.ot!=="8d"?"selected":""}>after 40 hrs a week</option><option value="8d" ${L.ot==="8d"?"selected":""}>after 8 hrs a day</option></select></label></div>
+ <dl class="v35sum"><div><dt>Hours</dt><dd>${esc(v35Hrs(w.tot))}<small>${esc(v35Hrs(w.st))} straight · ${esc(v35Hrs(w.ot))} OT</small></dd></div><div><dt>Wages (before tax)</dt><dd>${esc(v7$(w.wage))}</dd></div><div><dt>Per diem</dt><dd>${esc(v7$(w.pd))}<small>${w.pdDays} day${w.pdDays===1?"":"s"} × ${esc(v7$(c.perDiem||0))}</small></dd></div><div class="tot"><dt>Should pay</dt><dd>${esc(v7$(w.exp))}</dd></div></dl>
+ <form class="v35chk" id="v35chk" novalidate><h3>What the check said</h3><div class="v35chk-g"><div class="fld"><label for="v35cg">Gross wages</label><div class="v33amt"><span aria-hidden="true">$</span><input id="v35cg" name="g" inputmode="decimal" value="${w.ck&&w.ck.g!=null?esc(w.ck.g.toFixed(2)):""}" placeholder="0.00"></div></div><div class="fld"><label for="v35cp">Per diem paid</label><div class="v33amt"><span aria-hidden="true">$</span><input id="v35cp" name="pd" inputmode="decimal" value="${w.ck&&w.ck.pd!=null?esc(w.ck.pd.toFixed(2)):""}" placeholder="0.00"></div></div><button class="btn primary sm">Check it</button></div>
+ ${v?`<p class="v35v v35v-${v.k}" role="status">${I(v.k==="ok"?"check":"alertTri",16)}<b>${esc(v.t)}</b>${v.k!=="ok"?`<span>${w.dw!=null&&Math.abs(w.dw)>=1?`Wages ${w.dw<0?"short "+esc(v7$(-w.dw)):"over "+esc(v7$(w.dw))}. `:""}${w.dp!=null&&Math.abs(w.dp)>=1?`Per diem ${w.dp<0?"short "+esc(v7$(-w.dp)):"over "+esc(v7$(w.dp))}.`:""}</span>`:""}</p>`:""}<p class="err" id="v35ccE" role="alert"></p></form>
+ <div class="v35cc-a">${w.tot>0?`<button type="button" class="btn sm" id="v35msg">${I("chat",14)}Message ${esc(String(p.name||nameOf(p)||"the contractor").split(/\s+/)[0])} about this week</button>`:""}${Object.keys(L.d||{}).length?`<button type="button" class="btn sm ghost" id="v35csv">${I("download",14)}Download hours (CSV)</button>`:""}</div>
+ ${weeks.length?`<div class="v35rw"><h3>Recent weeks</h3><ul>${weeks.map(k=>{const x=v35Week(c,L,k),vv=v35Verdict(x),o=Math.round((new Date(k+"T12:00:00Z")-new Date(cur+"T12:00:00Z"))/(7*864e5));return`<li class="${k===mon?"on":""}"><a href="${href("tcall",c.id,o?{w35:o}:null)}">${esc(v35Fmt(k))}</a><span>${esc(v35Hrs(x.tot))} hrs</span><span class="v35n">${esc(v7$(x.exp))}</span>${vv?`<span class="v35v-${vv.k} v35tag">${esc(vv.t)}</span>`:`<span class="muted small">no check yet</span>`}</li>`}).join("")}</ul></div>`:""}
+ <p class="muted small v35cc-n">Checks the math against the posting. It isn't payroll or tax advice; taxes and deductions come out of the gross.</p></section>`}
+{const ov=VIEWS.tcall;VIEWS.tcall=(id,q)=>{let h=ov(id,q);try{const c=TC(id),m=me();if(!c||!m||!v35Hired(c,m))return h;const card=v35CheckCard(c,m,q);
+  const k=h.indexOf('<section class="card v7trip">');if(k>=0){const e=h.indexOf("</section>",k);if(e>0)return h.slice(0,e+10)+card+h.slice(e+10)}
+  const i=h.indexOf('<dl class="t5facts">');return i>=0?h.slice(0,i)+card+h.slice(i):h+card}catch(e){console.warn(e)}return h}}
+{const oa=AFTER.tcall;AFTER.tcall=(id,q)=>{oa&&oa(id,q);try{const c=TC(id),m=me();if(!c||!m||!document.getElementById("v35cc"))return;const $=s=>document.getElementById(s);const keep=()=>{const y=scrollY;render();scrollTo(0,y)};
+  document.querySelectorAll("[data-v35day]").forEach(inp=>inp.onchange=()=>{const r=A.tlogDay35(id,inp.dataset.v35day,inp.value);if(r&&r.ok){setTimeout(()=>{const f=document.activeElement&&document.activeElement.id;keep();if(f&&/^v35h\d$/.test(f)){const e=document.getElementById(f);if(e)try{e.focus({preventScroll:true})}catch(x){}}},0)}else{$("v35ccE").textContent=(r&&r.msg)||"That didn't save.";}});
+  if($("v35fill"))$("v35fill").onclick=()=>{const n=+$("v35fill").dataset.days,per=+$("v35fill").dataset.per;const today=new Date(v35Now()).toISOString().slice(0,10);let bad=null;
+   [...document.querySelectorAll("[data-v35day]")].slice(0,n).forEach(inp=>{if(inp.disabled||inp.dataset.v35day>today||inp.value)return;const r=A.tlogDay35(id,inp.dataset.v35day,per);if(!r||!r.ok)bad=r});if(bad)toast(bad.msg||"Some days didn't save","err");keep()};
+  if($("v35ot"))$("v35ot").onchange=()=>act(A.tlogSet35(id,{ot:$("v35ot").value}),keep);
+  if($("v35chk"))$("v35chk").onsubmit=e=>{e.preventDefault();const o=readForm($("v35chk"));const L=v35Log(m,id),today=new Date(v35Now()).toISOString().slice(0,10),off=Math.max(-52,Math.min(0,parseInt((q||{}).w35,10)||0)),mon=v35Add(v35Mon(today),off*7);
+   const r=A.tlogCheck35(id,mon,o.g,o.pd);if(r&&r.ok)act(r,keep);else $("v35ccE").textContent=(r&&r.msg)||"That didn't save."};
+  if($("v35msg"))$("v35msg").onclick=()=>{const L=v35Log(m,id),today=new Date(v35Now()).toISOString().slice(0,10),off=Math.max(-52,Math.min(0,parseInt((q||{}).w35,10)||0)),w=v35Week(c,L,v35Add(v35Mon(today),off*7));const p=U(c.by)||{};
+   modal(`<h2 id="mtitle">Message ${esc(nameOf(p))}</h2><form id="v35mF" class="form"><div class="fld"><label for="v35mt">Message</label><textarea id="v35mt" rows="7" maxlength="2000">${esc(v35Msg(c,w,m))}</textarea><small class="muted">Goes to ${esc(nameOf(p))} as a Sawyer message. Edit anything first.</small></div><p class="err" id="v35mE" role="alert"></p><div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" id="v35mS">${I("send",16)}Send</button></div></form>`);
+   document.querySelectorAll("#modal [data-close]").forEach(b=>b.onclick=closeModal);const F=$("v35mF");F.onsubmit=ev=>{ev.preventDefault();if(F.__busy)return;F.__busy=1;$("v35mS").disabled=true;const r=A.send(c.by,$("v35mt").value);if(r&&r.ok!==false){closeModal();toast("Sent to "+nameOf(p))}else{F.__busy=0;$("v35mS").disabled=false;$("v35mE").textContent=(r&&r.msg)||"That didn't send."}}};
+  if($("v35csv"))$("v35csv").onclick=()=>{const L=v35Log(m,id);const days=Object.keys(L.d||{}).sort();const rows=[["Date","Day","Hours","Call","Rate","Per diem"]];days.forEach(d=>rows.push([d,V35_DN[(new Date(d+"T12:00:00Z").getUTCDay()+6)%7],L.d[d],c.title,c.rate,c.perDiem||0]));
+   const ws=[...new Set(days.map(v35Mon))].sort();rows.push([]);rows.push(["Week of","Hours","Straight","OT","Wages","Per diem","Should pay","Check wages","Check per diem","Difference"]);ws.forEach(k=>{const x=v35Week(c,L,k);rows.push([k,x.tot,x.st,x.ot,x.wage.toFixed(2),x.pd.toFixed(2),x.exp.toFixed(2),x.ck&&x.ck.g!=null?x.ck.g.toFixed(2):"",x.ck&&x.ck.pd!=null?x.ck.pd.toFixed(2):"",x.diff!=null?x.diff.toFixed(2):""])});
+   v35Csv("hours-"+String(c.title||"call").replace(/\(demo\)/i,"").replace(/[^a-z0-9]+/gi,"-").toLowerCase().replace(/^-|-$/g,"").slice(0,40)+".csv",rows)}}catch(e){console.warn(e)}}}
+// the traveler dashboard points at it
+{const ov=VIEWS.tdash;if(typeof ov==="function")VIEWS.tdash=function(p,q){let h=ov.apply(this,arguments);try{const m=me();if(!m||!m.trav)return h;const cs=(DB.tcalls||[]).filter(c=>v35Hired(c,m));if(!cs.length)return h;
+  const today=new Date(v35Now()).toISOString().slice(0,10),mon=v35Mon(today);const li=cs.slice(0,3).map(c=>{const w=v35Week(c,v35Log(m,c.id),mon);return`<li><a href="${href("tcall",c.id)}"><b>${esc(String(c.title).replace(/\s*\(demo\)$/i,""))}</b><small class="muted">This week: ${esc(v35Hrs(w.tot))} hrs logged · should pay ${esc(v7$(w.exp))}</small></a></li>`}).join("");
+  const card=`<div class="wrap v35td-w"><section class="card v35td" id="v35td"><h2>${I("calc",18)} Check your check</h2><ul>${li}</ul><p class="muted small">Log hours on the call page and compare your stub with the posted terms.</p></section></div>`;
+  const k=h.indexOf("</h1>");if(k<0)return h+card;const e=h.indexOf("</header>",k);const at=e>0?e+9:-1;return at>0?h.slice(0,at)+card+h.slice(at):h+card}catch(e){}return h}}
+
+/* demo data: last week logged (6x10s) with a stub $230 short for the demo traveler (server-side, once per database) */
+function seedTlog35(){try{if(!DB||!Array.isArray(DB.users))return false;let ch=false;const now=v35Now();
+ const tv=DB.users.find(u=>u.id==="tv1"&&u.demo),c=(DB.tcalls||[]).find(x=>x.id==="tcd1");
+ if(tv&&c&&!tv.tlog35&&v35Hired(c,tv)){const today=new Date(now).toISOString().slice(0,10),mon=v35Mon(today),last=v35Add(mon,-7),d={};for(let i=0;i<6;i++)d[v35Add(last,i)]=10;for(let i=0;i<7;i++){const k=v35Add(mon,i);if(k<today&&i<6)d[k]=10}
+  const L={d,chk:{},ot:"40w"};const w=v35Week(c,L,last);L.chk[last]={g:v35r2(w.wage-230),pd:w.pd,at:now};tv.tlog35={[c.id]:L};ch=true}
+ if(ch)save();return ch}catch(e){return false}}
+if(v35OnServer()&&typeof DB!=="undefined"&&DB&&DB.users){seedTlog35()}
+{const os=seed;seed=function(){const r=os.apply(this,arguments);try{if(v35OnServer())seedTlog35()}catch(e){}return r}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
