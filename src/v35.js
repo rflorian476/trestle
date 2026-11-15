@@ -156,7 +156,8 @@ const V35_MI=[0,10,15,25,50],V35_MIN=[0,250,500,1000,2500,5000];
 function v35Lf(u){const f=u&&u.lf35;return f&&typeof f==="object"?f:null}
 function v35Budget(j){const s=String(j&&j.budget||"");if(!s||/\b(per|each|an? hour|\/\s*(hr|hour|day|turn|visit))\b|tbd|open/i.test(s))return null;
  /* SW-079: a leading minus (e.g. "-500") is not a comparable amount — same as TBD. */
- if(/^\s*-/.test(s)||/^\s*\$\s*-/.test(s))return null;let mx=null;
+ /* v36 (SW-080): the same check for a Unicode minus (U+2212) and leading en/em dashes, via v25Neg. */
+ if(v25Neg(s))return null;let mx=null;
  for(const x of s.matchAll(/\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(k)?/gi)){let n=parseFloat(x[1].replace(/,/g,""));if(!Number.isFinite(n))continue;if(x[2])n*=1000;if(mx==null||n>mx)mx=n}return mx}
 function v35Why(j,u){const f=v35Lf(u);if(!f||!j)return"";const out=[];
  if(f.mi>0&&dist(u.zip,j.zip)>f.mi)out.push("farther than "+f.mi+" mi");

@@ -23,7 +23,11 @@ function v25Guide(j){if(!j||typeof estimateRange!=="function")return null;const 
   const rd=n=>n<1000?Math.round(n/10)*10:Math.round(n/50)*50;return{low:rd(b[0]*ur*rg),high:rd(b[1]*ur*rg),sub:j.sub}}
  const r=typeof v14Range==="function"?v14Range(j):null;return r?{low:r.low,high:r.high,sub:null}:null}
 // "$1,000–1,800" -> [1000,1800]; "Around $500" -> [500,500]; per-unit, TBD or blank budgets don't compare.
-function v25Budget(s){s=String(s||"").trim();if(!/\d/.test(s)||/\bper\b|\/\s*(hr|hour|day|wk|week|mo|month|turn)\b/i.test(s))return null;
+/* v36 (SW-080): a budget that starts with a minus of any kind is not a comparable amount (like TBD): ASCII "-", the Unicode
+   minus U+2212, hyphen / figure / en / em dashes and bar (U+2010-2015), small and fullwidth hyphen-minus. Also after a "$". */
+const V25_NEG=/^[\s\u00a0\u200b\ufeff]*(?:[$\uff04]\s*)?[-\u2010-\u2015\u2212\ufe58\ufe63\uff0d]/;
+function v25Neg(s){return V25_NEG.test(String(s==null?"":s))}
+function v25Budget(s){s=String(s||"").trim();if(v25Neg(s))return null;if(!/\d/.test(s)||/\bper\b|\/\s*(hr|hour|day|wk|week|mo|month|turn)\b/i.test(s))return null;
  const n=(s.match(/\d[\d,]*(?:\.\d+)?\s*k?/gi)||[]).map(x=>{const k=/k$/i.test(x.trim());return Number(x.replace(/[,k\s]/gi,""))*(k?1000:1)}).filter(x=>x>0);if(!n.length)return null;
  return[Math.min(...n.slice(0,2)),Math.max(...n.slice(0,2))]}
 function v25Band(j,town){const g=v25Guide(j);if(!g)return "";const what=g.sub?String(g.sub).replace(/\b[A-Z][a-z]+/g,w=>w.toLowerCase()):"this kind of job";
