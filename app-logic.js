@@ -3553,9 +3553,26 @@ A.__delete13=function(){const m=me();if(!m)return{ok:false,msg:"Sign in first"};
  if(live.length)return{ok:false,msg:`Finish or cancel your ${live.length===1?"active job":live.length+" active jobs"} first, so nobody is left with money held in escrow.`};
  const gone=new Set((DB.jobs||[]).filter(j=>j.cust===m.id&&j.status==="posted"&&!j.hired).map(j=>j.id));
  DB.jobs=(DB.jobs||[]).filter(j=>!gone.has(j.id));DB.quotes=(DB.quotes||[]).filter(q=>!gone.has(q.job)&&!(q.cid===m.id&&q.status==="sent"));
+ v34OwnerGone(m.id);
  const keep={id:m.id,created:m.created};for(const k of Object.keys(m))delete m[k];
  Object.assign(m,keep,{name:"Former Sawyer member",role:"deleted",email:"",zip:"",deleted13:Date.now()});
  if(typeof save==="function")save();return{ok:true,msg:"Account deleted"}};
+/* v34 (QA SW-072): a deleted owner's crew projects leave the public catalog. Projects nobody was hired onto are deleted
+   outright, with their crew chat and the "new crew opening" notices that pointed at them. Staffed or finished ones stay only
+   as a closed, unlisted, anonymized record (no description, notes or budget), so the crew's history and reviews still make
+   sense; pending applications and invites are closed and the crew is told. Also run at boot for owners deleted before v34. */
+function v34Staffed(p){return(p.roles||[]).some(r=>r&&(((r.filled||[]).length)||((r.done||[]).length)||(r.apps||[]).some(a=>a&&a.status==="accepted")||(r.invites||[]).some(i=>i&&i.status==="accepted")))||(DB.reviews||[]).some(x=>x&&x.proj===p.id)}
+function v34OwnerGone(uid){const drop=new Set();let closed=0;
+ for(const p of (DB.projects||[])){if(!p||p.pm!==uid||p.ownerGone34)continue;
+  if(!v34Staffed(p)){drop.add(p.id);continue}
+  const live=p.status!=="completed";p.status=live?"closed":p.status;p.ownerGone34=Date.now();p.desc="";p.notes="";p.budget="";
+  (p.roles||[]).forEach(r=>{(r.apps||[]).forEach(a=>{if(a&&(a.status==="pending"||a.status==="waitlist"))a.status="closed"});(r.invites||[]).forEach(i=>{if(i&&i.status==="invited")i.status="closed"})});
+  if(live){const crew=[...new Set((p.roles||[]).flatMap(r=>r.filled||[]))].filter(c=>c!==uid);crew.forEach(c=>notify(c,`${p.title} was closed: the project manager deleted their account.`,"project:"+p.id))}closed++}
+ if(drop.size){DB.projects=(DB.projects||[]).filter(p=>!drop.has(p.id));DB.pmsgs=(DB.pmsgs||[]).filter(x=>!drop.has(x.pid));DB.notifs=(DB.notifs||[]).filter(n=>!(n&&typeof n.link==="string"&&n.link.startsWith("project:")&&drop.has(n.link.slice(8))))}
+ return{deleted:drop.size,closed}}
+/* projects whose owner is gone (deleted before v34, or the account row is missing) */
+function v34Orphans(){const gone=new Set((DB.users||[]).filter(u=>u&&u.role==="deleted").map(u=>u.id)),have=new Set((DB.users||[]).map(u=>u&&u.id));let n=0;
+ for(const id of new Set((DB.projects||[]).filter(p=>p&&p.pm&&!p.ownerGone34&&(gone.has(p.pm)||!have.has(p.pm))).map(p=>p.pm))){const r=v34OwnerGone(id);n+=r.deleted+r.closed}return n}
 if(typeof document!=="undefined"){
  {const ov=VIEWS.account;if(ov)VIEWS.account=function(){const h=ov.apply(this,arguments);const m=me();if(!m||!/id="signinMethods"/.test(h))return h;
   const card=`<div class="card del13" id="delAcct"><h2 class="h-sub">${I("x",16)} Delete account</h2><p class="muted small">This signs you out everywhere, removes your sign-in methods, photos and contact details, and takes your profile out of search. Reviews you wrote stay, credited to “Former Sawyer member”. This can't be undone.</p><button class="btn ghost danger13" id="delGo" type="button">Delete my account</button></div>`;
@@ -4865,6 +4882,18 @@ function v33TplSum(p){const n=(p.roles||[]).reduce((a,r)=>a+(+r.need||0),0);retu
   const k=h.indexOf('<form id="npf" class="form card" novalidate>');if(k>=0){const e=k+'<form id="npf" class="form card" novalidate>'.length;return h.slice(0,e)+pick+h.slice(e)}
  }catch(e){console.warn(e)}return h}}
 {const oa=AFTER.newproject;AFTER.newproject=function(){const r=oa&&oa.apply(this,arguments);try{const s=document.getElementById("v33ps");if(s)s.onchange=()=>{if(!s.value)return;if(v33Tpl(s.value))render();const n=document.getElementById("np-title");if(n)n.focus()}}catch(e){}return r}}
+
+/* ===== v34 ===== */
+/* (1) QA SW-072: a project whose owner deleted their account is never shown as an open listing. The server already leaves
+   it out of everyone's state except its crew, applicants and staff; the browse list skips it for them too, and its page
+   says plainly that it was closed. */
+function v34Gone(p){if(!p)return true;if(p.ownerGone34)return true;const u=p.pm&&U(p.pm);return !!(p.pm&&(!u||u.role==="deleted"))}
+{const ov=VIEWS.projects;if(ov)VIEWS.projects=function(){const all=DB.projects;try{DB.projects=(all||[]).filter(p=>!v34Gone(p));return ov.apply(this,arguments)}finally{DB.projects=all}}}
+{const ov=VIEWS.project;if(ov)VIEWS.project=function(id){let h=ov.apply(this,arguments);try{const p=PJ(id);if(!p||!v34Gone(p))return h;
+  const note=`<p class="v34gone" role="note">${I("x",15)}<span>This project is closed. Its project manager deleted their Sawyer account, so it no longer takes applications.</span></p>`;
+  h=h.split(">Hiring crew</b>").join(">Closed</b>").split("Hiring crew</span>").join("Closed</span>");
+  const dol=" · "+I("dollar",14)+" ";h=h.split(dol+"</p>").join("</p>").split(dol+" · ").join(" · ");
+  const k=h.indexOf("<h1");if(k>=0){const e=h.indexOf("</h1>",k);if(e>0)return h.slice(0,e+5)+note+h.slice(e+5)}return note+h}catch(e){}return h}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
