@@ -5340,6 +5340,49 @@ function v36JcModal(){const m=me(),b=BED;if(!m||!b)return;const all=v36Unbilled(
    const k=h.indexOf('<div class="o7-g2">');h=k>=0?h.slice(0,k)+card+h.slice(k):card+h}
  }catch(e){console.warn(e)}return h}}
 
+/* (3) Photos of the work on invoices. A pro adds up to 8 photos to any invoice, estimate or change order (from the phone's
+   camera or library, or from that customer's record), tags each Before / During / After with a short caption, and the
+   customer sees them on the invoice itself, above the totals, with a full-size view. Proof of work up front means fewer
+   "what did I pay for?" calls and faster payment. Only the pro's own uploads are accepted (checked on the server); location
+   data was already stripped at upload (lib/imgsafe.js). Stored on the bill (ph36). */
+const V36_PH_MAX=8,V36_TAGS=[["before","Before"],["during","During"],["after","After"]];
+function v36Ph(b){return Array.isArray(b&&b.ph36)?b.ph36:[]}
+A.billPhotos36=function(id,list){const m=me(),b=v7Bill(id);if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!b||b.by!==m.id)return{ok:false,msg:"Only the pro who wrote this can change its photos."};
+ if(b.status==="void")return{ok:false,msg:"This one is void."};if(!Array.isArray(list))return{ok:false,msg:"Send a list of photos."};
+ if(list.length>V36_PH_MAX)return{ok:false,msg:"Up to "+V36_PH_MAX+" photos per "+String(BILLNAME[b.type]||"invoice").toLowerCase()+"."};
+ const seen=new Set(),out=[];for(const x of list){const src=String(x&&x.src||"");if(!UPLOAD_RE.test(src)||seen.has(src))continue;seen.add(src);
+  const tag=V36_TAGS.some(t=>t[0]===(x&&x.tag))?x.tag:"";out.push({src,tag,cap:v35Desc(x&&x.cap).slice(0,80),at:(v36Ph(b).find(p=>p.src===src)||{}).at||v36Now()})}
+ if(list.length&&!out.length)return{ok:false,msg:"Those photos couldn't be added. Upload them again from your device."};
+ b.ph36=out;save();return{ok:true,msg:out.length?out.length+" photo"+(out.length===1?"":"s")+" on "+b.no:"Photos removed",n:out.length}};
+function v36Gallery(b){const P=v36Ph(b);if(!P.length)return"";const lab=t=>(V36_TAGS.find(x=>x[0]===t)||[])[1]||"";
+ return`<section class="v36g" aria-labelledby="v36gh-${esc(b.id)}"><h3 id="v36gh-${esc(b.id)}">${I("camera",16)} Photos of the work <small class="muted">${P.length}</small></h3><ul class="v36g-l">${P.map((p,i)=>`<li><button type="button" class="v36g-b" data-v36ph="${i}" aria-label="Open photo ${i+1}${p.tag?", "+lab(p.tag):""}${p.cap?": "+esc(p.cap):""}"><img src="${esc(p.src)}" alt="${esc(p.cap||((lab(p.tag)||"Job")+" photo"))}" loading="lazy" decoding="async" width="160" height="120">${p.tag?`<span class="v36g-t v36g-${esc(p.tag)}">${esc(lab(p.tag))}</span>`:""}</button>${p.cap?`<small>${esc(p.cap)}</small>`:""}</li>`).join("")}</ul></section>`}
+if(typeof billDoc==="function"){const ob=billDoc;billDoc=function(b,forCust){let h=ob.apply(this,arguments);try{const g=v36Gallery(b);if(!g)return h;const k=h.indexOf('<div class="o7-tot">');return k>=0?h.slice(0,k)+g+h.slice(k):h.replace("</article>",()=>g+"</article>")}catch(e){return h}}}
+function v36Lightbox(b,i){const P=v36Ph(b);if(!P.length)return;i=Math.max(0,Math.min(P.length-1,i|0));const p=P[i],lab=(V36_TAGS.find(x=>x[0]===p.tag)||[])[1]||"";
+ modal(`<div class="v36lb"><h2 id="mtitle">${esc(lab?lab+" photo":"Photo of the work")} <small class="muted">${i+1} of ${P.length}</small></h2><img src="${esc(p.src)}" alt="${esc(p.cap||lab+" photo")}" decoding="async">${p.cap?`<p>${esc(p.cap)}</p>`:""}
+ <div class="actions">${P.length>1?`<button type="button" class="btn ghost" id="v36lbP" aria-label="Previous photo">${I("left",16)}</button><button type="button" class="btn ghost" id="v36lbN" aria-label="Next photo">${I("right",16)}</button>`:""}<button type="button" class="btn" data-close>Close</button></div></div>`);
+ document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);const P_=document.getElementById("v36lbP"),N=document.getElementById("v36lbN");
+ if(P_)P_.onclick=()=>v36Lightbox(b,(i-1+P.length)%P.length);if(N)N.onclick=()=>v36Lightbox(b,(i+1)%P.length)}
+function v36PhCard(b){const P=v36Ph(b),c=v7Cust(b.cust),cp=(c&&Array.isArray(c.photos)?c.photos:[]).filter(u=>UPLOAD_RE.test(u)&&!P.some(p=>p.src===u));const full=P.length>=V36_PH_MAX;
+ return`<div class="card v36pc" id="v36pc"><div class="o7-sh"><h2 class="h-sub">${I("camera",16)} Photos of the work</h2><span class="muted small">${P.length} of ${V36_PH_MAX}</span></div>
+ <p class="muted small">Before and after shots show ${esc(b.cname||"your customer")} what they're paying for. They appear on the ${esc(String(BILLNAME[b.type]||"invoice").toLowerCase())}.</p>
+ ${P.length?`<ul class="v36pc-l">${P.map((p,i)=>`<li><img src="${esc(p.src)}" alt="" loading="lazy" width="64" height="64"><div class="v36pc-f"><label class="sr" for="v36t${i}">Tag for photo ${i+1}</label><select id="v36t${i}" data-v36tag="${i}"><option value="">No tag</option>${V36_TAGS.map(([k,v])=>`<option value="${k}" ${p.tag===k?"selected":""}>${v}</option>`).join("")}</select><label class="sr" for="v36c${i}">Caption for photo ${i+1}</label><input id="v36c${i}" data-v36cap="${i}" maxlength="80" value="${esc(p.cap||"")}" placeholder="Caption (optional)"></div><button type="button" class="linkbtn" data-v36rm="${i}" aria-label="Remove photo ${i+1}">${I("x",14)}</button></li>`).join("")}</ul>`:""}
+ <div class="v36pc-a">${full?`<span class="muted small">That's the most a bill can hold.</span>`:`<label class="btn sm primary" for="v36up">${I("camera",14)}Add photos</label><input id="v36up" class="r10-in" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>`}${cp.length&&!full?`<button type="button" class="btn sm" id="v36fc">${I("img",14)}From ${esc(c.name)}'s photos <small>${cp.length}</small></button>`:""}</div>
+ <p class="muted small v36pc-s" id="v36pcS" role="status"></p></div>`}
+{const ov=VIEWS.invoice;VIEWS.invoice=function(id){let h=ov.apply(this,arguments);try{const m=me(),b=v7Bill(id);if(!m||!b||b.by!==m.id||b.status==="void")return h;const a='<aside class="o7-side">';const k=h.indexOf(a);
+  return k<0?h:h.slice(0,k+a.length)+v36PhCard(b)+h.slice(k+a.length)}catch(e){return h}}}
+function v36PhSave(b,list,msg){const r=A.billPhotos36(b.id,list);const s=document.getElementById("v36pcS");if(r&&r.ok===false){if(s)s.textContent=r.msg;toast(r.msg,"err");return r}act(r,()=>{const y=scrollY;render();scrollTo(0,y)});return r}
+{const oa=AFTER.invoice;AFTER.invoice=function(id){const r=oa&&oa.apply(this,arguments);try{const b=v7Bill(id);if(!b)return r;
+  document.querySelectorAll("[data-v36ph]").forEach(x=>x.onclick=()=>v36Lightbox(b,+x.dataset.v36ph));
+  const pc=document.getElementById("v36pc");if(!pc)return r;const cur=()=>v36Ph(b).map(p=>({src:p.src,tag:p.tag,cap:p.cap}));
+  pc.querySelectorAll("[data-v36tag]").forEach(s=>s.onchange=()=>{const L=cur();L[+s.dataset.v36tag].tag=s.value;v36PhSave(b,L)});
+  pc.querySelectorAll("[data-v36cap]").forEach(s=>s.onchange=()=>{const L=cur();L[+s.dataset.v36cap].cap=s.value;v36PhSave(b,L)});
+  pc.querySelectorAll("[data-v36rm]").forEach(s=>s.onclick=()=>{const L=cur();L.splice(+s.dataset.v36rm,1);v36PhSave(b,L)});
+  const fc=document.getElementById("v36fc");if(fc)fc.onclick=()=>{const c=v7Cust(b.cust);const cp=(c&&c.photos||[]).filter(u=>UPLOAD_RE.test(u)&&!v36Ph(b).some(p=>p.src===u));const room=V36_PH_MAX-v36Ph(b).length;
+   modal(`<h2 id="mtitle">${I("img",18)} From ${esc(c.name)}'s photos</h2><ul class="v36fc-l">${cp.map((u,i)=>`<li><label><input type="checkbox" data-v36pick="${i}"><img src="${esc(u)}" alt="Photo ${i+1} from the customer record" loading="lazy" width="96" height="72"></label></li>`).join("")}</ul><p class="muted small">Room for ${room} more.</p><div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button type="button" class="btn primary" id="v36fcGo">Add</button></div>`);
+   document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);document.getElementById("v36fcGo").onclick=()=>{const pick=[...document.querySelectorAll("[data-v36pick]:checked")].map(x=>cp[+x.dataset.v36pick]).slice(0,room);closeModal();if(pick.length)v36PhSave(b,cur().concat(pick.map(src=>({src,tag:"",cap:""}))))}};
+  const up=document.getElementById("v36up");if(up)up.onchange=async()=>{const files=[...(up.files||[])];if(!files.length)return;const room=V36_PH_MAX-v36Ph(b).length;const s=document.getElementById("v36pcS");const got=[];
+   for(const [i,f0] of files.slice(0,room).entries()){if(s)s.textContent="Uploading "+(i+1)+" of "+Math.min(files.length,room)+"…";try{const f=typeof r10shrink==="function"?await r10shrink(f0):f0;got.push(await v2upload(f))}catch(e){toast(e.message||"Upload failed","err")}}
+   if(files.length>room)toast("Only "+room+" more fit on this bill","err");if(got.length)v36PhSave(b,cur().concat(got.map(src=>({src,tag:v36Ph(b).length?"after":"before",cap:""}))));else if(s)s.textContent=""}}catch(e){console.warn(e)}return r}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
