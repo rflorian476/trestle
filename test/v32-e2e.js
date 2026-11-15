@@ -5,7 +5,7 @@
 // payload decrypted, new matching job -> pro, new quote -> homeowner, hired / job filled -> pros, per-kind switches,
 // test alert, sign-out and account delete drop devices, dead endpoints removed, private key never leaves the server),
 // the dashboard / Inbox cards at 1440 and 390 (turn on, test, kinds, turn off, Not now), the service worker's push and
-// notification handlers (Chromium's DevTools push), health 2.15.2-sawyer and SW cache sawyer-v32. SW-068: subscribe cannot take over another account's endpoint.
+// notification handlers (Chromium's DevTools push), health and SW cache (any Sawyer version since v33). SW-068: subscribe cannot take over another account's endpoint.
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
 const {chromium}=require("playwright");
@@ -58,8 +58,8 @@ let LOCAL=null,br=null,PS=null;
  const page=async(w,cookie,init)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},acceptDownloads:true});
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:LOCAL.B}])}if(init)await c.addInitScript(init.fn,init.arg);
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.15.2-sawyer","healthz reports 2.15.2-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v32"/.test(sw.body),"service worker cache is sawyer-v32");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker has a Sawyer cache name");
  ok(/addEventListener\("push"/.test(sw.body)&&/showNotification\(/.test(sw.body)&&/addEventListener\("notificationclick"/.test(sw.body)&&/openWindow\(/.test(sw.body)&&/addEventListener\("pushsubscriptionchange"/.test(sw.body),"service worker handles push, notification clicks and subscription changes");
  const run=Math.random().toString(36).slice(2,8);
  const signupPro=async(tag,trade)=>{const r=await req(LOCAL.port,"POST","/api/signup",JH,J({kind:"pro",password:"v32-correct-horse",data:{name:"Vee "+tag,biz:"V32 "+tag+" "+run,email:"v32-"+tag+"-"+run+"@example.com",trade,zip:"78704",phone:"5125550100",plan:"founding"}}));return{ck:(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0],id:stateOf(r).me}};

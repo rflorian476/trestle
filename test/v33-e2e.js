@@ -51,7 +51,8 @@ const sigCk=r=>(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0]
 (async()=>{try{
  PS=await pushService();
  LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"});
- //@@RELEASE@@
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.16.0-sawyer","healthz reports 2.16.0-sawyer",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v33"/.test(sw.body),"service worker cache is sawyer-v33 (client assets changed)");
  const run=Math.random().toString(36).slice(2,8);
  const signupPro=async(tag,trade,zip)=>{const r=await req(LOCAL.port,"POST","/api/signup",JH,J({kind:"pro",password:"v33-correct-horse",data:{name:"Vee "+tag,biz:"V33 "+tag+" "+run,email:"v33-"+tag+"-"+run+"@example.com",trade:trade||"Plumbing",zip:zip||"78704",phone:"5125550100",plan:"founding"}}));return{ck:sigCk(r),id:stateOf(r).me}};
  const signupHo=async(tag)=>{const r=await req(LOCAL.port,"POST","/api/signup",JH,J({kind:"customer",password:"v33-correct-horse",data:{name:"Hana "+tag,email:"v33-ho-"+tag+"-"+run+"@example.com",zip:"78704"}}));return{ck:sigCk(r),id:stateOf(r).me}};
@@ -193,7 +194,7 @@ const sigCk=r=>(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0]
   for(const w of [390,1440]){const p=await page(w,pm.ck);await p.goto(LOCAL.B+"/project/p1",{waitUntil:"networkidle"});await p.waitForSelector("#v33tpl",{timeout:10000});
    const b=await p.evaluate(()=>{const e=document.getElementById("v33tpl"),r=e.getBoundingClientRect();return{t:e.textContent.trim(),h:r.height,r:r.right,ow:document.documentElement.scrollWidth>innerWidth+1}});
    ok(b.t==="Reuse as template"&&b.h>=36&&b.r<=w&&!b.ow,w+" PM's project page has 'Reuse as template'",J(b));
-   if(w===390){await sleep(700);await p.screenshot({path:path.join(SH,"v33-template-button-390.png")}).catch(()=>{});}
+   if(w===390){await sleep(700);await (await p.$(".upj-act")).screenshot({path:path.join(SH,"v33-template-button-390.png")}).catch(()=>{})}
    await p.click("#v33tpl");await p.waitForSelector("#v33tp.on",{timeout:8000});
    const o=await p.evaluate(()=>({url:location.pathname+location.hash,title:document.getElementById("np-title").value,n:document.querySelector(".v33tp-n").innerText.replace(/\s+/g," "),ow:document.documentElement.scrollWidth>innerWidth+1}));
    ok(/newproject/.test(o.url)&&o.title==="Inground pool build, Scottsdale (copy)"&&/Copied from Demo: Inground pool build, Scottsdale: 6 trades · 9 crew · \d+ phases/.test(o.n)&&!o.ow,w+" it opens Post a project with the title '(copy)' and a 'Copied from' note (trades, crew, phases)",J(o));

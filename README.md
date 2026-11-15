@@ -1,4 +1,4 @@
-# Sawyer (beta) — v2.15.0
+# Sawyer (beta) — v2.16.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
@@ -21,6 +21,14 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v33: follow up on quotes, log receipts from the dashboard, reuse a project, one key per device
+
+- **Quotes waiting for an answer** (pro dashboard, under "Here's what's next"). A quote with no reply for 2+ days on a job that is still open and not hired is listed with the homeowner's first name, the price (with cents) and how long ago. **Follow up** opens an editable, friendly check-in ("Hi Hana, just checking in on my quote for … ($1,234.50) …") that is sent as a normal Sawyer message, so the homeowner gets the usual "New message" notice / alert. One follow-up per quote, checked on the server (`followUp33`): not before 2 days, not after a hire, not on someone else's quote, 1,000 characters max. Threads where the homeowner already wrote back after the quote don't show. The follow-up time (`fu33`) stays with that pro and the homeowner; other pros and signed-out state don't get it.
+- **Quick log** (pro dashboard). **Receipt**: total (number pad), one-tap category (Materials, Fuel, Tools, Permits, Meals, Dump fees, or More…), vendor and job (remembered), receipt photo (opens the camera on phones). **Trip**: miles, round trip (doubles the miles), from (remembers the last one) and to. Saved as the same Office expense / mileage records, so Reports, the P&L and the tax file include them. After saving: what was logged, **Undo**, **Log another**, **Done**. The card shows this month's receipts and miles. On phones the sheet opens from the bottom.
+- **Reuse as template** (project managers). On a PM's own project page, and as **Start from one of your projects** in Post a project: copies trades, role names, crew counts, phases, budget, notes and town into a new draft titled "… (copy)" with blank dates. Crew, applicants and chat are not copied, and nothing is posted until the Review step.
+- **SW-069: one device, one key.** Push endpoints are canonicalized (`canonEndpoint()` in `lib/webpush.js`): lowercase scheme and host, no trailing slash, `%XX` upper-cased in the query. That key is used for subscribe, the other-account 409 (SW-068 wording unchanged), unsubscribe, status and test alerts. Spellings no push service hands out are refused with 400: user:pass@, an explicit default port, `%`-escapes in host or path, dot segments, `//`, fragments, backslashes, spaces, non-ASCII. Alerts still go to the exact URL the browser gave (`pushsubs.url`). v32 rows move to the canonical key at start; if two rows are the same device, the one turned on first keeps it.
+- Tests: `node test/v33-e2e.js [shots dir]` (self-contained, local stand-in push service; FCM endpoints are only subscribed / checked / removed, never sent to) is part of `test/run-all.sh`. `v32-e2e` now accepts any Sawyer version / SW cache name. SW cache is `sawyer-v33`. Code: `src/v33.js`, `src/v33.css`.
 
 ## v32: alerts on your phone or computer, cents on the tax card, safer spreadsheets
 Builds on v31 (live as `6c2d3dc`).
