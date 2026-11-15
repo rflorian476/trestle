@@ -207,6 +207,17 @@ function run(uid,name,args){const d=DB();d.me=uid;const pb=pushBefore();let r;tr
    quotes = a pro sent the homeowner a quote. The VAPID private key stays in this process (never logged or sent). ---- */
 db.exec(`CREATE TABLE IF NOT EXISTS pushsubs(endpoint TEXT PRIMARY KEY,uid TEXT NOT NULL,p256dh TEXT NOT NULL,auth TEXT NOT NULL,sess TEXT NOT NULL,created INTEGER NOT NULL,last_ok INTEGER,fails INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS pushprefs(uid TEXT PRIMARY KEY,cats TEXT NOT NULL);`);
+// SW-069: `endpoint` holds the canonical key (WEBPUSH.canonEndpoint().key); `url` is where alerts are POSTed. Rows from
+// v32 (raw endpoint, no url) are moved to the canonical key once at start; if two rows turn out to be the same device,
+// the one turned on first keeps it.
+try{db.exec("ALTER TABLE pushsubs ADD COLUMN url TEXT")}catch(e){}
+{const rows=db.prepare("SELECT endpoint,created FROM pushsubs WHERE url IS NULL ORDER BY created").all();
+ for(const r of rows){const c=WEBPUSH.canonEndpoint(r.endpoint);
+  if(!c){db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(r.endpoint);continue}
+  if(c.key===r.endpoint){db.prepare("UPDATE pushsubs SET url=? WHERE endpoint=?").run(c.url,r.endpoint);continue}
+  if(db.prepare("SELECT 1 FROM pushsubs WHERE endpoint=?").get(c.key))db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(r.endpoint);
+  else db.prepare("UPDATE pushsubs SET endpoint=?,url=? WHERE endpoint=?").run(c.key,c.url,r.endpoint)}}
+const pushKey=ep=>{const c=WEBPUSH.canonEndpoint(ep);return c?c.key:""};
 const VAPID=WEBPUSH.makeVapid(db);
 const PUSH_CATS=["jobs","hires","quotes","msgs"];
 const sessHash=t=>crypto.createHash("sha256").update(String(t||"")).digest("base64url").slice(0,32);
@@ -229,35 +240,36 @@ function pushSubject(){const s=String(process.env.VAPID_SUBJECT||"").trim();if(/
 let PUSH_SENT=0;
 async function pushTo(uid,payload,opts){const subs=db.prepare("SELECT * FROM pushsubs WHERE uid=?").all(uid);if(!subs.length)return{sent:0,devices:0};const live=liveSessHashes(uid);let sent=0;
  for(const s of subs){if(!live.has(s.sess)){db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(s.endpoint);continue}
-  const sub={endpoint:s.endpoint,keys:{p256dh:s.p256dh,auth:s.auth}},o=Object.assign({subject:pushSubject()},opts||{});let r=await WEBPUSH.send(VAPID,sub,payload,o);
+  const sub={endpoint:s.url||s.endpoint,keys:{p256dh:s.p256dh,auth:s.auth}},o=Object.assign({subject:pushSubject()},opts||{});let r=await WEBPUSH.send(VAPID,sub,payload,o);
   // A brand-new subscription can briefly read as 404/410 at the push service while it propagates (seen with FCM right
   // after subscribing). Retry once after a short wait, and never delete a subscription younger than 10 minutes for it.
   const young=Date.now()-s.created<10*60e3;if(r.gone&&young){await new Promise(z=>setTimeout(z,+process.env.PUSH_RETRY_MS||3000));r=await WEBPUSH.send(VAPID,sub,payload,o);if(r.gone)r={ok:false,status:r.status,gone:false}}
-  if(process.env.PUSH_DEBUG)console.log("push: "+new URL(s.endpoint).hostname+" -> "+r.status);
+  if(process.env.PUSH_DEBUG)console.log("push: "+new URL(s.url||s.endpoint).hostname+" -> "+r.status);
   if(r.ok){sent++;PUSH_SENT++;db.prepare("UPDATE pushsubs SET last_ok=?,fails=0 WHERE endpoint=?").run(Date.now(),s.endpoint)}
   else if(r.gone)db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(s.endpoint);
   else db.prepare("UPDATE pushsubs SET fails=fails+1 WHERE endpoint=?").run(s.endpoint)}
  db.prepare("DELETE FROM pushsubs WHERE fails>=8").run();pushAny=!!db.prepare("SELECT 1 FROM pushsubs LIMIT 1").get();return{sent,devices:subs.length}}
 async function pushDeliver(list){for(const n of list.slice(0,200)){const k=pushKind(n);if(!k||!n.to)continue;if(!db.prepare("SELECT 1 FROM pushsubs WHERE uid=? LIMIT 1").get(n.to))continue;
   if(!pushPrefs(n.to)[k])continue;await pushTo(n.to,pushPayload(n,k),{urgency:k==="jobs"&&/\(urgent\)/.test(n.text||"")?"high":"normal",topic:k})}}
-function pushStatus(uid,endpoint){const row=endpoint?db.prepare("SELECT uid FROM pushsubs WHERE endpoint=?").get(String(endpoint)):null;
+function pushStatus(uid,endpoint){const k=endpoint?pushKey(endpoint):"";const row=k?db.prepare("SELECT uid FROM pushsubs WHERE endpoint=?").get(k):null;
  return{key:VAPID.publicKey,on:!!(row&&row.uid===uid),devices:db.prepare("SELECT COUNT(*) n FROM pushsubs WHERE uid=?").get(uid).n,cats:pushPrefs(uid)}}
 async function pushApi(req,res,p,uid,b){
  if(p==="/api/push/status")return send(res,200,pushStatus(uid,b.endpoint));
  if(p==="/api/push/subscribe"){if(limited("pushsub:"+uid,20,3600e3))return send(res,429,{error:"Too many tries. Try again later."});
-  const sub=b.sub&&typeof b.sub==="object"?b.sub:{};const ep=String(sub.endpoint||"");
-  if(!WEBPUSH.endpointOk(ep)||!WEBPUSH.keysOk(sub.keys))return send(res,400,{error:"This browser's push service isn't supported."});
-  const t=cookies(req).swsid;const up=db.prepare("INSERT INTO pushsubs(endpoint,uid,p256dh,auth,sess,created,fails) VALUES(?,?,?,?,?,?,0) ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh,auth=excluded.auth,sess=excluded.sess,created=excluded.created,fails=0 WHERE pushsubs.uid=excluded.uid").run(ep,uid,String(sub.keys.p256dh),String(sub.keys.auth),sessHash(t),Date.now());
+  const sub=b.sub&&typeof b.sub==="object"?b.sub:{};const ep=String(sub.endpoint||"");const c=WEBPUSH.canonEndpoint(ep);
+  if(!c||!WEBPUSH.endpointOk(ep)||!WEBPUSH.keysOk(sub.keys))return send(res,400,{error:"This browser's push service isn't supported."});
+  // SW-068 + SW-069: the canonical key is unique, so any spelling of another account's device is a generic 409.
+  const t=cookies(req).swsid;const up=db.prepare("INSERT INTO pushsubs(endpoint,url,uid,p256dh,auth,sess,created,fails) VALUES(?,?,?,?,?,?,?,0) ON CONFLICT(endpoint) DO UPDATE SET url=excluded.url,p256dh=excluded.p256dh,auth=excluded.auth,sess=excluded.sess,created=excluded.created,fails=0 WHERE pushsubs.uid=excluded.uid").run(c.key,c.url,uid,String(sub.keys.p256dh),String(sub.keys.auth),sessHash(t),Date.now());
   if(!up.changes)return send(res,409,{error:"Couldn't turn alerts on for this device. Try again."});
   // at most 10 devices per account: the oldest drops off
   const all=db.prepare("SELECT endpoint FROM pushsubs WHERE uid=? ORDER BY created DESC").all(uid);for(const r of all.slice(10))db.prepare("DELETE FROM pushsubs WHERE endpoint=?").run(r.endpoint);
   if(b.cats&&typeof b.cats==="object"){const o={};for(const k of PUSH_CATS)o[k]=!!b.cats[k];db.prepare("INSERT INTO pushprefs(uid,cats) VALUES(?,?) ON CONFLICT(uid) DO UPDATE SET cats=excluded.cats").run(uid,JSON.stringify(o))}
   pushAny=true;return send(res,200,Object.assign({ok:true},pushStatus(uid,ep)))}
- if(p==="/api/push/unsubscribe"){const ep=String(b.endpoint||"");if(b.all===true)db.prepare("DELETE FROM pushsubs WHERE uid=?").run(uid);else if(ep)db.prepare("DELETE FROM pushsubs WHERE endpoint=? AND uid=?").run(ep,uid);
+ if(p==="/api/push/unsubscribe"){const ep=String(b.endpoint||"");if(b.all===true)db.prepare("DELETE FROM pushsubs WHERE uid=?").run(uid);else if(ep)db.prepare("DELETE FROM pushsubs WHERE endpoint=? AND uid=?").run(pushKey(ep)||ep,uid);
   pushAny=!!db.prepare("SELECT 1 FROM pushsubs LIMIT 1").get();return send(res,200,Object.assign({ok:true},pushStatus(uid,ep)))}
  if(p==="/api/push/prefs"){const o={};const c=b.cats&&typeof b.cats==="object"?b.cats:{};for(const k of PUSH_CATS)o[k]=!!c[k];db.prepare("INSERT INTO pushprefs(uid,cats) VALUES(?,?) ON CONFLICT(uid) DO UPDATE SET cats=excluded.cats").run(uid,JSON.stringify(o));return send(res,200,Object.assign({ok:true},pushStatus(uid,b.endpoint)))}
  if(p==="/api/push/test"){if(limited("pushtest:"+uid,6,3600e3))return send(res,429,{error:"You've sent a few test alerts already. Try again in an hour."});
-  const ep=String(b.endpoint||"");const row=ep&&db.prepare("SELECT uid FROM pushsubs WHERE endpoint=?").get(ep);if(!row||row.uid!==uid)return send(res,400,{error:"Turn alerts on for this device first."});
+  const ep=String(b.endpoint||"");const k=pushKey(ep);const row=k&&db.prepare("SELECT uid FROM pushsubs WHERE endpoint=?").get(k);if(!row||row.uid!==uid)return send(res,400,{error:"Turn alerts on for this device first."});
   const r=await pushTo(uid,{title:"Sawyer alerts are on",body:"This is how new jobs, quotes and hiring news will show up on this device.",url:"/inbox",tag:"test"},{ttl:600});
   return send(res,200,{ok:r.sent>0,sent:r.sent})}
  return send(res,404,{error:"Not found"})}
