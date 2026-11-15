@@ -69,17 +69,24 @@ A.__delete13=function(){const m=me();if(!m)return{ok:false,msg:"Sign in first"};
    as a closed, unlisted, anonymized record (no description, notes or budget), so the crew's history and reviews still make
    sense; pending applications and invites are closed and the crew is told. Also run at boot for owners deleted before v34. */
 function v34Staffed(p){return(p.roles||[]).some(r=>r&&(((r.filled||[]).length)||((r.done||[]).length)||(r.apps||[]).some(a=>a&&a.status==="accepted")||(r.invites||[]).some(i=>i&&i.status==="accepted")))||(DB.reviews||[]).some(x=>x&&x.proj===p.id)}
-function v34OwnerGone(uid){const drop=new Set();let closed=0;
- for(const p of (DB.projects||[])){if(!p||p.pm!==uid||p.ownerGone34)continue;
+function v34OnProject(p,uid){return(p.roles||[]).some(r=>r&&((r.filled||[]).includes(uid)||(r.done||[]).includes(uid)||(r.apps||[]).some(a=>a&&a.cid===uid)))}
+/* uid === null: SW-073, a non-demo leftover whose pm was already nulled (the live pwiw1ked shape). */
+function v34OwnerMatch(p,uid){if(!p||p.ownerGone34)return false;if(uid==null)return !p.pm&&!p.demo;return p.pm===uid}
+function v34OwnerGone(uid){const drop=new Set(),closed=new Set();
+ for(const p of (DB.projects||[])){if(!v34OwnerMatch(p,uid))continue;
   if(!v34Staffed(p)){drop.add(p.id);continue}
   const live=p.status!=="completed";p.status=live?"closed":p.status;p.ownerGone34=Date.now();p.desc="";p.notes="";p.budget="";
   (p.roles||[]).forEach(r=>{(r.apps||[]).forEach(a=>{if(a&&(a.status==="pending"||a.status==="waitlist"))a.status="closed"});(r.invites||[]).forEach(i=>{if(i&&i.status==="invited")i.status="closed"})});
-  if(live){const crew=[...new Set((p.roles||[]).flatMap(r=>r.filled||[]))].filter(c=>c!==uid);crew.forEach(c=>notify(c,`${p.title} was closed: the project manager deleted their account.`,"project:"+p.id))}closed++}
- if(drop.size){DB.projects=(DB.projects||[]).filter(p=>!drop.has(p.id));DB.pmsgs=(DB.pmsgs||[]).filter(x=>!drop.has(x.pid));DB.notifs=(DB.notifs||[]).filter(n=>!(n&&typeof n.link==="string"&&n.link.startsWith("project:")&&drop.has(n.link.slice(8))))}
- return{deleted:drop.size,closed}}
-/* projects whose owner is gone (deleted before v34, or the account row is missing) */
+  if(live){const crew=[...new Set((p.roles||[]).flatMap(r=>[...(r.filled||[]),...(r.done||[])]))].filter(c=>c&&c!==uid);crew.forEach(c=>notify(c,`${p.title} was closed: the project manager deleted their account.`,"project:"+p.id))}closed.add(p.id)}
+ if(drop.size||closed.size)DB.notifs=(DB.notifs||[]).filter(n=>{if(!n||typeof n.link!=="string"||!n.link.startsWith("project:"))return true;const id=n.link.slice(8);if(drop.has(id))return false;
+  /* SW-074: drop "New crew opening" notices for anyone who is not crew or an applicant, including on staffed closes. */
+  if(closed.has(id)&&/^New crew opening/.test(n.text||"")){const p=(DB.projects||[]).find(x=>x&&x.id===id);if(!p||!v34OnProject(p,n.to))return false}return true});
+ if(drop.size){DB.projects=(DB.projects||[]).filter(p=>!drop.has(p.id));DB.pmsgs=(DB.pmsgs||[]).filter(x=>!drop.has(x.pid))}
+ return{deleted:drop.size,closed:closed.size}}
+/* projects whose owner is gone (deleted before v34, the account row is missing, or pm was already nulled — SW-073) */
 function v34Orphans(){const gone=new Set((DB.users||[]).filter(u=>u&&u.role==="deleted").map(u=>u.id)),have=new Set((DB.users||[]).map(u=>u&&u.id));let n=0;
- for(const id of new Set((DB.projects||[]).filter(p=>p&&p.pm&&!p.ownerGone34&&(gone.has(p.pm)||!have.has(p.pm))).map(p=>p.pm))){const r=v34OwnerGone(id);n+=r.deleted+r.closed}return n}
+ for(const id of new Set((DB.projects||[]).filter(p=>p&&p.pm&&!p.ownerGone34&&(gone.has(p.pm)||!have.has(p.pm))).map(p=>p.pm))){const r=v34OwnerGone(id);n+=r.deleted+r.closed}
+ const r=v34OwnerGone(null);n+=r.deleted+r.closed;return n}
 if(typeof document!=="undefined"){
  {const ov=VIEWS.account;if(ov)VIEWS.account=function(){const h=ov.apply(this,arguments);const m=me();if(!m||!/id="signinMethods"/.test(h))return h;
   const card=`<div class="card del13" id="delAcct"><h2 class="h-sub">${I("x",16)} Delete account</h2><p class="muted small">This signs you out everywhere, removes your sign-in methods, photos and contact details, and takes your profile out of search. Reviews you wrote stay, credited to “Former Sawyer member”. This can't be undone.</p><button class="btn ghost danger13" id="delGo" type="button">Delete my account</button></div>`;

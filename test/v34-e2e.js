@@ -1,7 +1,9 @@
 // v34 end-to-end. Self-contained: starts its own Sawyer servers (local test mode, temp data dirs).
 // Covers: SW-072 (deleting a PM's account takes their projects out of the public catalog: unstaffed ones are deleted,
 // staffed ones are closed + unlisted + anonymized and only their crew still sees them; owners deleted before v34 are tidied
-// at start), persistence readiness (healthz storage flags, boot warnings, DATA_DIR checks, render.yaml/README), the
+// at start), SW-073 (a leftover with pm:null is tidied at boot), SW-074 (staffed owner-delete also clears 'New crew opening'
+// notices for pros who are not crew or applicants), SW-075 (demo GET /api/account/export is 403), persistence readiness
+// (healthz storage flags, boot warnings, DATA_DIR checks including RENDER=true workdir mounts, render.yaml/README), the
 // 'This beta resets' note, 'Export my data' on the delete screen, health 2.17.0-sawyer and SW cache sawyer-v34.
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
@@ -72,6 +74,7 @@ let LOCAL=null,br=null;
   const c1=await stateFor(C1.ck),pc=(c1.projects||[]).find(p=>p.id===pid);
   ok(pc&&pc.status==="closed"&&pc.ownerGone34&&pc.desc===""&&pc.budget===""&&!/4321/.test(J(pc))&&pc.roles[0].filled.includes(C1.id),"the crew still has it as a closed, anonymized record (no description, notes or budget; crew kept)",J(pc&&{s:pc.status,d:pc.desc,b:pc.budget}));
   ok((c1.notifs||[]).some(n=>n.link==="project:"+pid&&/was closed: the project manager deleted their account/.test(n.text)),"the crew is told it was closed");
+  ok(!((await stateFor(Y.ck)).notifs||[]).some(n=>n.link==="project:"+pid&&/New crew opening/.test(n.text||"")),"SW-074: a pro who isn't crew or an applicant no longer has the 'new crew opening' notice");
   const pend=((await stateFor(C2.ck)).projects||[]).find(p=>p.id===pid);ok(pend&&pend.roles[0].apps.find(x=>x.cid===C2.id).status==="closed","the pending applicant's application is closed (not left pending)",J(pend&&pend.roles[0].apps));
   for(const w of [390,1440]){const pp=await page(w,C1.ck);await pp.goto(LOCAL.B+"/projects",{waitUntil:"networkidle"});await sleep(300);
    ok(!(await pp.content()).includes("V34 staffed addition "+run),w+" the crew member's project browse doesn't list it as a listing");
@@ -94,6 +97,19 @@ let LOCAL=null,br=null;
   const cs=await login(P(),"v34-oldcrew-"+run+"@example.com","v34-correct-horse");const pc=(cs.st.projects||[]).find(p=>p.id===a2.res.id);
   ok(!(cs.st.projects||[]).some(p=>p.id===a1.res.id)&&pc&&pc.status==="closed"&&pc.ownerGone34,"the unstaffed one is deleted, the staffed one closed for its crew",J(pc&&pc.status));
   ok(((await pub()).projects||[]).filter(p=>/^Demo: /.test(p.title)).length===4,"the four demo projects are untouched")}
+ // SW-073: a leftover whose pm was already nulled (the live pwiw1ked shape) is tidied at start
+ {await stopApp(LOCAL,true);
+  {const {DatabaseSync}=require("node:sqlite");const db=new DatabaseSync(path.join(LOCAL.dir,"sawyer.db"));
+   const pj=JSON.parse(db.prepare("SELECT v FROM appdata WHERE k='projects'").get().v);
+   pj.push({id:"pwiw1ked",pm:null,status:"open",title:"L33 Westlake addition leftover",zip:"78704",budget:"45000",start:"2027-03-01",end:"2027-06-01",desc:"leftover gate",type:"custom",roles:[{id:"r1",trade:"Plumbing",label:"Plumber",need:2,filled:[],apps:[],invites:[]}]});
+   db.prepare("UPDATE appdata SET v=? WHERE k='projects'").run(JSON.stringify(pj));db.close()}
+  LOCAL=await startApp(await freePort(),null,LOCAL.dir);
+  ok(/SW-072: tidied 1 project\(s\)/.test(LOCAL.log()),"SW-073: at start, a non-demo leftover with pm:null is tidied (logged)",LOCAL.log().slice(-400));
+  const s=await pub();ok(!(s.projects||[]).some(p=>p.id==="pwiw1ked")&&!JSON.stringify(s).includes("L33 Westlake addition leftover"),"SW-073: it is gone from the signed-out catalog");
+  {const {DatabaseSync}=require("node:sqlite");const db=new DatabaseSync(path.join(LOCAL.dir,"sawyer.db"));
+   const pj=JSON.parse(db.prepare("SELECT v FROM appdata WHERE k='projects'").get().v);db.close();
+   ok(!pj.some(p=>p.id==="pwiw1ked"),"SW-073: the unstaffed leftover is hard-deleted from sqlite")}
+  ok(((await pub()).projects||[]).filter(p=>/^Demo: /.test(p.title)).length===4,"SW-073: the four demo projects are still untouched")}
 
  // ===== 2. Persistence readiness / wipe detection (SW-071 itself needs a paid disk: owner decision) =====
  {const PS=require(path.join(ROOT,"lib/persist.js"));
@@ -104,6 +120,9 @@ let LOCAL=null,br=null;
   ok(PS.check("/scratch",{},"/dev/a / ext4 rw 0 0\ntmpfs /scratch tmpfs rw 0 0\n").persistent===false,"tmpfs is not persistent");
   ok(PS.check("/data",{SAWYER_PERSISTENT:"1"},"overlay / overlay rw 0 0\n").persistent===true&&PS.check("/data",{SAWYER_PERSISTENT:"0"},"/dev/a / ext4 rw 0 0\n/dev/b /data ext4 rw 0 0\n").persistent===false,"SAWYER_PERSISTENT=1 / 0 overrides the guess");
   ok(PS.mountOf("/data2",'/dev/a / ext4 rw 0 0\n/dev/b /data ext4 rw 0 0\n').point==="/","/data2 is not inside /data (prefix match is per path segment)");
+  ok(PS.check("/opt/render/project/src/data",{RENDER:"true"},"overlay / overlay rw 0 0\n/dev/nvme0n1 /opt/render/project/src ext4 rw 0 0\n").persistent===false,"RENDER=true: a workdir that looks like its own ext4 mount is not persistent");
+  ok(PS.check("/data",{RENDER:"true"},"overlay / overlay rw 0 0\n/dev/sdb /data ext4 rw 0 0\n").persistent===true,"RENDER=true: an attached /data disk is still persistent");
+  ok(PS.check("/opt/render/project/src/data",{RENDER:"true",SAWYER_PERSISTENT:"1"},"overlay / overlay rw 0 0\n/dev/nvme0n1 /opt/render/project/src ext4 rw 0 0\n").persistent===true,"RENDER=true: SAWYER_PERSISTENT=1 still overrides");
   // a fresh server on a temp dir (root filesystem here)
   const A1=await startApp(await freePort());
   let hz=(await req(A1.port,"GET","/healthz")).json||{};
@@ -179,8 +198,12 @@ let LOCAL=null,br=null;
    const o=await p.evaluate(()=>{const e=document.getElementById("v34ex");return e?{t:e.innerText.replace(/\s+/g," "),ow:document.documentElement.scrollWidth>innerWidth+1}:null});ok(o&&/Export my data \(ZIP\)/.test(o.t)&&!/Office records/.test(o.t)&&!o.ow,"1440 a homeowner sees it too (no Office mention without Office records)",J(o));
    await sleep(500);await p.screenshot({path:path.join(SH,"v34-export-delete-1440.png")}).catch(()=>{});
    const r=await req(P(),"GET","/api/account/export",{Cookie:E2.ck});ok(r.status===200&&/attachment; filename="sawyer-data-/.test(r.headers["content-disposition"]||"")&&r.json&&r.json.account.id===E2.id,"'JSON only' downloads this account's JSON export");await p.context().close()}
-  // demo accounts can't be deleted, so there is nothing to export first
-  {const dm=await login(P(),"demo-homeowner@sawyer.test");const p=await page(390,dm.ck);await p.goto(LOCAL.B+"/account",{waitUntil:"networkidle"});await p.waitForSelector("#delGo");await p.click("#delGo");await sleep(500);ok(!(await p.$("#v34ex")),"the demo account's dialog (can't delete) doesn't offer the export");await p.context().close()}
+  // demo accounts can't be deleted, so there is nothing to export first; the API also refuses (SW-075)
+  {const dm=await login(P(),"demo-homeowner@sawyer.test");const p=await page(390,dm.ck);await p.goto(LOCAL.B+"/account",{waitUntil:"networkidle"});await p.waitForSelector("#delGo");
+   ok(!(await p.$("#dataExport")),"SW-075: the demo account page has no Download my data card");
+   await p.click("#delGo");await sleep(500);ok(!(await p.$("#v34ex")),"the demo account's dialog (can't delete) doesn't offer the export");
+   const r=await req(P(),"GET","/api/account/export",{Cookie:dm.ck});ok(r.status===403&&/can't export/i.test((r.json&&r.json.error)||r.body),"SW-075: demo-homeowner GET /api/account/export is 403",r.status+" "+r.body.slice(0,200));await p.context().close()}
+  {const dp=await login(P(),"demo-pro@sawyer.test");const r=await req(P(),"GET","/api/account/export",{Cookie:dp.ck});ok(r.status===403&&/can't export/i.test((r.json&&r.json.error)||r.body),"SW-075: demo-pro GET /api/account/export is 403",r.status+" "+r.body.slice(0,200))}
   ok((await req(P(),"GET","/api/account/export")).status===401,"signed out, the export is 401")}
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL)}

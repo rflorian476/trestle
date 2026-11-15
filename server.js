@@ -171,7 +171,7 @@ function onProject(p,uid){if(!uid||!p)return false;if(p.pm===uid)return true;ret
 function pubProject(p){const c=Object.assign({},p);c.desc="";c.notes="";c.pm=null;if(!p.demo)c.zip="";c.roles=(p.roles||[]).map(r=>{const x=Object.assign({},r);x.apps=[];x.invites=[];x.done=[];x.note="";return x});return c}
 // v34 (SW-072): a project whose owner deleted their account is never a public listing. Only its crew, applicants and staff
 // still get the (closed, anonymized) record. Also covers owners deleted before v34 or a missing account row.
-function ownerGone(p,d){if(!p)return true;if(p.ownerGone34)return true;if(!p.pm)return false;const u=(d.users||[]).find(x=>x.id===p.pm);return !u||u.role==="deleted"}
+function ownerGone(p,d){if(!p)return true;if(p.ownerGone34)return true;if(!p.pm)return !p.demo;const u=(d.users||[]).find(x=>x.id===p.pm);return !u||u.role==="deleted"}
 function pubLodging(l){const c=Object.assign({},l);c.notes="";if(!l.demo){c.loc="";c.near=""}return c}
 /* ---- user-scoped snapshot: no password data, no other people's private messages/emails ---- */
 function snapshot(uid){const d=DB();const own=a=>uid?(a||[]).filter(x=>x.by===uid):[];const crewOf=p=>(p.roles||[]).flatMap(r=>r.filled||[]);
@@ -647,6 +647,7 @@ const server=http.createServer(async(req,res)=>{
  // privacy-filtered snapshot the app itself uses (other people's private fields never appear). No password hash, salt,
  // session tokens, passkey keys or one-time codes are included.
  if(req.method==="GET"&&p==="/api/account/export"){if(!uid)return send(res,401,{error:"Sign in first"});
+  const eu=DB().users.find(x=>x.id===uid);if(eu&&eu.demo)return send(res,403,{error:"Demo accounts can't export."});
   if(limited("export:"+uid,10,3600e3))return send(res,429,{error:"You've downloaded your data a lot in the last hour. Try again later."});
   const out=exportData(uid);const day=new Date().toISOString().slice(0,10);
   return send(res,200,out,{"Content-Disposition":`attachment; filename="sawyer-data-${day}.json"`})}
