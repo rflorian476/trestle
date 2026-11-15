@@ -128,6 +128,25 @@ let LOCAL=null,br=null;
   ok(/VAPID_PRIVATE_KEY/.test(ry)&&!/^\s+- key: VAPID/m.test(ry),"render.yaml documents the VAPID env keys (commented)");
   ok(/## Keep data between deploys/.test(rd)&&/mount path \*\*`\/data`\*\*/.test(rd)&&/`DATA_DIR=\/data`/.test(rd)&&/"persistent": true/.test(rd)&&/tools\/vapid-keys\.js/.test(rd),"README has the exact disk steps, the healthz check and the VAPID key steps");
  }
+
+ // ===== 3. "This beta resets" note while the data isn't persistent =====
+ {const NOTE="This beta resets from time to time — don't store real jobs here yet.";
+  const BH=await signupHo("beta");
+  const look=async(p)=>p.evaluate(()=>{const e=document.getElementById("v34beta");if(!e)return null;const r=e.getBoundingClientRect(),cs=getComputedStyle(e);return{t:e.textContent.trim(),role:e.getAttribute("role"),l:Math.round(r.left),r:Math.round(r.right),h:Math.round(r.height),c:cs.color,bg:cs.backgroundColor,ff:cs.fontFamily,ow:document.documentElement.scrollWidth>innerWidth+1}});
+  for(const w of [390,1440]){
+   {const p=await page(w);await p.goto(LOCAL.B+"/signup",{waitUntil:"networkidle"});await p.waitForSelector("#v34beta",{timeout:8000}).catch(()=>{});const n=await look(p);
+    ok(n&&n.t===NOTE&&n.role==="note"&&n.l>=0&&n.r<=w&&!n.ow&&/Plus Jakarta Sans/.test(n.ff)&&n.c==="rgb(15, 42, 68)",w+" sign-up shows the plain beta note (navy on linen, Plus Jakarta Sans, fits)",J(n));
+    const inBox=await p.evaluate(()=>!!document.querySelector("#authBox #v34beta"));ok(inBox,w+" …inside the sign-in card");
+    if(w===390){await sleep(500);await p.screenshot({path:path.join(SH,"v34-beta-signup-390.png")}).catch(()=>{})}
+    await p.goto(LOCAL.B+"/join",{waitUntil:"networkidle"});await p.waitForSelector("#v34beta",{timeout:8000}).catch(()=>{});const j=await look(p);ok(j&&j.t===NOTE&&j.r<=w&&!j.ow,w+" the pro sign-up wizard (step 1) shows it too",J(j));await p.context().close()}
+   {const p=await page(w,BH.ck);await p.goto(LOCAL.B+"/account",{waitUntil:"networkidle"});await p.waitForSelector("#v34beta",{timeout:8000}).catch(()=>{});const n=await look(p);ok(n&&n.t===NOTE&&n.r<=w&&!n.ow,w+" Account shows it under the page title",J(n));
+    if(w===1440){await sleep(500);await p.screenshot({path:path.join(SH,"v34-beta-account-1440.png")}).catch(()=>{})}
+    await p.goto(LOCAL.B+"/",{waitUntil:"networkidle"});ok(!(await p.$("#v34beta")),w+" not on the home page (betabar stays as it was)");await p.context().close()}}
+  // with a disk the note is gone
+  const D=await startApp(await freePort(),{SAWYER_PERSISTENT:"1"});
+  {const c=await br.newContext({viewport:{width:390,height:844}});const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));await p.goto(D.B+"/signup",{waitUntil:"networkidle"});await p.waitForSelector("#authBox",{timeout:8000}).catch(()=>{});
+   ok(!(await p.$("#v34beta"))&&!!(await p.$("#authBox")),"with persistent storage the note is not shown");await c.close()}
+  await stopApp(D)}
 // @@NEXT@@
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL)}
