@@ -142,3 +142,6 @@ p.v35out{margin:6px 0 0;padding:4px 8px;border-radius:8px;font-size:12.5px}
  .v35chk-g{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.v35chk-g .btn{grid-column:1/-1}
  .v35rw li{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}
 }
+/* SW-076: the legacy .num step badge (absolute, 2.4rem, pale) leaked into the Office invoice editor ("Amount" header and the
+   line amounts floated to the top-right of the page). Office and invoice pages get plain numbers, like v9 did for tables. */
+.o7 span.num,.o7 b.num,.o7c span.num,.o7c b.num{position:static;font-size:inherit;line-height:inherit;color:inherit;font-weight:700;text-align:right}
