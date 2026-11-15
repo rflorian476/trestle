@@ -76,3 +76,21 @@
 }
 @media (max-width:760px){.v35ar-l li .btn{justify-self:end}}
 @media (max-width:760px){.v35st .v35st-x{display:none}}
+/* lead filters */
+.v35lf{display:flex;align-items:center;gap:10px;margin:8px 0 12px;padding:10px 12px;border-radius:12px;background:#F8F6F1;border:1px solid #E2DCCF}
+.v35lf.on{border-left:3px solid #0F2A44}
+.v35lf-i{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:9px;background:#E6ECF3;color:#0F2A44;flex:none}
+.v35lf-t{flex:1;min-width:0}.v35lf-t b{display:block;color:#0F2A44;font-size:14px}.v35lf-t small{display:block;color:#4A4F5C;font-size:12.5px;overflow-wrap:anywhere}
+.v35lf .btn{min-height:40px;flex:none}
+.v35out{display:inline-flex;align-items:center;gap:5px;color:#7A4A00!important;background:#FFF4DC!important;border-color:#F0D9A8!important;font-weight:600}
+p.v35out{margin:6px 0 0;padding:4px 8px;border-radius:8px;font-size:12.5px}
+.v35lfm h2{display:flex;align-items:center;gap:8px}
+.v35sk{border:1px solid #E2DCCF;border-radius:12px;padding:10px 12px;margin:10px 0}
+.v35sk legend{font-weight:700;padding:0 4px;color:#0F2A44}
+.v35sk-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}
+.v35sk-g label{display:flex;align-items:center;gap:8px;font-size:14px;min-height:36px}
+.v35sk-g input{width:auto!important}
+@media (max-width:760px){
+ .v35lf{flex-wrap:wrap}.v35lf .btn{margin-left:42px}
+ .v35sk-g label{font-size:13.5px}
+}

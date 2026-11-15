@@ -4943,7 +4943,7 @@ if(typeof document!=="undefined"){const oa=AFTER.account;AFTER.account=function(
    const z=document.getElementById("v34zip");if(z)z.onclick=()=>v34Export(z)}catch(e){}return x}}catch(e){}return r}}
 
 /* ===== v35 ===== */
-const V2_ACTIONS35=["pbSave35","pbDel35","pbImport35","stmt35"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS35);
+const V2_ACTIONS35=["pbSave35","pbDel35","pbImport35","leadFilters35","stmt35"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS35);
 function v35Now(){return typeof __now==="function"?__now():Date.now()}
 const v35r2=n=>Math.round((Number(n)||0)*100)/100;
 const v35OnServer=()=>typeof navigator!=="undefined"&&navigator&&navigator.userAgent==="node";
@@ -5085,6 +5085,56 @@ if(typeof TITLES!=="undefined")Object.assign(TITLES,{statement:"Statement"});
 
 {const ov=VIEWS.office;VIEWS.office=(tab,q)=>{const m=me();if(m&&v7Pro(m)&&tab==="invoices"){const h=ov(tab,q);const a='<div class="o7-bar">',i=h.indexOf(a);return i<0?h:h.slice(0,i)+v35AgingCard(m)+h.slice(i)}return ov(tab,q)}}
 {const oa=AFTER.office;AFTER.office=(tab,q)=>{oa&&oa(tab,q);try{document.querySelectorAll("[data-v35st]").forEach(b=>b.onclick=()=>v35StmtModal(b.dataset.v35st))}catch(e){console.warn(e)}}}
+
+/* (3) Lead filters. A pro decides which posted jobs are worth their time: how far (inside their radius), the smallest job
+   (by the posted budget), whether to include jobs with no budget or urgent / same-day jobs, and the job types they skip.
+   Jobs outside the filters don't ring the bell, don't send a phone alert and don't count as "new"; on the dashboard and
+   /jobs they stay visible, tagged "Outside your filters: …", so nothing is hidden behind a paywall. Private to the pro. */
+const V35_MI=[0,10,15,25,50],V35_MIN=[0,250,500,1000,2500,5000];
+function v35Lf(u){const f=u&&u.lf35;return f&&typeof f==="object"?f:null}
+function v35Budget(j){const s=String(j&&j.budget||"");if(!s||/\b(per|each|an? hour|\/\s*(hr|hour|day|turn|visit))\b|tbd|open/i.test(s))return null;let mx=null;
+ for(const x of s.matchAll(/\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(k)?/gi)){let n=parseFloat(x[1].replace(/,/g,""));if(!Number.isFinite(n))continue;if(x[2])n*=1000;if(mx==null||n>mx)mx=n}return mx}
+function v35Why(j,u){const f=v35Lf(u);if(!f||!j)return"";const out=[];
+ if(f.mi>0&&dist(u.zip,j.zip)>f.mi)out.push("farther than "+f.mi+" mi");
+ const b=v35Budget(j);if(f.min>0&&b!=null&&b<f.min)out.push("budget under $"+f.min.toLocaleString("en-US"));
+ if(f.nob===false&&b==null)out.push("no budget given");
+ if(f.urg===false&&j.urgent)out.push("urgent job");
+ if(Array.isArray(f.skip)&&j.sub&&f.skip.includes(j.sub))out.push("you skip "+j.sub.toLowerCase());
+ return out.join(", ")}
+{const base=v28Fits;v28Fits=function(j,u){return base(j,u)&&!v35Why(j,u)}}
+function v35BaseFits(j,u){if(!j||!u||u.role!=="contractor"||u.staff||j.cust===u.id)return false;const sub=j.sub&&(u.subs||[]).includes(j.sub);if(j.cat!==u.trade&&!sub)return false;return dist(u.zip,j.zip)<=(+u.radius||0)}
+function v35Hidden(m){return(DB.jobs||[]).filter(j=>j.status==="posted"&&!j.hired&&v35BaseFits(j,m)&&v35Why(j,m))}
+// a pro whose filters rule a new job out gets no "New job" bell for it (so no phone alert either)
+{const op=A.postJob;A.postJob=function(o){const before=new Set((DB.notifs||[]).map(n=>n.id));const r=op.apply(this,arguments);try{if(r&&r.ok&&r.id){const j=(DB.jobs||[]).find(x=>x.id===r.id);
+  if(j){const n0=DB.notifs.length;DB.notifs=DB.notifs.filter(n=>{if(before.has(n.id)||n.link!=="job:"+j.id||!/^New /.test(String(n.text||"")))return true;const u=U(n.to);return!(u&&v35Lf(u)&&v35Why(j,u))});if(DB.notifs.length!==n0)save()}}}catch(e){}return r}}
+A.leadFilters35=function(o){const m=me();if(!m||m.role!=="contractor"||m.staff)return{ok:false,msg:"Lead filters are for pro accounts."};o=o||{};
+ const mi=V35_MI.includes(+o.mi)?+o.mi:0,min=V35_MIN.includes(+o.min)?+o.min:0;const subs=(typeof CATS!=="undefined"&&CATS[m.trade])||[];
+ const skip=(Array.isArray(o.skip)?o.skip:[]).filter(s=>subs.includes(s)).slice(0,20);const f={mi,min,nob:o.nob!==false,urg:o.urg!==false,skip,at:v35Now()};
+ const any=mi||min||!f.nob||!f.urg||skip.length;if(!any){delete m.lf35;save();return{ok:true,msg:"Lead filters off. You'll hear about every job in your trade and radius."}}
+ m.lf35=f;save();const pass=(DB.jobs||[]).filter(j=>j.status==="posted"&&!j.hired&&v35BaseFits(j,m)&&!v35Why(j,m)).length;
+ return{ok:true,msg:"Lead filters saved. "+pass+" open job"+(pass===1?"":"s")+" near you pass them."}};
+function v35LfSum(m){const f=v35Lf(m);if(!f)return"Off: you hear about every job in your trade inside "+(+m.radius||0)+" mi";const p=[];
+ if(f.mi)p.push("within "+f.mi+" mi");if(f.min)p.push("$"+f.min.toLocaleString("en-US")+"+ jobs");if(!f.nob)p.push("budget required");if(!f.urg)p.push("no urgent jobs");if(f.skip&&f.skip.length)p.push("skipping "+f.skip.length+" job type"+(f.skip.length===1?"":"s"));return p.join(" · ")}
+function v35LfBar(m,where){const f=v35Lf(m),hid=v35Hidden(m).length;
+ return`<div class="v35lf ${f?"on":""}" id="v35lf"><span class="v35lf-i">${I("sliders",16)}</span><div class="v35lf-t"><b>Lead filters</b><small>${esc(v35LfSum(m))}${f&&hid?` · ${hid} open job${hid===1?"":"s"} outside them`:""}</small></div><button type="button" class="btn sm" id="v35lfB">${f?"Edit":"Set filters"}</button></div>`}
+function v35LfModal(){const m=me();if(!m)return;const f=v35Lf(m)||{mi:0,min:0,nob:true,urg:true,skip:[]};const subs=(typeof CATS!=="undefined"&&CATS[m.trade])||[];
+ modal(`<div class="v35lfm"><h2 id="mtitle">${I("sliders",20)} Lead filters</h2><p class="muted small">Only get alerts for the jobs you want. Jobs outside your filters still show on the job board, tagged, so you never miss one by accident. No lead fees either way.</p>
+ <form id="v35lfF" class="form" novalidate><div class="row2"><div class="fld"><label for="v35mi">How far</label><select id="v35mi" name="mi">${V35_MI.filter(x=>!x||x<(+m.radius||0)).map(x=>`<option value="${x}" ${+f.mi===x?"selected":""}>${x?"Within "+x+" mi":"Anywhere in my "+(+m.radius||0)+" mi radius"}</option>`).join("")}</select></div>
+ <div class="fld"><label for="v35min">Smallest job</label><select id="v35min" name="min">${V35_MIN.map(x=>`<option value="${x}" ${+f.min===x?"selected":""}>${x?"Budget $"+x.toLocaleString("en-US")+" or more":"Any size"}</option>`).join("")}</select></div></div>
+ <label class="o7-chk"><input type="checkbox" name="nob" ${f.nob!==false?"checked":""}> Include jobs with no budget posted</label>
+ <label class="o7-chk"><input type="checkbox" name="urg" ${f.urg!==false?"checked":""}> Include urgent and same-day jobs</label>
+ ${subs.length?`<fieldset class="v35sk"><legend>Job types you skip <small class="muted">(${esc(m.trade||"")})</small></legend><div class="v35sk-g">${subs.map(s=>`<label><input type="checkbox" name="skip" value="${esc(s)}" data-multi ${(f.skip||[]).includes(s)?"checked":""}><span>${esc(s)}</span></label>`).join("")}</div></fieldset>`:""}
+ <p class="err" id="v35lfE" role="alert"></p><div class="actions"><button type="button" class="btn ghost" id="v35lfOff">Turn off</button><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary">Save filters</button></div></form></div>`,"v33sheet");
+ document.querySelectorAll("#modal [data-close]").forEach(b=>b.onclick=closeModal);const F=document.getElementById("v35lfF");
+ const done=r=>{if(r&&r.ok){closeModal();act(r,()=>{const y=scrollY;render();scrollTo(0,y)})}else document.getElementById("v35lfE").textContent=(r&&r.msg)||"That didn't save."};
+ F.onsubmit=e=>{e.preventDefault();const o=readForm(F);done(A.leadFilters35({mi:+o.mi,min:+o.min,nob:!!o.nob,urg:!!o.urg,skip:o.skip||[]}))};
+ document.getElementById("v35lfOff").onclick=()=>done(A.leadFilters35({}))}
+{const op=v27Pipe;v27Pipe=function(j,m){let h=op.apply(this,arguments);try{if(!h||!m)return h;const w=v35Why(j,m);if(!w)return h;const u='<ul class="v27p-f" aria-label="Why this job fits">',i=h.indexOf(u);
+  const li=`<li class="v35out">${I("sliders",12)}Outside your filters: ${esc(w)}</li>`;if(i>=0)return h.slice(0,i+u.length)+li+h.slice(i+u.length);return h+`<p class="v35out">${esc("Outside your filters: "+w)}</p>`}catch(e){}return h}}
+{const ov=VIEWS.dash;VIEWS.dash=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||m.role!=="contractor"||m.staff)return h;const k=h.indexOf('id="v28new"');if(k<0)return h;const e=h.indexOf("</p>",k);if(e<0)return h;return h.slice(0,e+4)+v35LfBar(m,"dash")+h.slice(e+4)}catch(e){}return h}}
+{const ov=VIEWS.jobs;VIEWS.jobs=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||m.role!=="contractor"||m.staff)return h;const a='<form class="filterbar" id="jf">',k=h.indexOf(a);if(k<0)return h;return h.slice(0,k)+v35LfBar(m,"jobs")+h.slice(k)}catch(e){}return h}}
+for(const v of ["dash","jobs"]){const oa=AFTER[v];AFTER[v]=function(){const r=oa&&oa.apply(this,arguments);try{const b=document.getElementById("v35lfB");if(b)b.onclick=()=>v35LfModal()}catch(e){}return r}}
+
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
