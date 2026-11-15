@@ -61,6 +61,8 @@ A.__delete13=function(){const m=me();if(!m)return{ok:false,msg:"Sign in first"};
  const gone=new Set((DB.jobs||[]).filter(j=>j.cust===m.id&&j.status==="posted"&&!j.hired).map(j=>j.id));
  DB.jobs=(DB.jobs||[]).filter(j=>!gone.has(j.id));DB.quotes=(DB.quotes||[]).filter(q=>!gone.has(q.job)&&!(q.cid===m.id&&q.status==="sent"));
  v34OwnerGone(m.id);
+ /* v36 (SW-082): their traveler calls leave the catalog too */
+ if(typeof v36CallsGone==="function")v36CallsGone(m.id);
  const keep={id:m.id,created:m.created};for(const k of Object.keys(m))delete m[k];
  Object.assign(m,keep,{name:"Former Sawyer member",role:"deleted",email:"",zip:"",deleted13:Date.now()});
  if(typeof save==="function")save();return{ok:true,msg:"Account deleted"}};
