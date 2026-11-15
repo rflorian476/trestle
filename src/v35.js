@@ -219,7 +219,8 @@ function v35Week(c,L,mon){const x=tX(c),days=[0,1,2,3,4,5,6].map(i=>v35Add(mon,i
  return{mon,days,hrs,tot:v35r2(tot),st:v35r2(st),ot:v35r2(ot),wage,worked,pdDays,u7,pd,exp:v35r2(wage+pd),ck,dw,dp,diff,unit:x.pdUnit}}
 function v35Verdict(w){if(w.diff==null)return null;if(Math.abs(w.diff)<1)return{k:"ok",t:"Matches the posting"};return w.diff<0?{k:"short",t:"Short "+v7$(-w.diff)}:{k:"over",t:v7$(w.diff)+" more than expected"}}
 A.tlogDay35=function(cid,date,hrs){const m=me(),c=TC(cid);if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!c||!v35Hired(c,m))return{ok:false,msg:"You can log hours on calls you were hired on."};
- const d=v35Iso(date);if(!d)return{ok:false,msg:"Pick a day."};const now=new Date(v35Now()).toISOString().slice(0,10);if(d>now||d<v35Add(now,-400))return{ok:false,msg:"Log days from the last year, up to today."};
+ const d=v35Iso(date);if(!d)return{ok:false,msg:"Pick a day."};const now=new Date(v35Now()).toISOString().slice(0,10);/* v36: the message says exactly what is checked: no day after the server's today (shown), none more than 400 days back. */
+ if(d>now||d<v35Add(now,-400))return{ok:false,msg:"Log days up to today ("+v35Fmt(now)+"), from the last 400 days."};
  const raw=hrs===""||hrs==null?"":String(hrs).trim();
  /* SW-078: a leading minus is refused (HTTP 400) instead of being stripped to a positive number. */
  if(/^[-−]/.test(raw))return{ok:false,msg:"Hours must be from 0 to 24.",status:400};
