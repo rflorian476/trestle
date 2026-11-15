@@ -95,7 +95,8 @@ if(typeof v31Backup==="function"){const ob=v31Backup;v31Backup=function(m){const
 /* (2) Who owes you. Office -> Invoices opens with an aging card: open balances by how late they are (not due yet, 1-30,
    31-60, 61-90, 90+ days) and one row per customer with the oldest late invoice. "Statement" lists that customer's open
    invoices with totals; send it in Sawyer (the customer gets a notice and a statement page with Pay buttons), copy it as
-   text, or download a CSV. One statement per customer per day, checked on the server. Payments stay in test mode. */
+   text, or download a CSV. One in-app statement per customer account per 24 hours, keyed on (pro, target uid) so a
+   second customer row can't get around it. Payments stay in test mode. */
 const V35_BK=[["cur","Not due yet"],["d30","1–30 days late"],["d60","31–60 days late"],["d90","61–90 days late"],["d90p","90+ days late"]];
 function v35Late(b){const d=b.due?v7DaysTo(b.due):null;return d==null||d>=0?0:-d}
 function v35Bk(n){return n<=0?"cur":n<=30?"d30":n<=60?"d60":n<=90?"d90":"d90p"}
@@ -112,15 +113,18 @@ function v35AgingCard(m){const a=v35Aging(m);if(!a.n)return`<div class="card v35
  <ul class="v35ar-l">${rows}</ul>${a.rows.length>6?`<p class="muted small">+${a.rows.length-6} more customers with an open balance.</p>`:""}</div>`}
 function v35StmtRows(by,cust){return v35Open(by,cust).sort((a,b)=>(a.date||0)-(b.date||0)).map(b=>{const c=billCalc(b);return{b,no:b.no,title:b.title||"",issued:v31D?v31D(b.date):new Date(b.date).toISOString().slice(0,10),due:b.due||"",total:c.total,paid:v35r2(c.total-c.bal),bal:c.bal,late:v35Late(b)}})}
 function v35StmtText(m,c,rows){const tot=rows.reduce((a,r)=>a+r.bal,0);return`Statement from ${m.biz||nameOf(m)} for ${c.name}, ${v7Today()}\n\n`+rows.map(r=>`${r.no} · ${r.title} · issued ${r.issued}${r.due?" · due "+r.due:""} · total ${v7$(r.total)} · paid ${v7$(r.paid)} · balance ${v7$(r.bal)}${r.late?" ("+r.late+" days late)":""}`).join("\n")+`\n\nTotal open: ${v7$(tot)}\nThank you!`}
+function v35StmtRecent(proId,target){return!!(target&&(DB.bcust||[]).some(x=>x&&x.by===proId&&x.uid===target&&x.stmt35&&v35Now()-x.stmt35<864e5))}
 A.stmt35=function(cid){const m=me();if(!v7Pro(m))return{ok:false,msg:"Statements are part of The Office for pro accounts."};const c=v7Cust(cid);if(!c||c.by!==m.id)return{ok:false,msg:"That customer wasn't found."};
  if(!c.uid||!U(c.uid))return{ok:false,msg:c.name+" isn't on __BRAND__ yet. Copy the statement and text or email it."};
  const rows=v35StmtRows(m.id,c.id);if(!rows.length)return{ok:false,msg:c.name+" has no open invoices."};
- if(c.stmt35&&v35Now()-c.stmt35<864e5)return{ok:false,msg:"You sent "+c.name+" a statement in the last 24 hours. One a day keeps it friendly."};
- const tot=rows.reduce((a,r)=>a+r.bal,0);notify(c.uid,`${m.biz||nameOf(m)} sent you a statement: ${v7$(tot)} open on ${rows.length} invoice${rows.length===1?"":"s"}`,"stmt35:"+m.id);c.stmt35=v35Now();save();
+ /* SW-077: one in-app statement per (pro, target uid) per 24h — a second customer row for the same person can't bypass it. */
+ if(v35StmtRecent(m.id,c.uid))return{ok:false,msg:"You sent "+c.name+" a statement in the last 24 hours. One a day keeps it friendly."};
+ const tot=rows.reduce((a,r)=>a+r.bal,0),at=v35Now();notify(c.uid,`${m.biz||nameOf(m)} sent you a statement: ${v7$(tot)} open on ${rows.length} invoice${rows.length===1?"":"s"}`,"stmt35:"+m.id);
+ (DB.bcust||[]).forEach(x=>{if(x&&x.by===m.id&&x.uid===c.uid)x.stmt35=at});save();
  return{ok:true,msg:"Statement sent to "+c.name+" in __BRAND__"}};
 function v35Csv(name,rows){try{const blob=new Blob(["\ufeff"+v7CSV(rows)],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}catch(e){toast("Couldn't download the file","err")}}
 function v35StmtModal(cid){const m=me(),c=v7Cust(cid);if(!m||!c)return;const rows=v35StmtRows(m.id,cid),tot=v35r2(rows.reduce((a,r)=>a+r.bal,0)),txt=v35StmtText(m,c,rows);
- const sentAt=c.stmt35&&v35Now()-c.stmt35<864e5;
+ const sentAt=v35StmtRecent(m.id,c.uid)||(c.stmt35&&v35Now()-c.stmt35<864e5);
  modal(`<div class="v35sm"><h2 id="mtitle">Statement for ${esc(c.name)}</h2><p class="muted small">${esc(m.biz||nameOf(m))} · ${esc(v7Today())}</p>
  <div class="tablewrap"><table class="v35st"><thead><tr><th scope="col">Invoice</th><th scope="col">Due</th><th scope="col" class="v35n v35st-x">Total</th><th scope="col" class="v35n v35st-x">Paid</th><th scope="col" class="v35n">Balance</th></tr></thead><tbody>${rows.map(r=>`<tr><th scope="row">${esc(r.no)}<small class="muted">${esc(r.title)}</small></th><td>${esc(r.due?v35Fmt(r.due):"—")}${r.late?`<small class="v35late">${r.late} days late</small>`:""}</td><td class="v35n v35st-x">${esc(v7$(r.total))}</td><td class="v35n v35st-x">${esc(v7$(r.paid))}</td><td class="v35n"><b>${esc(v7$(r.bal))}</b></td></tr>`).join("")}</tbody><tfoot><tr><th scope="row" colspan="2">Total open</th><td class="v35st-x"></td><td class="v35st-x"></td><td class="v35n"><b>${esc(v7$(tot))}</b></td></tr></tfoot></table></div>
  <label class="sr" for="v35stx">Statement text</label><textarea id="v35stx" class="v35stx" rows="4" readonly>${esc(txt)}</textarea>
@@ -130,12 +134,14 @@ function v35StmtModal(cid){const m=me(),c=v7Cust(cid);if(!m||!c)return;const row
  $("v35stC").onclick=()=>{const t=$("v35stx");const done=()=>toast("Statement copied");try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,()=>{t.select();document.execCommand("copy");done()});else{t.select();document.execCommand("copy");done()}}catch(e){t.select()}};
  $("v35stD").onclick=()=>v35Csv("statement-"+String(c.name).replace(/[^a-z0-9]+/gi,"-").toLowerCase().replace(/^-|-$/g,"")+"-"+v7Today()+".csv",[["Invoice","Title","Issued","Due","Total","Paid","Balance","Days late"],...rows.map(r=>[r.no,r.title,r.issued,r.due,r.total.toFixed(2),r.paid.toFixed(2),r.bal.toFixed(2),r.late]),["Total open","","","","","",tot.toFixed(2),""]])}
 // customer side: /statement/<pro id> lists what's open with that pro, with Pay buttons (test mode)
-VIEWS.statement=function(pid){const m=me();if(!m)return VIEWS.signup(null,{next:"/statement/"+(pid||"")});const p=U(pid);
+VIEWS.statement=function(pid){const m=me();if(!m)return VIEWS.signup(null,{next:"/statement/"+(pid||"")});
  const bs=(DB.bills||[]).filter(b=>b.by===pid&&b.cuid===m.id&&b.type==="inv"&&b.status!=="draft"&&b.status!=="void"&&billCalc(b).bal>0.004).sort((a,b)=>(a.date||0)-(b.date||0));
- const tot=v35r2(bs.reduce((a,b)=>a+billCalc(b).bal,0)),biz=(bs[0]&&bs[0].bizName)||(p&&nameOf(p))||"Your pro";
+ /* Idea 4: with nothing open, use the same generic empty page whether or not the pro exists (don't leak a business name). */
+ if(!bs.length)return`<section class="page narrow v35cs"><a class="backlink" href="${href("bills")}">${I("back",16)}My invoices</a><h1>Statement</h1><p class="muted">${esc(v7Today())}</p>
+ <div class="card">${empty("check","You're all paid up","Nothing is open on this statement.","")}</div></section>`;
+ const tot=v35r2(bs.reduce((a,b)=>a+billCalc(b).bal,0)),biz=(bs[0]&&bs[0].bizName)||"Your pro";
  return`<section class="page narrow v35cs"><a class="backlink" href="${href("bills")}">${I("back",16)}My invoices</a><h1>Statement from ${esc(biz)}</h1><p class="muted">${esc(v7Today())} · ${bs.length} open invoice${bs.length===1?"":"s"}</p>
- ${bs.length?`<div class="card"><ul class="v35cs-l">${bs.map(b=>{const c=billCalc(b),n=v35Late(b);return`<li><div><b>${esc(b.no)} · ${esc(b.title||"Invoice")}</b><small class="muted">${b.due?"Due "+esc(b.due):""}${n?` · <span class="v35late">${n} days late</span>`:""}</small></div><b class="v35n">${esc(v7$(c.bal))}</b><a class="btn sm primary" href="${href("pay",b.id)}">${I("lock",14)}Pay</a></li>`}).join("")}</ul><div class="v35cs-t"><span>Total open</span><b class="v35n">${esc(v7$(tot))}</b></div></div><p class="muted small">Payments are in test mode during the beta. No real money moves.</p>`
- :`<div class="card">${empty("check","You're all paid up","Nothing is open with "+esc(biz)+".","")}</div>`}</section>`};
+ <div class="card"><ul class="v35cs-l">${bs.map(b=>{const c=billCalc(b),n=v35Late(b);return`<li><div><b>${esc(b.no)} · ${esc(b.title||"Invoice")}</b><small class="muted">${b.due?"Due "+esc(b.due):""}${n?` · <span class="v35late">${n} days late</span>`:""}</small></div><b class="v35n">${esc(v7$(c.bal))}</b><a class="btn sm primary" href="${href("pay",b.id)}">${I("lock",14)}Pay</a></li>`}).join("")}</ul><div class="v35cs-t"><span>Total open</span><b class="v35n">${esc(v7$(tot))}</b></div></div><p class="muted small">Payments are in test mode during the beta. No real money moves.</p></section>`};
 if(typeof TITLES!=="undefined")Object.assign(TITLES,{statement:"Statement"});
 {const ol=linkTo;linkTo=function(l){const[a,b]=String(l||"").split(":");if(a==="stmt35"&&b)return go("statement",b);return ol(l)}}
 
@@ -148,7 +154,9 @@ if(typeof TITLES!=="undefined")Object.assign(TITLES,{statement:"Statement"});
    /jobs they stay visible, tagged "Outside your filters: …", so nothing is hidden behind a paywall. Private to the pro. */
 const V35_MI=[0,10,15,25,50],V35_MIN=[0,250,500,1000,2500,5000];
 function v35Lf(u){const f=u&&u.lf35;return f&&typeof f==="object"?f:null}
-function v35Budget(j){const s=String(j&&j.budget||"");if(!s||/\b(per|each|an? hour|\/\s*(hr|hour|day|turn|visit))\b|tbd|open/i.test(s))return null;let mx=null;
+function v35Budget(j){const s=String(j&&j.budget||"");if(!s||/\b(per|each|an? hour|\/\s*(hr|hour|day|turn|visit))\b|tbd|open/i.test(s))return null;
+ /* SW-079: a leading minus (e.g. "-500") is not a comparable amount — same as TBD. */
+ if(/^\s*-/.test(s)||/^\s*\$\s*-/.test(s))return null;let mx=null;
  for(const x of s.matchAll(/\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(k)?/gi)){let n=parseFloat(x[1].replace(/,/g,""));if(!Number.isFinite(n))continue;if(x[2])n*=1000;if(mx==null||n>mx)mx=n}return mx}
 function v35Why(j,u){const f=v35Lf(u);if(!f||!j)return"";const out=[];
  if(f.mi>0&&dist(u.zip,j.zip)>f.mi)out.push("farther than "+f.mi+" mi");
@@ -210,8 +218,11 @@ function v35Week(c,L,mon){const x=tX(c),days=[0,1,2,3,4,5,6].map(i=>v35Add(mon,i
  return{mon,days,hrs,tot:v35r2(tot),st:v35r2(st),ot:v35r2(ot),wage,worked,pdDays,u7,pd,exp:v35r2(wage+pd),ck,dw,dp,diff,unit:x.pdUnit}}
 function v35Verdict(w){if(w.diff==null)return null;if(Math.abs(w.diff)<1)return{k:"ok",t:"Matches the posting"};return w.diff<0?{k:"short",t:"Short "+v7$(-w.diff)}:{k:"over",t:v7$(w.diff)+" more than expected"}}
 A.tlogDay35=function(cid,date,hrs){const m=me(),c=TC(cid);if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!c||!v35Hired(c,m))return{ok:false,msg:"You can log hours on calls you were hired on."};
- const d=v35Iso(date);if(!d)return{ok:false,msg:"Pick a day."};const now=new Date(v35Now()).toISOString().slice(0,10);if(d>v35Add(now,1)||d<v35Add(now,-400))return{ok:false,msg:"Log days from the last year, up to today."};
- const n=hrs===""||hrs==null?0:parseFloat(String(hrs).replace(/[^0-9.]/g,""));if(!Number.isFinite(n)||n<0||n>24)return{ok:false,msg:"Hours must be from 0 to 24."};
+ const d=v35Iso(date);if(!d)return{ok:false,msg:"Pick a day."};const now=new Date(v35Now()).toISOString().slice(0,10);if(d>now||d<v35Add(now,-400))return{ok:false,msg:"Log days from the last year, up to today."};
+ const raw=hrs===""||hrs==null?"":String(hrs).trim();
+ /* SW-078: a leading minus is refused (HTTP 400) instead of being stripped to a positive number. */
+ if(/^[-−]/.test(raw))return{ok:false,msg:"Hours must be from 0 to 24.",status:400};
+ const n=raw===""?0:parseFloat(raw.replace(/[^0-9.]/g,""));if(!Number.isFinite(n)||n<0||n>24)return{ok:false,msg:"Hours must be from 0 to 24."};
  m.tlog35=m.tlog35&&typeof m.tlog35==="object"?m.tlog35:{};const L=m.tlog35[cid]=Object.assign({d:{},chk:{},ot:"40w"},m.tlog35[cid]||{});L.d=L.d||{};if(n>0)L.d[d]=Math.round(n*4)/4;else delete L.d[d];
  const ks=Object.keys(L.d).sort();while(ks.length>400)delete L.d[ks.shift()];save();return{ok:true}};
 A.tlogCheck35=function(cid,mon,g,pd){const m=me(),c=TC(cid);if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!c||!v35Hired(c,m))return{ok:false,msg:"You can check pay on calls you were hired on."};
@@ -231,7 +242,7 @@ function v35Msg(c,w,m){const p=U(c.by)||{},first=String(p.name||nameOf(p)||"ther
 function v35CheckCard(c,m,q){const L=v35Log(m,c.id),today=new Date(v35Now()).toISOString().slice(0,10),cur=v35Mon(today);const off=Math.max(-52,Math.min(0,parseInt((q||{}).w35,10)||0));const mon=v35Add(cur,off*7);
  const w=v35Week(c,L,mon),v=v35Verdict(w),sh=v35Shape(c),p=U(c.by)||{};
  const weeks=[...new Set(Object.keys(L.d||{}).concat(Object.keys(L.chk||{})).map(v35Mon))].sort().reverse().slice(0,4);
- const grid=w.days.map((d,i)=>`<div class="v35d ${d===today?"today":""} ${d>today?"fut":""}"><label for="v35h${i}">${V35_DN[i]}<small>${esc(v35Fmt(d))}</small></label><input id="v35h${i}" data-v35day="${d}" inputmode="decimal" value="${w.hrs[i]?esc(v35Hrs(w.hrs[i])):""}" placeholder="0" ${d>v35Add(today,1)?"disabled":""} aria-label="Hours worked ${V35_DN[i]} ${esc(v35Fmt(d))}"></div>`).join("");
+ const grid=w.days.map((d,i)=>`<div class="v35d ${d===today?"today":""} ${d>today?"fut":""}"><label for="v35h${i}">${V35_DN[i]}<small>${esc(v35Fmt(d))}</small></label><input id="v35h${i}" data-v35day="${d}" inputmode="decimal" value="${w.hrs[i]?esc(v35Hrs(w.hrs[i])):""}" placeholder="0" ${d>today?"disabled":""} aria-label="Hours worked ${V35_DN[i]} ${esc(v35Fmt(d))}"></div>`).join("");
  return`<section class="card v35cc" id="v35cc" aria-labelledby="v35cch"><div class="o7-sh"><h2 id="v35cch">${I("calc",18)} Check your check</h2><span class="muted small">${esc(v7$(c.rate))}/hr · ${esc(v7$(c.perDiem||0))} per diem, ${esc(String(w.unit||"").toLowerCase())}</span></div>
  <p class="muted small">Log your hours each day. __BRAND__ works out what the week should pay from the posted terms, then checks your stub against it. Only you see this.</p>
  <div class="v35wk"><a class="btn sm ghost" href="${href("tcall",c.id,{w35:off-1})}" aria-label="Previous week">${I("left",16)}</a><b>Week of ${esc(v35Fmt(mon))}${off===0?" (this week)":""}</b>${off<0?`<a class="btn sm ghost" href="${href("tcall",c.id,off+1?{w35:off+1}:null)}" aria-label="Next week">${I("right",16)}</a>`:`<span class="v35wk-sp"></span>`}</div>

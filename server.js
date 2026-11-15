@@ -752,7 +752,9 @@ const server=http.createServer(async(req,res)=>{
   if(newThread&&r&&r.ok!==false&&DB().msgs.some(x=>x.from===uid&&(x.a===String(args[0])||x.b===String(args[0]))))hits.get("newthread:"+uid).push(Date.now());
   if(name==="submitVerify19"&&r&&r.ok!==false){const me_=DB().users.find(u=>u.id===uid);const nm=uploadName(me_&&me_.coiFile);if(nm){markCoi(nm);me_.coiFile="/api/coi/"+nm;persist()}}
   if(mailBefore)await deliverVerifyEmails(mailBefore);
-  return send(res,200,{res:r===undefined?{ok:true}:r,state:snapshot(uid)})}
+  const code=(r&&r.ok===false&&r.status>=400)?r.status:200,out=r===undefined?{ok:true}:r&&r.status?Object.assign({},r,{status:undefined}):r;
+  if(out&&"status" in out&&out.status===undefined)delete out.status;
+  return send(res,code,{res:out,state:snapshot(uid)})}
  return send(res,404,{error:"Not found"});
  }catch(e){console.error(e);return send(res,400,{error:"Bad request"})}
 });

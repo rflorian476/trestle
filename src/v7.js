@@ -55,9 +55,11 @@ const MILE_RATE=0.70;
 Object.assign(A,{
 saveCust(o){const m=me();if(!v7Pro(m))return{ok:false,msg:"The Office is for pro accounts"};o=o||{};const name=v7S(o.name,80);if(!name)return{ok:false,msg:"Add the customer's name"};
  let c=o.id&&v7Cust(o.id);if(c&&c.by!==m.id)return{ok:false,msg:"Not your customer record"};
+ /* SW-077: ignore a client-supplied uid. Link only when the email matches a living customer account. The response
+    never says whether a uid or email exists — both a known and an unknown supplied uid stay unlinked unless the email matches. */
  const link=(DB.users||[]).find(u=>u.role==="customer"&&liveEmail(u)&&liveEmail(u)===emailKey(o.email));
- const f={name,email:v7S(o.email,120),phone:v7S(o.phone,30),addr:v7S(o.addr,160),site:v7S(o.site,160)};
- if(c)Object.assign(c,f);else{c=Object.assign({id:"bc"+uid(),by:m.id,uid:o.uid&&U(o.uid)?o.uid:(link?link.id:null),notes:[],photos:[],date:Date.now()},f);v7Col("bcust").push(c)}
+ const f={name,email:v7S(o.email,120),phone:v7S(o.phone,30),addr:v7S(o.addr,160),site:v7S(o.site,160)},linked=link?link.id:null;
+ if(c){Object.assign(c,f);c.uid=linked}else{c=Object.assign({id:"bc"+uid(),by:m.id,uid:linked,notes:[],photos:[],date:Date.now()},f);v7Col("bcust").push(c)}
  save();return{ok:true,msg:"Customer saved",id:c.id}},
 addCustNote(id,t){const m=me(),c=v7Cust(id);if(!c||!m||c.by!==m.id)return{ok:false,msg:"Not found"};t=v7S(t,600);if(!t)return{ok:false,msg:"Write a note first"};c.notes.unshift({t,date:Date.now()});save();return{ok:true,msg:"Note added"}},
 addCustPhoto(id,url){const m=me(),c=v7Cust(id);if(!c||!m||c.by!==m.id)return{ok:false,msg:"Not found"};if(!/^\/(uploads|img)\/[\w.\-]+$/.test(String(url||"")))return{ok:false,msg:"That photo didn't upload"};c.photos.unshift(url);c.photos=c.photos.slice(0,24);save();return{ok:true,msg:"Photo added"}},

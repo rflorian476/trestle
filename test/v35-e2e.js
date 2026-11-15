@@ -1,6 +1,8 @@
 // v35 end-to-end. Self-contained: starts its own Sawyer server (local test mode). Covers health 2.18.0-sawyer / SW cache
 // sawyer-v35, the price book, Who owes you (aging + statements), lead filters, Check your check (traveler hours vs pay),
-// SW-076 (the floating .num badge in the invoice editor) and privacy of the new per-user data. Usage: node test/v35-e2e.js [shots dir]
+// SW-076 (the floating .num badge in the invoice editor), privacy of the new per-user data, SW-077 (saveCust ignores a
+// client uid; 24h statement cap is per target account), SW-078 (negative hours and dates after today), SW-079 (a leading
+// minus on a budget is not a comparable amount), and a generic empty /statement/<pro> page. Usage: node test/v35-e2e.js [shots dir]
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
 const {chromium}=require("playwright");
@@ -80,6 +82,25 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
   const hs=await stateFor(dh.ck);const n=(hs.notifs||[]).find(x=>x.link==="stmt35:c1");ok(n&&/sent you a statement: \$[\d,]+\.\d\d open on \d+ invoice/.test(n.text),"Pat gets a statement notice linking to /statement/c1",J(n));
   const ds=await stateFor(dp.ck);ok(((ds.bcust||[]).find(c=>c.id===pat.id)||{}).stmt35>0,"the pro's customer record notes when the statement went out");
   const ps=await pub();ok(!(ps.bcust||[]).length,"signed out: no customer records")}
+ // SW-077: ignore a client-supplied uid; link only by email; 24h cap is per (pro, target uid)
+ {const victim=await signupHo("uidlink");
+  const r1=await act(P(),PRO.ck,"saveCust",[{name:"Stranger A",email:"stranger-a-"+run+"@example.com",uid:"u1"}]);
+  const c1=(r1.st.bcust||[]).find(c=>c.id===r1.res.id);
+  ok(r1.res.ok&&r1.res.id&&r1.res.uid===undefined&&(!c1||c1.uid==null),"SW-077: a supplied existing uid is ignored when the email doesn't match",J({res:r1.res,c:c1&&{id:c1.id,uid:c1.uid,email:c1.email}}));
+  const r2=await act(P(),PRO.ck,"saveCust",[{name:"Stranger B",email:"stranger-b-"+run+"@example.com",uid:"no-such-user-xyz"}]);
+  const c2=(r2.st.bcust||[]).find(c=>c.id===r2.res.id);
+  ok(r2.res.ok&&r2.res.msg===r1.res.msg&&JSON.stringify({ok:r2.res.ok,msg:r2.res.msg})===JSON.stringify({ok:r1.res.ok,msg:r1.res.msg})&&c2&&c2.uid==null,"SW-077: an unknown uid gets the same response and stays unlinked (no existence leak)",J({r1:r1.res,r2:r2.res,c2:c2&&{id:c2.id,uid:c2.uid}}));
+  const r3=await act(P(),PRO.ck,"saveCust",[{name:"Hana match",email:"v35-ho-uidlink-"+run+"@example.com",uid:"c1"}]);
+  const c3=(r3.st.bcust||[]).find(c=>c.id===r3.res.id);
+  ok(r3.res.ok&&c3&&c3.uid===victim.id&&c3.uid!=="c1","SW-077: only a matching customer email links the row (a supplied pro uid is ignored)",J(c3&&{id:c3.id,uid:c3.uid}));
+  const r4=await act(P(),dp.ck,"saveCust",[{name:"Pat Duplicate",email:"demo-homeowner@sawyer.test"}]);
+  const c4=(r4.st.bcust||[]).find(c=>c.id===r4.res.id);
+  ok(c4&&c4.uid==="u1"&&c4.id!==pat.id,"SW-077: a second customer row with Pat's email links to the same account",J(c4&&{id:c4.id,uid:c4.uid}));
+  const bill=await act(P(),dp.ck,"saveBill",[{type:"inv",cust:c4.id,title:"Dup stmt",lines:[{d:"Labor",q:1,r:50}],tax:0}]);
+  ok(bill.res.ok&&bill.res.id,"SW-077: an invoice on the duplicate row can be saved",J(bill.res));
+  await act(P(),dp.ck,"sendBill",[bill.res.id]);
+  const r5=await act(P(),dp.ck,"stmt35",[c4.id]);
+  ok(r5.res.ok===false&&/24 hours/.test(r5.res.msg),"SW-077: a second customer row for the same person can't bypass the 24h statement cap",J(r5.res))}
 
  // ===== 3. Lead filters =====
  const lp=await signupPro("lf","Plumbing","78704"),ho=await signupHo("lf");
@@ -90,6 +111,7 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
   ok(r.res.ok&&me.lf35&&me.lf35.mi===0&&me.lf35.min===500&&J(me.lf35.skip)===J(["Water heaters"]),"leadFilters35 keeps only allowed values (bad distance -> any, unknown job type dropped)",J(me.lf35));
   j=await post("V35 small drain",{budget:"$100–400"});ok(j&&await bells(j)===0,"a job under the $500 minimum rings no bell (so no phone alert)");
   global.SMALL=j;
+  j=await post("V35 negative budget",{budget:"-500"});ok(j&&await bells(j)===1,"SW-079: a budget of -500 is treated like TBD (not under the minimum), so the bell still rings");
   j=await post("V35 big drain",{budget:"$600–900"});ok(j&&await bells(j)===1,"a $600–900 job still rings the bell");
   j=await post("V35 per-unit",{budget:"$150 per turn"});ok(j&&await bells(j)===1,"per-unit budgets aren't compared (bell rings)");
   j=await post("V35 heater",{sub:"Water heaters",budget:"$2,000"});ok(j&&await bells(j)===0,"a skipped job type rings no bell");
@@ -106,6 +128,8 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
  {const tme=meOf(tv.st),L=tme.tlog35&&tme.tlog35.tcd1;ok(L&&Object.keys(L.d).filter(d=>monOf(d)===last).length===6&&L.chk[last]&&L.chk[last].g>0,"demo traveler has last week logged (6×10) with a check stub",J(L&&L.chk));
   let r=await act(P(),tv.ck,"tlogDay35",["tcd2",today,8]);ok(r.res.ok===false&&/hired on/.test(r.res.msg),"can't log hours on a call you weren't hired on",J(r.res));
   r=await act(P(),tv.ck,"tlogDay35",["tcd1",today,25]);ok(r.res.ok===false&&/0 to 24/.test(r.res.msg),"more than 24 hours a day is refused");
+  r=await act(P(),tv.ck,"tlogDay35",["tcd1",today,"-5"]);ok(r.status===400&&r.res.ok===false&&/0 to 24/.test(r.res.msg)&&((meOf(r.st).tlog35&&meOf(r.st).tlog35.tcd1&&meOf(r.st).tlog35.tcd1.d)||{})[today]!==5,"SW-078: a leading minus is refused with 400 (not stored as 5 hours)",J({status:r.status,res:r.res,hrs:meOf(r.st).tlog35&&meOf(r.st).tlog35.tcd1&&meOf(r.st).tlog35.tcd1.d}));
+  r=await act(P(),tv.ck,"tlogDay35",["tcd1",addD(today,1),8]);ok(r.res.ok===false&&/up to today/.test(r.res.msg),"SW-078: tomorrow (after the server's today) is refused");
   r=await act(P(),tv.ck,"tlogDay35",["tcd1",addD(today,5),8]);ok(r.res.ok===false&&/up to today/.test(r.res.msg),"days in the future are refused");
   r=await act(P(),tv.ck,"tlogDay35",["tcd1","2026-13-40",8]);ok(r.res.ok===false,"a bad date is refused");
   r=await act(P(),tv.ck,"tlogCheck35",["tcd1",addD(mon,2),100,100]);ok(r.res.ok===false&&/week/.test(r.res.msg),"a check must be for a week starting Monday");
@@ -191,6 +215,11 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
   {const {c,p}=await page(w,null);await go(p,"/t/tcd1");ok(await p.locator("#v35cc").count()===0,w+": signed out: no Check your check");await c.close()}
   {const {c,p}=await page(w,dp.ck);await go(p,"/t/tcd1");ok(await p.locator("#v35cc").count()===0,w+": someone not hired on the call doesn't get it");await c.close()}
  }
+ // Idea 4: /statement/<pro> with nothing open is the same generic empty page whether or not the pro exists
+ {const hoE=await signupHo("stmtnone");
+  const extract=async path=>{const {c,p}=await page(1440,hoE.ck);await go(p,path);const t=await p.evaluate(()=>{const s=document.querySelector("section.v35cs");return s?s.innerText.replace(/\s+/g," ").trim():""});await c.close();return t};
+  const a=await extract("/statement/c1"),b=await extract("/statement/no-such-pro-xyz");
+  ok(a===b&&/all paid up/i.test(a)&&/Nothing is open on this statement/.test(a)&&!/Bluebonnet/i.test(a)&&!/Statement from /.test(a),"Idea 4: a viewer with no invoices sees the same generic empty /statement page for a real pro and an unknown id",J({a,b}))}
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL)}
  console.log(failed?"FAIL v35-e2e: "+failed+" failed":"PASS v35-e2e: all checks passed");process.exit(failed?1:0)})();
