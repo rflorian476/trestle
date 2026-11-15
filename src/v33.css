@@ -29,3 +29,8 @@
 .v33da{justify-content:center;flex-wrap:wrap;margin-top:14px}
 @media(max-width:520px){.v33ql-b{width:100%}.v33ql-b .btn{flex:1;justify-content:center}
  .mbox.v33sheet{align-self:flex-end;border-radius:18px 18px 0 0;max-height:92vh;overflow:auto}}
+/* v33: reuse a project as a template */
+.v33tp{margin:0 0 16px;padding:12px 14px;border:1px dashed var(--line);border-radius:var(--r-sm);background:var(--surface2)}
+.v33tp.on{border-style:solid;border-color:color-mix(in srgb,var(--good) 40%,var(--line))}
+.v33tp .fld{margin-bottom:6px}.v33tp label{display:flex;align-items:center;gap:6px;font-weight:700}.v33tp select{width:100%}
+.v33tp-n{margin:0;font-size:13px;display:flex;gap:6px;align-items:flex-start}.v33tp-n svg{flex:none;margin-top:3px;color:var(--good)}

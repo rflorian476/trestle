@@ -4842,6 +4842,29 @@ function v33QlBind(kind){document.querySelectorAll("#modal [data-close]").forEac
   document.querySelectorAll("[data-v33fu]").forEach(b=>b.onclick=()=>v33FuModal(b.dataset.v33fu));
   document.querySelectorAll("[data-v33ql]").forEach(b=>b.onclick=()=>v33QlOpen(b.dataset.v33ql))}catch(e){}return r}}
 
+/* (3) Project managers reuse a project as a template. Pool builders and GCs post the same kind of multi-trade job again
+   and again; "Reuse as template" (on the project page, and "Start from one of your projects" in Post a project) copies the
+   trades, crew counts, role names, phases, budget, notes and town into a new draft. Dates start blank and the title gets
+   "(copy)", so nothing is posted until the PM has looked it over on the Review step. Crew, applicants and chat aren't copied. */
+function v33Mine(m){return m?(DB.projects||[]).filter(p=>p.pm===m.id).sort((a,b)=>(b.created||0)-(a.created||0)):[]}
+function v33Tpl(pid){const p=PJ(pid),m=me();if(!p||!m||p.pm!==m.id)return false;const base=String(p.title||"").replace(/^Demo:\s*/i,"").replace(/\s*\(copy\)$/i,"");
+ NP={step:0,type:PTPL[p.type]?p.type:"custom",title:(base+" (copy)").slice(0,120),zip:p.zip||m.zip||"78704",start:"",end:"",budget:p.budget&&p.budget!=="Open"?p.budget:"",desc:String(p.desc||""),
+  roles:(p.roles||[]).filter(r=>r&&r.trade).map(r=>({trade:r.trade,label:String(r.label||r.trade),need:Math.max(1,Math.min(20,+r.need||1))})),phases:(p.phases&&p.phases.length?p.phases:PTPL[PTPL[p.type]?p.type:"custom"].phases).slice(),from33:p.id};
+ if(!NP.roles.length)NP.roles=PTPL[NP.type].roles.map(([trade,label,need])=>({trade,label,need}));return true}
+function v33TplSum(p){const n=(p.roles||[]).reduce((a,r)=>a+(+r.need||0),0);return`${(p.roles||[]).length} trade${(p.roles||[]).length===1?"":"s"} · ${n} crew · ${(p.phases||[]).length} phases`}
+{const ov=VIEWS.project;VIEWS.project=function(id){let h=ov.apply(this,arguments);try{const m=me(),p=PJ(id);if(!m||!p||p.pm!==m.id)return h;
+  const btn=`<button type="button" class="btn ghost" id="v33tpl" data-v33tpl="${esc(p.id)}">${I("layers",16)}Reuse as template</button>`;
+  for(const k of ['<div class="upj-act">','<button class="btn" id="advPhase">']){const a=h.indexOf(k);if(a<0)continue;const e=h.indexOf("</div>",a);if(e>0)return h.slice(0,e)+btn+h.slice(e)}
+  for(const k of ['<div class="utabs"','<div class="pjtabs"']){const t=h.indexOf(k);if(t>=0)return h.slice(0,t)+`<div class="upj-act v33tpl-r">${btn}</div>`+h.slice(t)}
+ }catch(e){console.warn(e)}return h}}
+{const oa=AFTER.project;AFTER.project=function(){const r=oa&&oa.apply(this,arguments);try{const b=document.getElementById("v33tpl");if(b)b.onclick=()=>{if(v33Tpl(b.dataset.v33tpl)){go("newproject");toast("Copied. Check the title and dates, then post.")}}}catch(e){}return r}}
+{const ov=VIEWS.newproject;VIEWS.newproject=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||!NP||NP.step!==0)return h;const ps=v33Mine(m);if(!ps.length)return h;
+  const src=NP.from33&&PJ(NP.from33);
+  const pick=`<div class="v33tp${src?" on":""}" id="v33tp"><div class="fld"><label for="v33ps">${I("layers",16)} Start from one of your projects</label><select id="v33ps"><option value="">Choose a project to copy…</option>${ps.slice(0,30).map(p=>`<option value="${esc(p.id)}" ${src&&src.id===p.id?"selected":""}>${esc(p.title)} (${esc(v33TplSum(p))})</option>`).join("")}</select></div>
+   ${src?`<p class="v33tp-n" role="status">${I("check",14)}<span>Copied from <b>${esc(src.title)}</b>: ${esc(v33TplSum(src))}. Crew, applicants and chat aren't copied. Set new dates on the next step.</span></p>`:`<p class="muted small v33tp-n">Copies the trades, crew counts, phases and notes. You set new dates.</p>`}</div>`;
+  const k=h.indexOf('<form id="npf" class="form card" novalidate>');if(k>=0){const e=k+'<form id="npf" class="form card" novalidate>'.length;return h.slice(0,e)+pick+h.slice(e)}
+ }catch(e){console.warn(e)}return h}}
+{const oa=AFTER.newproject;AFTER.newproject=function(){const r=oa&&oa.apply(this,arguments);try{const s=document.getElementById("v33ps");if(s)s.onchange=()=>{if(!s.value)return;if(v33Tpl(s.value))render();const n=document.getElementById("np-title");if(n)n.focus()}}catch(e){}return r}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};

@@ -187,6 +187,35 @@ const sigCk=r=>(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0]
   await p.context().close()}
  {const hp=await page(390,PH.ck);await hp.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await hp.waitForSelector("#v33ql",{timeout:8000}).catch(()=>{});const t=await hp.$eval("#v33ql",e=>e.innerText).catch(()=>"");ok(/Log a receipt or a trip in seconds/.test(t),"a pro with nothing logged sees what Quick log does",t);await hp.context().close()}
 
+ // ===== 4. PM: reuse a project as a template =====
+ {const pm=await login(P(),"demo-pm@sawyer.test");ok(!!pm.ck,"demo project manager logs in");
+  const src=(pm.st.projects||[]).find(x=>x.id==="p1");
+  for(const w of [390,1440]){const p=await page(w,pm.ck);await p.goto(LOCAL.B+"/project/p1",{waitUntil:"networkidle"});await p.waitForSelector("#v33tpl",{timeout:10000});
+   const b=await p.evaluate(()=>{const e=document.getElementById("v33tpl"),r=e.getBoundingClientRect();return{t:e.textContent.trim(),h:r.height,r:r.right,ow:document.documentElement.scrollWidth>innerWidth+1}});
+   ok(b.t==="Reuse as template"&&b.h>=36&&b.r<=w&&!b.ow,w+" PM's project page has 'Reuse as template'",J(b));
+   if(w===390){await sleep(700);await p.screenshot({path:path.join(SH,"v33-template-button-390.png")}).catch(()=>{});}
+   await p.click("#v33tpl");await p.waitForSelector("#v33tp.on",{timeout:8000});
+   const o=await p.evaluate(()=>({url:location.pathname+location.hash,title:document.getElementById("np-title").value,n:document.querySelector(".v33tp-n").innerText.replace(/\s+/g," "),ow:document.documentElement.scrollWidth>innerWidth+1}));
+   ok(/newproject/.test(o.url)&&o.title==="Inground pool build, Scottsdale (copy)"&&/Copied from Demo: Inground pool build, Scottsdale: 6 trades · 9 crew · \d+ phases/.test(o.n)&&!o.ow,w+" it opens Post a project with the title '(copy)' and a 'Copied from' note (trades, crew, phases)",J(o));
+   if(w===1440){await sleep(700);await p.screenshot({path:path.join(SH,"v33-template-wizard-1440.png")}).catch(()=>{});}
+   if(w===1440){await p.click("#npNext");await p.waitForSelector("#np-start");const dates=await p.evaluate(()=>[document.getElementById("np-start").value,document.getElementById("np-end").value,document.getElementById("np-phases").value.split("\n").length]);
+    ok(dates[0]===""&&dates[1]===""&&dates[2]===src.phases.length,"dates start blank and the phases are copied",J(dates));
+    await p.fill("#np-start","2027-03-01");await p.fill("#np-end","2027-05-15");await p.click("#npNext");await p.waitForSelector(".nproles");
+    const roles=await p.evaluate(()=>[...document.querySelectorAll(".np-row")].map(r=>[r.querySelector("select").value,r.querySelector("input[name^=label]").value,+r.querySelector("input[name^=need]").value]));
+    ok(J(roles)===J(src.roles.map(r=>[r.trade,r.label,r.need])),"every trade, role name and crew count is copied",J(roles));
+    await p.click("#npNext");await p.waitForSelector(".npreview");await p.click("#npPost");await p.waitForFunction(()=>/\/project\//.test(location.pathname+location.hash),null,{timeout:8000}).catch(()=>{});
+    const st=stateOf(await req(P(),"GET","/api/state",{Cookie:pm.ck}));const np=(st.projects||[]).filter(x=>x.pm===pm.st.me&&x.title==="Inground pool build, Scottsdale (copy)");
+    ok(np.length===1&&np[0].start==="2027-03-01"&&J(np[0].roles.map(r=>[r.trade,r.label,r.need,r.filled.length,r.apps.length]))===J(src.roles.map(r=>[r.trade,r.label,r.need,0,0]))&&J(np[0].phases)===J(src.phases)&&np[0].phase===0&&!np[0].demo,"posting makes a new project with the same crew plan, empty slots, phase 1, new dates",J(np[0]&&{t:np[0].title,s:np[0].start,r:np[0].roles.length}))}
+   await p.context().close()}
+  // the picker in Post a project
+  {const p=await page(1440,pm.ck);await p.goto(LOCAL.B+"/newproject",{waitUntil:"networkidle"});await p.waitForSelector("#v33ps",{timeout:8000});
+   const opts=await p.$$eval("#v33ps option",a=>a.map(o=>o.textContent));ok(opts.length>=4&&/Lakeview kitchen remodel/.test(opts.join("|")),"Post a project offers 'Start from one of your projects'",J(opts));
+   const val=await p.$$eval("#v33ps option",a=>(a.find(o=>/Lakeview/.test(o.textContent))||{}).value);await p.selectOption("#v33ps",val);await p.waitForSelector("#v33tp.on");
+   const t=await p.$eval("#np-title",e=>e.value);ok(t==="Lakeview kitchen remodel, Chicago (copy)","picking one fills the draft from it",t);await p.context().close()}
+  // not for others
+  {const p=await page(1440,PA.ck);await p.goto(LOCAL.B+"/project/p1",{waitUntil:"networkidle"});await sleep(400);ok(!(await p.$("#v33tpl")),"a pro viewing the project has no 'Reuse as template'");
+   await p.goto(LOCAL.B+"/newproject",{waitUntil:"networkidle"});await sleep(300);ok(!(await p.$("#v33ps")),"a pro with no projects of their own sees no picker");await p.context().close()}
+ }
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);try{PS&&PS.srv.close()}catch(e){}}
