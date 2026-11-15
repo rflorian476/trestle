@@ -1,1 +1,20 @@
 /* v36 */
+/* job costs */
+.v36jcb{gap:6px}.v36jcb small{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:#0F2A44;color:#fff;font-size:11.5px;font-weight:700}
+.v36jc h2{display:flex;align-items:center;gap:8px}
+.v36jc-f{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:12px;margin-top:8px}.v36jc-f .fld{margin:0}
+.v36jc-m{display:flex;align-items:center;gap:6px}.v36jc-m input{max-width:110px}.v36jc-m span{font-weight:700;color:#0F2A44}
+.v36jc-chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.v36jc-l{list-style:none;margin:8px 0;padding:0;max-height:46vh;overflow:auto;border:1px solid #E2DCCF;border-radius:12px;background:#fff}
+.v36jc-l li+li{border-top:1px solid #ECE7DC}
+.v36jc-r{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:center;min-height:52px;padding:8px 12px;cursor:pointer}
+.v36jc-r input{width:18px;height:18px;margin:0;accent-color:#0F2A44}
+.v36jc-t{min-width:0}.v36jc-t b{display:block;overflow-wrap:anywhere;color:#14151a}.v36jc-t small{display:block;font-size:12.5px}
+.v36jc-a{text-align:right;white-space:nowrap}.v36jc-a b{display:block;color:#0F2A44}.v36jc-a small{font-size:12px}
+.v36jc-e{padding:14px 12px}
+.v36jc-s{margin:6px 0 0;font-weight:700;color:#0F2A44;font-size:14px}
+.v36jc-on{display:flex;align-items:center;gap:6px;margin:8px 0 0}
+.v36bl{display:inline-flex;align-items:center;gap:4px;margin-right:8px;padding:2px 8px;border-radius:99px;background:#E8EEF4;color:#0F2A44;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}
+.v36ub{display:flex;align-items:center;justify-content:space-between;gap:14px;border-left:3px solid #0F2A44;background:#F8F6F1;margin-bottom:14px}
+.v36ub-t{min-width:0}.v36ub-t b{display:flex;align-items:center;gap:6px;color:#0F2A44}.v36ub-t span{display:block;margin-top:2px}
+@media (max-width:600px){.v36jc-f{grid-template-columns:1fr}.v36ub{flex-direction:column;align-items:flex-start}}
