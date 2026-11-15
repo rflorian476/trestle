@@ -2,6 +2,7 @@
 const V2_ACTIONS36=["mk36","billPhotos36"];if(typeof V2_ACTIONS!=="undefined")V2_ACTIONS.push(...V2_ACTIONS36);
 function v36Now(){return typeof __now==="function"?__now():Date.now()}
 const v36r2=n=>Math.round((Number(n)||0)*100)/100;
+const v36Markup=(amt,mk)=>Math.round(Math.round((Number(amt)||0)*100)*(100+(Number(mk)||0))/100)/100;
 
 /* (1) QA SW-082: a deleted contractor's traveler calls leave the catalog, the same tidy as SW-072 for crew projects.
    A call nobody was hired on (open, or filled and later emptied) is deleted outright, with the notices that pointed at it
@@ -40,7 +41,7 @@ function v36Mk(m){const n=Number(m&&m.mk36);return Number.isFinite(n)&&n>=0&&n<=
 function v36Unbilled(m,billId){return v7Mine("ledger",m).filter(L=>L&&(L.kind==="exp"||L.kind==="mile")&&(!v36Billed(L)||L.billed36===billId)).sort((a,b)=>String(b.date).localeCompare(String(a.date)))}
 function v36CostLine(L,mk){const dt=v35Fmt(String(L.date||"").slice(0,10));
  if(L.kind==="mile")return{d:v35Desc(`Mileage: ${L.from||"Shop"} → ${L.to||"job site"}, ${dt}`).slice(0,160),q:v36r2(L.miles),r:MILE_RATE,l36:L.id};
- const amt=v36r2(L.amt*(1+(mk||0)/100));return{d:v35Desc(`${L.cat||"Materials"}: ${L.vendor||"receipt"}, ${dt}`).slice(0,160),q:1,r:amt,l36:L.id}}
+ return{d:v35Desc(`${L.cat||"Materials"}: ${L.vendor||"receipt"}, ${dt}`).slice(0,160),q:1,r:v36Markup(L.amt,mk),l36:L.id}}
 A.mk36=function(p){const m=me();if(!v7Pro(m))return{ok:false,msg:"Job costs are part of The Office for pro accounts."};const n=parseFloat(String(p==null?"":p).replace(/[%\s]/g,""));
  if(!Number.isFinite(n)||n<0||n>100||/^[\s]*[-\u2212]/.test(String(p)))return{ok:false,msg:"Markup must be from 0% to 100%."};m.mk36=v36r2(n);save();return{ok:true,msg:"Markup saved: "+m.mk36+"%"}};
 {const os=A.saveBill;A.saveBill=function(o){const m=me();const src=(o&&Array.isArray(o.lines)?o.lines:[]).slice(0,40);
@@ -56,7 +57,7 @@ function v36JcModal(){const m=me(),b=BED;if(!m||!b)return;const all=v36Unbilled(
  const jobs=[...new Set(all.map(L=>L.job).filter(Boolean))];let job=b.job&&jobs.includes(b.job)?b.job:"";const st={mk:v36Mk(m),sel:new Set(),job};
  const rows=()=>all.filter(L=>!st.job||L.job===st.job);
  const pre=()=>{st.sel=new Set(rows().map(L=>L.id))};pre();
- const draw=()=>{const R=rows();const tot=R.filter(L=>st.sel.has(L.id)).reduce((a,L)=>{const x=v36CostLine(L,st.mk);a.n++;a.bill+=x.q*x.r;a.cost+=L.kind==="mile"?x.q*x.r:L.amt;return a},{n:0,bill:0,cost:0});
+ const draw=()=>{const R=rows();const tot=R.filter(L=>st.sel.has(L.id)).reduce((a,L)=>{const x=v36CostLine(L,st.mk);a.n++;a.bill=v36r2(a.bill+x.q*x.r);a.cost=v36r2(a.cost+(L.kind==="mile"?x.q*x.r:Number(L.amt)||0));return a},{n:0,bill:0,cost:0});
   const box=document.getElementById("v36jcL");if(!box)return;
   box.innerHTML=R.length?R.map(L=>{const x=v36CostLine(L,st.mk);return`<li><label class="v36jc-r"><input type="checkbox" data-v36c="${esc(L.id)}" ${st.sel.has(L.id)?"checked":""}><span class="v36jc-t"><b>${esc(L.kind==="mile"?`${L.miles} mi · ${L.from||"Shop"} → ${L.to||"job site"}`:(L.vendor||L.cat||"Receipt"))}</b><small class="muted">${esc(v35Fmt(String(L.date).slice(0,10)))} · ${esc(L.kind==="mile"?"Mileage at "+v7$(MILE_RATE)+"/mi":(L.cat||"Materials"))}${L.job?" · "+esc(L.job):""}</small></span><span class="v36jc-a"><b>${esc(v7$(x.q*x.r))}</b>${L.kind!=="mile"&&st.mk?`<small class="muted">cost ${esc(v7$(L.amt))}</small>`:""}</span></label></li>`}).join("")
    :`<li class="muted small v36jc-e">Nothing unbilled${st.job?" for "+esc(st.job):""}. Log receipts and trips in Expenses & mileage or with Quick log on your dashboard.</li>`;
@@ -111,11 +112,25 @@ A.billPhotos36=function(id,list){const m=me(),b=v7Bill(id);if(!m)return{ok:false
 function v36Gallery(b){const P=v36Ph(b);if(!P.length)return"";const lab=t=>(V36_TAGS.find(x=>x[0]===t)||[])[1]||"";
  return`<section class="v36g" aria-labelledby="v36gh-${esc(b.id)}"><h3 id="v36gh-${esc(b.id)}">${I("camera",16)} Photos of the work <small class="muted">${P.length}</small></h3><ul class="v36g-l">${P.map((p,i)=>`<li><button type="button" class="v36g-b" data-v36ph="${i}" aria-label="Open photo ${i+1}${p.tag?", "+lab(p.tag):""}${p.cap?": "+esc(p.cap):""}"><img src="${esc(p.src)}" alt="${esc(p.cap||((lab(p.tag)||"Job")+" photo"))}" loading="lazy" decoding="async" width="160" height="120">${p.tag?`<span class="v36g-t v36g-${esc(p.tag)}">${esc(lab(p.tag))}</span>`:""}</button>${p.cap?`<small>${esc(p.cap)}</small>`:""}</li>`).join("")}</ul></section>`}
 if(typeof billDoc==="function"){const ob=billDoc;billDoc=function(b,forCust){let h=ob.apply(this,arguments);try{const g=v36Gallery(b);if(!g)return h;const k=h.indexOf('<div class="o7-tot">');return k>=0?h.slice(0,k)+g+h.slice(k):h.replace("</article>",()=>g+"</article>")}catch(e){return h}}}
-function v36Lightbox(b,i){const P=v36Ph(b);if(!P.length)return;i=Math.max(0,Math.min(P.length-1,i|0));const p=P[i],lab=(V36_TAGS.find(x=>x[0]===p.tag)||[])[1]||"";
- modal(`<div class="v36lb"><h2 id="mtitle">${esc(lab?lab+" photo":"Photo of the work")} <small class="muted">${i+1} of ${P.length}</small></h2><img src="${esc(p.src)}" alt="${esc(p.cap||lab+" photo")}" decoding="async">${p.cap?`<p>${esc(p.cap)}</p>`:""}
- <div class="actions">${P.length>1?`<button type="button" class="btn ghost" id="v36lbP" aria-label="Previous photo">${I("left",16)}</button><button type="button" class="btn ghost" id="v36lbN" aria-label="Next photo">${I("right",16)}</button>`:""}<button type="button" class="btn" data-close>Close</button></div></div>`);
- document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);const P_=document.getElementById("v36lbP"),N=document.getElementById("v36lbN");
- if(P_)P_.onclick=()=>v36Lightbox(b,(i-1+P.length)%P.length);if(N)N.onclick=()=>v36Lightbox(b,(i+1)%P.length)}
+function v36Lightbox(b,i0){const P=v36Ph(b);if(!P.length)return;let i=Math.max(0,Math.min(P.length-1,i0|0));
+ const ann=()=>{const p=P[i],lab=(V36_TAGS.find(x=>x[0]===p.tag)||[])[1]||"";return(lab?lab+" photo":"Photo of the work")+", "+(i+1)+" of "+P.length};
+ const draw=()=>{const p=P[i],lab=(V36_TAGS.find(x=>x[0]===p.tag)||[])[1]||"";
+  modal(`<div class="v36lb"><h2 id="mtitle">${esc(lab?lab+" photo":"Photo of the work")} <small class="muted">${i+1} of ${P.length}</small></h2><img src="${esc(p.src)}" alt="${esc(p.cap||lab+" photo")}" decoding="async">${p.cap?`<p>${esc(p.cap)}</p>`:""}
+  <p class="sr-only" id="v36lbLive" aria-live="polite">${esc(ann())}</p>
+  <div class="actions">${P.length>1?`<button type="button" class="btn ghost" id="v36lbP" aria-label="Previous photo">${I("left",16)}</button><button type="button" class="btn ghost" id="v36lbN" aria-label="Next photo">${I("right",16)}</button>`:""}<button type="button" class="btn" data-close>Close</button></div></div>`);
+  document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);const P_=document.getElementById("v36lbP"),N=document.getElementById("v36lbN");
+  if(P_)P_.onclick=()=>{i=(i-1+P.length)%P.length;draw()};if(N)N.onclick=()=>{i=(i+1)%P.length;draw()};
+  const box=document.querySelector(".v36lb");if(box&&P.length>1){let x0=null,y0=null;
+   const pos=e=>{const t=(e.changedTouches&&e.changedTouches[0])||(e.touches&&e.touches[0])||e;return{x:t.clientX,y:t.clientY}};
+   const down=e=>{const p=pos(e);x0=p.x;y0=p.y};
+   const up=e=>{if(x0==null)return;const p=pos(e),dx=p.x-x0,dy=p.y-y0;x0=null;if(Math.abs(dx)<40||Math.abs(dx)<Math.abs(dy))return;if(dx<0)i=(i+1)%P.length;else i=(i-1+P.length)%P.length;draw()};
+   box.addEventListener("touchstart",down,{passive:true});box.addEventListener("touchend",up,{passive:true})}};
+ draw();
+ if(v36Lightbox._key)removeEventListener("keydown",v36Lightbox._key);
+ const key=e=>{const md=document.getElementById("modal");if(!md||md.hidden||!document.querySelector(".v36lb")){removeEventListener("keydown",key);v36Lightbox._key=null;return}
+  if(e.key==="ArrowLeft"){e.preventDefault();if(P.length>1){i=(i-1+P.length)%P.length;draw()}}
+  if(e.key==="ArrowRight"){e.preventDefault();if(P.length>1){i=(i+1)%P.length;draw()}}};
+ v36Lightbox._key=key;addEventListener("keydown",key)}
 function v36PhCard(b){const P=v36Ph(b),c=v7Cust(b.cust),cp=(c&&Array.isArray(c.photos)?c.photos:[]).filter(u=>UPLOAD_RE.test(u)&&!P.some(p=>p.src===u));const full=P.length>=V36_PH_MAX;
  return`<div class="card v36pc" id="v36pc"><div class="o7-sh"><h2 class="h-sub">${I("camera",16)} Photos of the work</h2><span class="muted small">${P.length} of ${V36_PH_MAX}</span></div>
  <p class="muted small">Before and after shots show ${esc(b.cname||"your customer")} what they're paying for. They appear on the ${esc(String(BILLNAME[b.type]||"invoice").toLowerCase())}.</p>

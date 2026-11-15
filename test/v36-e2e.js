@@ -3,8 +3,10 @@
 // travelers keep a closed record; boot tidy for older deletes), SW-080 (Unicode minus / dash budgets parse as no budget),
 // SW-081 (staff accounts never link as Office customers or get statements), the hours-log date message, Bill job costs
 // (receipts and trips onto an invoice, markup, one live invoice per receipt, void frees them, customer copy has no receipt
-// ids), and Photos of the work on invoices (own uploads only, 8 max, tags/captions, customer gallery + full-size view),
-// at 390 and 1440. Usage: node test/v36-e2e.js [shots dir]
+// ids), SW-083 (job-cost markup in integer cents; $0.01–$500 sweep at the 10/15/20/25% presets, incl. $10.10 at 15% = $11.62),
+// Photos of the work on invoices (own uploads only, 8 max, tags/captions, customer gallery + full-size view), and SW-084
+// (invoice photo lightbox: ArrowLeft/ArrowRight, touch swipe, aria-live slide announcements), at 390 and 1440.
+// Usage: node test/v36-e2e.js [shots dir]
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
 const {chromium}=require("playwright");
@@ -186,6 +188,14 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
  const go=async(p,u)=>{await p.goto(LOCAL.B+u,{waitUntil:"networkidle"});await p.waitForTimeout(250)};
  const noOverflow=async(p,lbl)=>{const ov=await p.evaluate(()=>document.documentElement.scrollWidth-innerWidth);ok(ov<=0,lbl+": no sideways scroll",ov)};
  const font=async(p,sel)=>p.evaluate(s=>{const e=document.querySelector(s);return e?getComputedStyle(e).fontFamily:""},sel);
+ {const {c,p}=await page(1440,JP.ck);await go(p,"/office/money");
+  const sw=await p.evaluate(()=>{const want=(amt,mk)=>Math.round(Math.round(amt*100)*(100+mk)/100)/100;const bad=[];
+   const ten=v36CostLine({kind:"exp",amt:10.10,date:"2026-11-15",cat:"Materials",vendor:"Penny"},15).r;
+   for(let n=1;n<=50000;n++){const amt=n/100;for(const mk of [10,15,20,25]){const got=v36CostLine({kind:"exp",amt,date:"2026-11-15",cat:"Materials",vendor:"x"},mk).r;if(got!==want(amt,mk)){bad.push({amt,mk,got,want:want(amt,mk)});if(bad.length>=8)return{ten,n:bad.length,bad,checked:n}}}}
+   return{ten,n:bad.length,bad,checked:50000*4}});
+  ok(sw.ten===11.62,"SW-083: $10.10 at 15% bills $11.62 through v36CostLine (not $11.61)",JSON.stringify(sw.ten));
+  ok(sw.n===0,"SW-083: $0.01–$500 at 10/15/20/25% matches integer-cent math ("+sw.checked+" checks)",J(sw.bad));
+  await c.close()}
  for(const w of [390,1440]){
   const JOB="Bath refresh "+w;for(const o of [{kind:"exp",amt:"126.80",cat:"Materials",vendor:"Ferguson Supply",job:JOB,date:addD(iso(new Date()),-1)},{kind:"exp",amt:"42.50",cat:"Permits",vendor:"City of Austin",job:JOB,date:addD(iso(new Date()),-1)},{kind:"mile",miles:"18.5",from:"Shop",to:"Oak St",job:JOB,date:iso(new Date())}])await act(P(),JP.ck,"addLedger",[o]);
   {const {c,p}=await page(w,JP.ck);await go(p,"/office/money");
@@ -198,7 +208,8 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
    await p.selectOption("#v36jcJ",JOB);await p.waitForTimeout(100);
    ok(await p.locator("#v36jcL [data-v36c]").count()===3,w+": picking the job lists its 3 unbilled costs");
    await p.click('[data-v36mk="10"]');await p.waitForTimeout(100);const s=await p.textContent("#v36jcS");
-   const want=Math.round((126.8*1.1)*100)/100+Math.round((42.5*1.1)*100)/100+18.5*0.7;
+   const cents=(amt,mk)=>Math.round(Math.round(amt*100)*(100+mk)/100)/100;
+   const want=cents(126.80,10)+cents(42.50,10)+18.5*0.7;
    ok(s.includes("Adds 3 lines")&&s.includes("$"+want.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})),w+": summary shows 3 lines with a 10% markup on receipts ("+s+")",want);
    await noOverflow(p,w+" job-costs sheet");if(w===390)await p.screenshot({path:path.join(SH,"v36-jobcosts-sheet-"+w+".png")});else await p.locator("#modal .mbox").screenshot({path:path.join(SH,"v36-jobcosts-sheet-"+w+".png")}).catch(()=>p.screenshot({path:path.join(SH,"v36-jobcosts-sheet-"+w+".png")}));
    await p.click("#v36jcGo");await p.waitForTimeout(400);
@@ -224,6 +235,18 @@ const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d
    await p.locator(".v36g").screenshot({path:path.join(SH,"v36-invoice-photos-"+w+".png")});
    await p.click('[data-v36ph="0"]');await p.waitForSelector(".v36lb img");ok(/Before photo/.test(await p.textContent(".v36lb h2")),w+": tapping a photo opens it full size");
    await p.click("#v36lbN");await p.waitForTimeout(150);ok(/After photo/.test(await p.textContent(".v36lb h2")),w+": next goes to the After photo");
+   ok(await p.locator("#v36lbLive").getAttribute("aria-live")==="polite",w+": lightbox has an aria-live region");
+   await p.waitForFunction(()=>/After photo, 2 of 2/.test((document.getElementById("v36lbLive")||{}).textContent||""),null,{timeout:2000});
+   ok(/After photo, 2 of 2/.test(await p.textContent("#v36lbLive")),w+": aria-live announces the After photo");
+   await p.keyboard.press("ArrowLeft");await p.waitForFunction(()=>/Before photo/.test((document.querySelector(".v36lb h2")||{}).textContent||"")&&/Before photo, 1 of 2/.test((document.getElementById("v36lbLive")||{}).textContent||""),null,{timeout:2000});
+   ok(/Before photo/.test(await p.textContent(".v36lb h2"))&&/Before photo, 1 of 2/.test(await p.textContent("#v36lbLive")),w+": ArrowLeft goes back to the Before photo and announces it");
+   await p.keyboard.press("ArrowRight");await p.waitForFunction(()=>/After photo/.test((document.querySelector(".v36lb h2")||{}).textContent||"")&&/After photo, 2 of 2/.test((document.getElementById("v36lbLive")||{}).textContent||""),null,{timeout:2000});
+   ok(/After photo/.test(await p.textContent(".v36lb h2"))&&/After photo, 2 of 2/.test(await p.textContent("#v36lbLive")),w+": ArrowRight goes to the After photo and announces it");
+   const swipe=async(from,to)=>p.evaluate(({from,to})=>{const el=document.querySelector(".v36lb");const fire=(type,x)=>{const t=new Touch({identifier:1,target:el,clientX:x,clientY:80,pageX:x,pageY:80,screenX:x,screenY:80,radiusX:1,radiusY:1,rotationAngle:0,force:1});el.dispatchEvent(new TouchEvent(type,{bubbles:true,cancelable:true,touches:type==="touchend"?[]:[t],targetTouches:type==="touchend"?[]:[t],changedTouches:[t]}))};fire("touchstart",from);fire("touchend",to)},{from,to});
+   await swipe(280,180);await p.waitForFunction(()=>/Before photo/.test((document.querySelector(".v36lb h2")||{}).textContent||""),null,{timeout:2000});
+   ok(/Before photo/.test(await p.textContent(".v36lb h2")),w+": swipe left from the last photo wraps to the Before photo");
+   await swipe(180,280);await p.waitForFunction(()=>/After photo/.test((document.querySelector(".v36lb h2")||{}).textContent||""),null,{timeout:2000});
+   ok(/After photo/.test(await p.textContent(".v36lb h2"))&&/After photo, 2 of 2/.test(await p.textContent("#v36lbLive")),w+": swipe right goes back to the After photo and announces it");
    if(w===390)await p.screenshot({path:path.join(SH,"v36-photo-lightbox-"+w+".png")});
    await c.close()}
  }
