@@ -1,6 +1,6 @@
 // v33 end-to-end. Self-contained: starts its own Sawyer server (local test mode) and a local stand-in push service.
 // Covers: SW-069 (push endpoints are canonicalized: lowercase scheme/host, no trailing slash, odd spellings refused, one
-// key for subscribe / conflict / unsubscribe / status / test; v32 rows migrated at start; SW-070: the first-registered owner keeps a duplicated device even when a later row already stores the canonical key), health 2.16.0-sawyer and the
+// key for subscribe / conflict / unsubscribe / status / test; v32 rows migrated at start; SW-070: the first-registered owner keeps a duplicated device even when a later row already stores the canonical key), health and SW cache (any Sawyer version since v34) and the
 // v33 features (see the sections below). No real push service or email provider is contacted: deliveries go to the local
 // stand-in (PUSH_TEST_ORIGIN); the fcm.googleapis.com endpoints below are only subscribed / checked / removed, never sent to.
 "use strict";
@@ -51,8 +51,8 @@ const sigCk=r=>(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0]
 (async()=>{try{
  PS=await pushService();
  LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"});
- const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(hz.v==="2.16.0-sawyer","healthz reports 2.16.0-sawyer",J(hz));
- const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v33"/.test(sw.body),"service worker cache is sawyer-v33 (client assets changed)");
+ const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker has a Sawyer cache name");
  const run=Math.random().toString(36).slice(2,8);
  const signupPro=async(tag,trade,zip)=>{const r=await req(LOCAL.port,"POST","/api/signup",JH,J({kind:"pro",password:"v33-correct-horse",data:{name:"Vee "+tag,biz:"V33 "+tag+" "+run,email:"v33-"+tag+"-"+run+"@example.com",trade:trade||"Plumbing",zip:zip||"78704",phone:"5125550100",plan:"founding"}}));return{ck:sigCk(r),id:stateOf(r).me}};
  const signupHo=async(tag)=>{const r=await req(LOCAL.port,"POST","/api/signup",JH,J({kind:"customer",password:"v33-correct-horse",data:{name:"Hana "+tag,email:"v33-ho-"+tag+"-"+run+"@example.com",zip:"78704"}}));return{ck:sigCk(r),id:stateOf(r).me}};

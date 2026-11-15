@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.16.0
+# Sawyer (beta) — v2.17.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.15.0-sawyer"}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.17.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -21,6 +21,14 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v34: deleted accounts leave no listings, wipe detection, a plain beta note, export before you delete
+
+- **SW-072: deleting an account takes its crew projects out of the catalog.** `A.__delete13` (`src/v13.js`) now calls `v34OwnerGone()`: open projects nobody was hired onto are deleted outright, with their crew chat and the "New crew opening" notices that pointed at them. Staffed or finished projects stay only as a closed, unlisted, anonymized record (no description, notes or budget); pending applications and invites are closed and the crew is told. The server never lists an owner-deleted project in anyone's state except its crew, applicants and staff (`ownerGone()` in `server.js`), and projects of accounts deleted before v34 are tidied once at start (`v34Orphans()`). The browse list skips them and the project page says "This project is closed…".
+- **Persistence readiness (SW-071 prep, no plan change).** `lib/persist.js` checks whether `DATA_DIR` sits on its own disk mount (not the image's root filesystem, tmpfs or overlay; `SAWYER_PERSISTENT=1/0` overrides). Boot prints `WARNING: data is NOT persistent …` when it isn't and `NOTICE: started from an empty database …` when the DB was freshly seeded. `/healthz` adds `persistent`, `freshDb`, `dbSince`, `boots` (no paths). `DATA_DIR` resolves next to `server.js`, and an unwritable one (disk not mounted) stops the server with one clear `FATAL` line. `render.yaml` has the 1 GB `/data` disk block and the VAPID env keys written out but commented; the plan stays `free`. Steps: **Keep data between deploys** below. `tools/vapid-keys.js` makes a VAPID key pair to paste into the dashboard.
+- **Beta note.** While data isn't persistent, sign-up (in the sign-in card), pro sign-up step 1 and Account show "This beta resets from time to time — don't store real jobs here yet." It disappears by itself once a disk is attached.
+- **Export my data on the delete screen.** The Delete your account dialog offers **Take a copy first**: **Export my data (ZIP)** builds one ZIP on the device with `sawyer-data.json` (the `/api/account/export` copy), a README, formula-safe CSVs of jobs, quotes, messages and reviews, and, for anyone with Office records, the "Back up everything" files under `office/`. **JSON only** links the plain export. Demo accounts (which can't be deleted) don't get it.
+- Tests: `node test/v34-e2e.js [shots dir]` (self-contained) is part of `test/run-all.sh`. `v33-e2e` now accepts any Sawyer version / SW cache name. SW cache is `sawyer-v34`. Code: `src/v34.js`, `src/v34.css`, `lib/persist.js`.
 
 ## v33: follow up on quotes, log receipts from the dashboard, reuse a project, one key per device
 
