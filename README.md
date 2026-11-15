@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.18.0
+# Sawyer (beta) — v2.19.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.18.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.19.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -21,6 +21,16 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v36: bill your job costs, photos of the work on invoices, cleaner deletes
+
+- **Bill job costs** (invoice editor → **Job costs**, or **Bill job costs** on Office → Expenses & mileage). Receipts and trips a pro already logged (Expenses & mileage, or the v33 Quick log) go onto an invoice in one step: pick the job tag, set an optional **markup on receipts** (0–100%, presets 0/10/15/20/25, remembered privately as `mk36`), and mileage is billed at the Office rate ($0.70/mi, no markup). The sheet shows cost vs. billed ("Adds 3 lines · $199.18 (cost $182.25 + markup $16.93)") and the lines land in date order with the job name filled in. Each line remembers the receipt it came from (`l36`), so a receipt can be on **one live invoice** only (a second invoice gets a plain line); Expenses & mileage marks rows **Billed on INV-…** and shows a **Not billed yet: $X** card; voiding the invoice (or removing the line and saving) frees the receipt again. The customer's copy has ordinary lines: the server strips `l36` from every bill it sends to anyone but the pro.
+- **Photos of the work** (pro's invoice / estimate / change order page). Up to 8 photos per bill, from the phone's camera or library (shrunk on the device like receipt photos) or from that customer's record; each can be tagged **Before / During / After** with an 80-character caption. The customer sees them on the bill itself, above the totals, and taps one for a full-size view with next/previous. Only the pro's own uploads (or photos already on that bill) are accepted, never COI files (checked in `server.js` before `billPhotos36`); location data was already stripped at upload (`lib/imgsafe.js`). Stored on the bill as `ph36`; it prints with the bill.
+- **SW-082: deleting a contractor tidies their traveler calls** (same idea as SW-072 for projects). A call nobody was hired on is deleted, with the notices that pointed at it and travelers' saved copies. A call with a hire (filled or not) stays only as a closed, unlisted record without its description, so hired travelers keep their pay terms and Check your check log, and they're told. The server never lists such a call except to its hired travelers and staff; `/t/<id>` is the same generic 404 page as an unknown id for everyone else. Calls of accounts deleted before v36 are tidied once at start (`v36CallOrphans()`).
+- **SW-080: Unicode minus budgets.** A budget that starts with any minus or dash (ASCII `-`, U+2212 `−`, hyphen / figure / en / em dashes, small and fullwidth minus), also after a `$`, parses as no budget, like TBD. One check, `v25Neg()`, feeds the lead filters (`v35Budget`) and the posted-budget vs. price-guide note (`v25Budget`).
+- **SW-081: staff are never billable customers.** `saveCust` doesn't email-link a staff account (the Trust team, `demo-trust@sawyer.test`), `stmt35` answers "isn't on Sawyer yet" for a row linked to staff, and rows / unpaid bills linked to staff before the fix are unlinked once at start (`v36StaffUnlink()`).
+- **Hours-log message.** A day after the server's today or more than 400 days back gets "Log days up to today (Nov 15), from the last 400 days.", naming the server's date, which is exactly what's checked.
+- Tests: `node test/v36-e2e.js [shots dir]` (self-contained) is part of `test/run-all.sh`. `v35-e2e` now accepts any Sawyer version / SW cache name. SW cache is `sawyer-v36`. Code: `src/v36.js`, `src/v36.css`.
 
 ## v35: a price book, who owes you, lead filters, check your check
 

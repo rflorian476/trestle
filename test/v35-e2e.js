@@ -1,5 +1,5 @@
-// v35 end-to-end. Self-contained: starts its own Sawyer server (local test mode). Covers health 2.18.0-sawyer / SW cache
-// sawyer-v35, the price book, Who owes you (aging + statements), lead filters, Check your check (traveler hours vs pay),
+// v35 end-to-end. Self-contained: starts its own Sawyer server (local test mode). Covers health and SW cache (any Sawyer
+// version since v36), the price book, Who owes you (aging + statements), lead filters, Check your check (traveler hours vs pay),
 // SW-076 (the floating .num badge in the invoice editor), privacy of the new per-user data, SW-077 (saveCust ignores a
 // client uid; 24h statement cap is per target account), SW-078 (negative hours and dates after today), SW-079 (a leading
 // minus on a budget is not a comparable amount), and a generic empty /statement/<pro> page. Usage: node test/v35-e2e.js [shots dir]
@@ -36,8 +36,8 @@ const addD=(s,n)=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+
 const monOf=s=>{const d=new Date(s+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return iso(d)};
 (async()=>{try{
  LOCAL=await startApp(await freePort());const P=()=>LOCAL.port;
- const hz=(await req(P(),"GET","/healthz")).json||{};ok(hz.v==="2.18.0-sawyer","healthz reports 2.18.0-sawyer",J(hz));
- {const sw=await req(P(),"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v35"/.test(sw.body),"service worker cache is sawyer-v35 (client assets changed)")}
+ const hz=(await req(P(),"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ {const sw=await req(P(),"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker has a Sawyer cache name")}
  const run=Math.random().toString(36).slice(2,8);
  const signupPro=async(tag,trade,zip)=>{const r=await req(P(),"POST","/api/signup",JH,J({kind:"pro",password:"v35-correct-horse",data:{name:"Vee "+tag,biz:"V35 "+tag+" "+run,email:"v35-"+tag+"-"+run+"@example.com",trade:trade||"Plumbing",zip:zip||"78704",phone:"5125550100",plan:"founding"}}));return{ck:sigCk(r),id:stateOf(r).me}};
  const signupHo=async(tag)=>{const r=await req(P(),"POST","/api/signup",JH,J({kind:"customer",password:"v35-correct-horse",data:{name:"Hana "+tag,email:"v35-ho-"+tag+"-"+run+"@example.com",zip:"78704"}}));return{ck:sigCk(r),id:stateOf(r).me}};
