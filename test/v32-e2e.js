@@ -226,7 +226,7 @@ let LOCAL=null,br=null,PS=null;
   // Inbox: kinds
   await p.goto(LOCAL.B+"/inbox",{waitUntil:"networkidle"});await p.waitForSelector("#v32push-inbox [data-v32off]",{timeout:8000});
   const ib=await p.evaluate(()=>{const c=document.getElementById("v32push-inbox");return{boxes:[...c.querySelectorAll("[data-v32cat]")].map(i=>[i.dataset.v32cat,i.checked,!!i.closest("label")]),side:!!c.closest(".n11-side"),ow:document.documentElement.scrollWidth>innerWidth+1,first:c.parentElement.firstElementChild===c}});
-  ok(J(ib.boxes)===J([["jobs",true,true],["hires",true,true],["msgs",true,true]])&&ib.side&&ib.first&&!ib.ow,w+" Inbox: alert card first in 'How we reach you', with labeled switches for new jobs, hires and messages, no overflow",J(ib));
+  ok(J(ib.boxes)===J([["jobs",true,true],["hires",true,true],["msgs",true,true],["visits",true,true]])&&ib.side&&ib.first&&!ib.ow,w+" Inbox: alert card first in 'How we reach you', with labeled switches for new jobs, hires, messages and appointments (v37), no overflow",J(ib));
   if(w===1440)await p.screenshot({path:path.join(process.argv[3]||os.tmpdir(),"v32-inbox-"+w+".png")}).catch(()=>{});
   await p.click('#v32push-inbox [data-v32cat="jobs"]');await sleep(400);const st2=(await post(LOCAL.port,U.ck,"/api/push/status",{endpoint:EP("ui"+w)})).json||{};
   ok(st2.cats&&st2.cats.jobs===false&&st2.cats.hires===true,w+" unticking 'new jobs' saves on the server",J(st2.cats));
@@ -240,7 +240,7 @@ let LOCAL=null,br=null,PS=null;
  {const p=await page(1440,HO.ck,Object.assign({},stub,{arg:{endpoint:EP("hoUI"),p256dh:dHO.keys.p256dh,auth:dHO.keys.auth,deny:true}}));await p.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await p.waitForSelector("#v32push-dash [data-v32s] button",{timeout:8000});
   const t=await p.$eval("#v32push-dash",e=>e.innerText.replace(/\s+/g," "));ok(/as soon as a pro sends you a quote/.test(t),"homeowner dashboard card talks about quotes",t);
   await p.goto(LOCAL.B+"/inbox",{waitUntil:"networkidle"});await p.waitForSelector("#v32push-inbox",{timeout:8000});await sleep(500);
-  const hb=await p.$$eval("#v32push-inbox [data-v32cat]",a=>a.map(i=>i.dataset.v32cat));ok(J(hb)===J(["quotes","msgs"]),"homeowner Inbox switches: new quotes and messages",J(hb));
+  const hb=await p.$$eval("#v32push-inbox [data-v32cat]",a=>a.map(i=>i.dataset.v32cat));ok(J(hb)===J(["quotes","msgs","visits"]),"homeowner Inbox switches: new quotes, messages and appointments (v37)",J(hb));
   if(await p.$("#v32push-inbox [data-v32off]")){await p.click("#v32push-inbox [data-v32off]");await p.waitForSelector("#v32push-inbox [data-v32on]",{timeout:8000})}
   await p.click("#v32push-inbox [data-v32on]");await p.waitForFunction(()=>/blocked/.test(document.getElementById("v32push-inbox").innerText),null,{timeout:8000}).catch(()=>{});
   const t2=await p.$eval("#v32push-inbox",e=>e.innerText.replace(/\s+/g," "));ok(/blocked for Sawyer/.test(t2)&&!/On for this device/.test(t2),"if the person says no (permission denied), the card explains how to allow it and stays off",t2);await p.context().close()}

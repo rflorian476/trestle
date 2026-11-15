@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.19.0
+# Sawyer (beta) — v2.20.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.19.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.20.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -21,6 +21,15 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v37: appointments customers confirm, a home history by property, exact markups
+
+- **Appointments customers can count on** (no-shows and loose scheduling are a top complaint about the big sites, `research/competitor-flaws.md` #12). When a pro schedules a visit (Office → Schedule, or **Schedule a visit** on a hired job's page) they pick an **arrival window**: exact time, or a 1-, 2-, 3- or 4-hour window ("Arrive 8–10am"). The visit can be tied to the hired job. The customer gets "… scheduled "Water heater install" for Thu, Nov 19, arrive 8–10am. Tap to confirm or ask for another time." and sees an **Appointment** card on that job's page, on the tracker and as the first next step on their dashboard, with **Confirm this time** or **Ask to reschedule** (up to 3 times that work for them, from today to 6 months out, plus an optional note). The pro sees ✓ / ↻ / ? on the week calendar chip and "Asked to reschedule" in the visit sheet with **Use this time** next to each offered time: one tap moves the visit, marks it confirmed and tells the customer. If the pro changes the day, time or window themselves, the customer is asked to confirm again. **On my way** (v8) still sends the live ETA. Checked on the server: only that customer can confirm or ask (`visitConfirm37`, `visitAsk37`), only that pro can pick (`visitPick37`), nothing once the pro is on the way, at most 6 asks per visit. Visits only ever reach their pro and their customer in `/api/state`; the reschedule note isn't in any notice text.
+- **Phone alerts for appointments.** A new alert switch, **visits** ("My pro is on the way, or my appointment is set or moved" / "A customer confirms or asks to move a visit"), on by default for everyone who turned alerts on. Scheduled, moved, confirmed, reschedule asked, on the way, arrived, done and canceled go through the existing push plumbing (v32) and open `/track/<visit>`. The push carries the notice text (who, the visit title and the time); a customer's reschedule note never goes in a notice or a push. Each account can turn the switch off on its own.
+- **My home: a home history by property** (`/myhome`, from the account menu, the home log and the dashboard). One page per property: **Your home** (or your business), each business location, and up to 10 places you add yourself (a rental, a cabin, a parent's house). Every job you hired a pro for (in progress and done), the invoices and estimates that go with it (paid / due), warranties (from invoices and your own), photos of the work (the pro's job photos and the v36 invoice photos) and your own **notes** with an optional photo (paint colors, filter sizes, where the shutoff is). Jobs file themselves by ZIP and can be moved with the picker next to them. **Print or save as PDF** gives a clean printout headed "Home history printed <date> from Sawyer" (no menus or buttons), and **Download (CSV)** saves the same list (formula-safe). Private to the account: it lives on your own record (`home37`), which other accounts, the pros you hired and signed-out visitors never get; note photos must be your own uploads (checked in `server.js`).
+- **SW-085: exact markups.** The job-cost markup is read from its text as hundredths of a percent (33.33% → 3333) and multiplied in whole cents with half-up rounding, so a custom 33.33% on $50 bills **$66.67** (it was $66.66), and $150 / $250 / $350 / $450 bill $200.00 / $333.33 / $466.66 / $599.99. No float multiply is left in `v36Markup`. The saved markup keeps two decimals ("33.335" → 33.34%) and 100.01% is refused.
+- Tests: `node test/v37-e2e.js [shots dir]` (self-contained, local stand-in push service) is part of `test/run-all.sh`. `v36-e2e` now accepts any Sawyer version / SW cache name and sweeps 33.33 / 12.5 / 7.25% too; `v32-e2e` expects the new `visits` alert switch. SW cache is `sawyer-v37`. Code: `src/v37.js`, `src/v37.css`.
+- Note: posted jobs still only take ZIPs from the built-in town list; a job in any other ZIP (for example Manistee, 49660) is posted under the account's own ZIP, so it lands under **Your home** until it's moved with the picker.
 
 ## v36: bill your job costs, photos of the work on invoices, cleaner deletes
 
