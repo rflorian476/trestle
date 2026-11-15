@@ -156,6 +156,37 @@ const sigCk=r=>(String(r.headers["set-cookie"]||"").match(/swsid=[^;]+/)||[])[0]
  {const p=await page(1440,PB.ck);await p.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await sleep(300);ok(!(await p.$("#v33fu")),"…and the card is gone for the other pros");await p.context().close()}
  {const hp=await page(1440,HO.ck);await hp.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await sleep(300);ok(!(await hp.$("#v33fu"))&&!(await hp.$("#v33ql")),"homeowner dashboard has neither pro card");await hp.context().close()}
 
+ // ===== 3. Quick log =====
+ for(const w of [390,1440]){const p=await page(w,PA.ck);await p.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await p.waitForSelector("#v33ql",{timeout:10000});
+  const o=await p.evaluate(()=>{const c=document.getElementById("v33ql");const na=document.querySelector("section.na8");const b=[...c.querySelectorAll("[data-v33ql]")].map(x=>{const r=x.getBoundingClientRect();return[x.textContent.trim(),Math.round(r.height),Math.round(r.right)]});return{t:c.innerText.replace(/\s+/g," "),b,afterNa:!!na&&!!(na.compareDocumentPosition(c)&Node.DOCUMENT_POSITION_FOLLOWING),ow:document.documentElement.scrollWidth>innerWidth+1}});
+  ok(/Quick log/.test(o.t)&&o.b.length===2&&o.b[0][0]==="Receipt"&&o.b[1][0]==="Trip"&&o.b.every(x=>x[1]>=44&&x[2]<=w)&&o.afterNa&&!o.ow,w+" pro dashboard: Quick log card with Receipt and Trip buttons (44px+ tap targets, no overflow)",J(o));
+  if(w===390){await (await p.$("#v33ql")).screenshot({path:path.join(SH,"v33-quicklog-card-390.png")}).catch(()=>{});
+   await p.click('[data-v33ql="exp"]');await p.waitForSelector("#v33qf");
+   const f=await p.evaluate(()=>{const a=document.getElementById("v33am"),ph=document.getElementById("v33pf"),box=document.querySelector("#modal .mbox").getBoundingClientRect();return{im:a.inputMode,focus:document.activeElement===a,cap:ph.getAttribute("capture"),acc:ph.accept,cats:[...document.querySelectorAll('#v33qf input[name="cat"]')].map(x=>x.value),box:[Math.round(box.left),Math.round(box.right)],ow:document.documentElement.scrollWidth>innerWidth+1}});
+   ok(f.im==="decimal"&&f.focus&&f.cap==="environment"&&/image\/jpeg/.test(f.acc)&&f.cats.join()==="Materials,Fuel,Tools,Permits,Meals,Dump fees"&&f.box[0]>=0&&f.box[1]<=390,"receipt sheet: number pad, focused amount, one-tap categories, camera for the receipt photo, fits a 390px phone",J(f));
+   await p.click("#v33qs");const e1=await p.$eval("#v33qe",e=>e.textContent);ok(/Enter the receipt total/.test(e1),"an empty total says 'Enter the receipt total.'",e1);
+   await p.fill("#v33am","$42.50");await p.click('#v33qf label:has(input[value="Fuel"])');await p.fill("#v33vn","Ferguson");await sleep(700);await p.screenshot({path:path.join(SH,"v33-quicklog-receipt-390.png")}).catch(()=>{});
+   await p.click("#v33qs");await p.waitForSelector(".v33done",{timeout:8000});const d1=await p.$eval(".v33done",e=>e.innerText.replace(/\s+/g," "));
+   ok(/Receipt logged/.test(d1)&&/\$42\.50 · Fuel · Ferguson/.test(d1)&&/Undo/.test(d1)&&/Log another/.test(d1),"after saving: 'Receipt logged · $42.50 · Fuel · Ferguson' with Undo, Log another and Done",d1);
+   await sleep(700);await p.screenshot({path:path.join(SH,"v33-quicklog-done-390.png")}).catch(()=>{});
+   let st=stateOf(await req(P(),"GET","/api/state",{Cookie:PA.ck}));let l=(st.ledger||[]).filter(x=>x.by===PA.id);
+   ok(l.length===1&&l[0].kind==="exp"&&l[0].amt===42.5&&l[0].cat==="Fuel"&&l[0].vendor==="Ferguson","the receipt is an Office expense record ($42.50, Fuel, Ferguson)",J(l));
+   await p.click("#v33un");await sleep(400);st=stateOf(await req(P(),"GET","/api/state",{Cookie:PA.ck}));ok(!(st.ledger||[]).some(x=>x.by===PA.id),"Undo removes it");
+   // other category from the select + Log another
+   await p.click('[data-v33ql="exp"]');await p.waitForSelector("#v33qf");await p.fill("#v33am","19.99");await p.selectOption("#v33cx","Office");await p.click("#v33qs");await p.waitForSelector(".v33done");
+   await p.click("#v33ag");await p.waitForSelector("#v33qf");await p.fill("#v33am","1,250");await p.click("#v33qs");await p.waitForSelector(".v33done");await p.click("#v33dn");await sleep(400);
+   st=stateOf(await req(P(),"GET","/api/state",{Cookie:PA.ck}));l=(st.ledger||[]).filter(x=>x.by===PA.id&&x.kind==="exp").map(x=>[x.amt,x.cat]).sort((a,b)=>a[0]-b[0]);
+   ok(J(l)===J([[19.99,"Office"],[1250,"Materials"]]),"'More…' categories work, 'Log another' keeps the sheet open, and 1,250 reads as $1,250",J(l));
+   // trip, round trip
+   await p.click('[data-v33ql="mile"]');await p.waitForSelector("#v33qf");const fr=await p.$eval("#v33fr",e=>e.value);await p.fill("#v33mi","12.4");await p.check("#v33rt");await p.fill("#v33to","Ferguson");await p.click("#v33qs");await p.waitForSelector(".v33done");
+   const d2=await p.$eval(".v33done",e=>e.innerText.replace(/\s+/g," "));ok(fr==="Shop"&&/Trip logged/.test(d2)&&/24\.8 mi to Ferguson and back · about \$17\.36 deduction/.test(d2),"Trip: round trip doubles the miles (12.4 -> 24.8 mi, about $17.36 at 70¢)",fr+" | "+d2);
+   await p.click("#v33dn");await sleep(400);st=stateOf(await req(P(),"GET","/api/state",{Cookie:PA.ck}));const t=(st.ledger||[]).find(x=>x.by===PA.id&&x.kind==="mile");
+   ok(t&&t.miles===24.8&&t.from==="Shop"&&t.to==="Ferguson and back","the trip is an Office mileage record",J(t));
+   const s2=await p.$eval("#v33qls",e=>e.textContent);ok(/This month: \$1,269\.99 in receipts · 24\.8 mi/.test(s2),"the card now sums this month: receipts and miles",s2);
+   await p.goto(LOCAL.B+"/office?t=money",{waitUntil:"networkidle"}).catch(()=>{});}
+  await p.context().close()}
+ {const hp=await page(390,PH.ck);await hp.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await hp.waitForSelector("#v33ql",{timeout:8000}).catch(()=>{});const t=await hp.$eval("#v33ql",e=>e.innerText).catch(()=>"");ok(/Log a receipt or a trip in seconds/.test(t),"a pro with nothing logged sees what Quick log does",t);await hp.context().close()}
+
  ok(errs.length===0,"no page errors",J(errs.slice(0,5)));
 
 }catch(e){ok(false,"suite crashed",e&&e.stack||e)}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);try{PS&&PS.srv.close()}catch(e){}}

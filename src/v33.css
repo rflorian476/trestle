@@ -8,3 +8,24 @@
 .v33fu-l .btn{flex:none;white-space:nowrap}
 .v33fm textarea{width:100%;min-height:150px;line-height:1.5}
 @media(max-width:520px){.v33fu-l li{flex-wrap:wrap}.v33fu-l .btn{width:100%;justify-content:center}}
+/* v33: quick log */
+.v33ql-w{margin-top:14px}
+.v33ql{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.v33ql-tx{min-width:0;flex:1 1 280px}.v33ql h2{display:flex;align-items:center;gap:8px;margin:0 0 2px;font-size:1.1rem}.v33ql-tx p{margin:0}
+.v33ql-b{display:flex;gap:8px;flex:none}.v33ql-b .btn{min-height:44px}
+.v33q-2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.v33amt{display:flex;align-items:center;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface,#fff);padding-left:12px}
+.v33amt:focus-within{outline:2px solid var(--p);outline-offset:1px}.v33amt span{color:var(--muted);font-weight:700}
+.v33amt input{border:0!important;box-shadow:none!important;outline:0!important;background:transparent;font-size:1.15rem;font-weight:700;min-width:0;width:100%}
+.v33cats{border:0;padding:0;margin:4px 0 12px;display:flex;flex-wrap:wrap;gap:8px}.v33cats legend{font-weight:700;font-size:.9rem;margin-bottom:6px;padding:0}
+.v33cats label{position:relative;display:inline-flex}.v33cats input[type=radio]{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.v33cats label span{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;font-size:.9rem;font-weight:600;background:var(--surface,#fff)}
+.v33cats input:checked+span{background:var(--navy,#0F2A44);border-color:var(--navy,#0F2A44);color:#fff}.v33cats input:focus-visible+span{outline:2px solid var(--p);outline-offset:2px}
+.v33cats select{min-height:40px;border-radius:999px;padding:0 12px;font-size:.9rem}
+.v33rt{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-weight:600;font-size:.92rem;min-height:32px}
+.v33ph input[type=file]{max-width:100%}.v33ph label{display:flex;align-items:center;gap:6px}
+.v33done{text-align:center;padding:6px 0 2px}.v33done h2{margin:8px 0 4px}.v33done p{margin:4px 0}
+.v33ok{display:inline-grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--good-bg);color:var(--good)}
+.v33da{justify-content:center;flex-wrap:wrap;margin-top:14px}
+@media(max-width:520px){.v33ql-b{width:100%}.v33ql-b .btn{flex:1;justify-content:center}
+ .mbox.v33sheet{align-self:flex-end;border-radius:18px 18px 0 0;max-height:92vh;overflow:auto}}
