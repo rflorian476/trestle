@@ -43,7 +43,7 @@ let LOCAL=null,PUB=null,br=null;
    ok(o.oauth===0,w+": no 'Continue with …' buttons when every provider is off",J(o));
    ok(!o.sms&&!o.tabs,w+": no Phone / text-message tab when SMS is off",J(o));
    ok(o.send&&o.email==="email"&&o.pk,w+": the email-code form and the passkey button stay",J(o));
-   if(w===1440){await p.fill("#au-to","v21-nobody@example.com");await p.click("#au-send");await p.waitForTimeout(700);const t=await toasts(p);const u=new URL(p.url());
+   if(w===1440){/* v39: while codes can't be delivered the code form is folded under "not switched on yet" */await p.evaluate(()=>{const d=document.getElementById("v39codes");if(d)d.open=true});await p.fill("#au-to","v21-nobody@example.com");await p.click("#au-send");await p.waitForTimeout(700);const t=await toasts(p);const u=new URL(p.url());
     ok(t.some(x=>/isn't|aren't|not (fully )?(enabled|available)|use .*password/i.test(x))&&!t.some(x=>/\b\d{6}\b/.test(x)),"email code on a host without a provider shows the friendly 503 message",J(t));
     ok(/signup/.test(u.pathname+u.hash)&&(await p.$("#authBox"))!==null,"the person stays on the sign-up view (no 404 page)",p.url())}
    await p.context().close()}

@@ -52,10 +52,10 @@ const login=async(port,email)=>{const r=await req(port,"POST","/api/login",JH,J(
   ok(o.jakarta&&o.minGap>=3.6,w+" SW-057: every space in the divider is at least 3.6px wide (was about 2.8px) in Plus Jakarta Sans",J(o));
   ok(o.sw<=o.cw+1&&!o.ow,w+" divider is not clipped and the page has no sideways scroll",J(o));
   await p.close()}
- {// the public host shows the full "… by email" line (text codes are off there)
-  const p=await br.newPage({viewport:{width:390,height:844}});await p.goto(PUB.B+"/signup");await p.waitForSelector(".v3or span");await p.evaluate(()=>document.fonts.ready);
-  const o=await p.evaluate(()=>{const s=document.querySelector(".v3or span");return {t:s.textContent,sw:s.scrollWidth,cw:s.clientWidth,ow:document.documentElement.scrollWidth>innerWidth+1,ws:getComputedStyle(s).wordSpacing}});
-  ok(o.t==="or get a one-time code by email"&&o.sw<=o.cw+1&&!o.ow&&parseFloat(o.ws)>=1.5,"public 390 /signup: 'or get a one-time code by email' fits with the extra word space",J(o));await p.close()}
+ {// v39: the public host can't deliver codes, so instead of the "… by email" divider the code form is folded under an honest line
+  const p=await br.newPage({viewport:{width:390,height:844}});await p.goto(PUB.B+"/signup");await p.waitForSelector("#v39codes summary");await p.evaluate(()=>document.fonts.ready);
+  const o=await p.evaluate(()=>{const s=document.querySelector("#v39codes summary");return {t:s.textContent,div:!!document.querySelector(".v3or"),sw:s.scrollWidth,cw:s.clientWidth,ow:document.documentElement.scrollWidth>innerWidth+1}});
+  ok(o.t==="Sign-in codes by email or text: not switched on yet"&&!o.div&&o.sw<=o.cw+1&&!o.ow,"public 390 /signup: no 'one-time code' promise; the code form is folded under 'not switched on yet' and fits",J(o));await p.close()}
  {// other small muted labels drop the body's negative tracking too
   const p=await page(1440);await p.goto(LOCAL.B+"/p/c1");await p.waitForSelector("#app .px-stats small");await p.waitForTimeout(300);
   const o=await p.evaluate(()=>{const bad=[];for(const e of document.querySelectorAll("#app small")){const c=getComputedStyle(e);if(c.textTransform==="uppercase")continue;const ls=parseFloat(c.letterSpacing)||0;if(ls<0&&parseFloat(c.fontSize)<=13.5)bad.push(e.textContent.slice(0,30)+" "+c.letterSpacing)}return {n:document.querySelectorAll("#app small").length,bad:bad.slice(0,5)}});

@@ -219,7 +219,7 @@ const V38N=8;
   await noOverflow(p,w+" Office reports with tax records");
   {const bb=await card.boundingBox();ok(bb&&bb.x>=0&&bb.x+bb.width<=w+1,w+": the Tax records card fits the screen (tables scroll inside it)",J(bb))}
   if(w===1440){await card.scrollIntoViewIfNeeded();await shot(p,"v38-tax-records-1440.png",{clip:await card.boundingBox()});
-   const [dl]=await Promise.all([p.waitForEvent("download"),p.click("#v38SubCsv")]);const csv=fs.readFileSync(await dl.path(),"utf8");ok(/^Paid to,Payments,Total paid/.test(csv.replace(/^\ufeff/,""))&&/Ruiz Drywall,2,2100\.50/.test(csv)&&/Kim Low Voltage,1,1999\.99,[^,]*,2000\.00,No,No/.test(csv),"1099 worksheet CSV",csv.slice(0,300));
+   const [dl]=await Promise.all([p.waitForEvent("download"),p.click("#v38SubCsv")]);const csv=fs.readFileSync(await dl.path(),"utf8");ok(/^Paid to,Payments,(Credits \/ refunds,)?Total paid/.test(csv.replace(/^\ufeff/,""))&&/Ruiz Drywall,2,(0\.00,)?2100\.50/.test(csv)&&/Kim Low Voltage,1,(0\.00,)?1999\.99,[^,]*,2000\.00,No,No/.test(csv),"1099 worksheet CSV (v39 adds a Credits / refunds column)",csv.slice(0,300));
    const [d2]=await Promise.all([p.waitForEvent("download"),p.click("#v38SalesCsv")]);const c2=fs.readFileSync(await d2.path(),"utf8");ok(/Total \d{4},2,1000\.00,500\.00,82\.50,41\.25/.test(c2),"sales tax CSV totals",c2.slice(-200));
    await p.locator('[data-v38w9="kim low voltage"]').check();await p.waitForTimeout(400);const st=await stateFor(global.TAX.tp.ck);ok(meOf(st).w938&&meOf(st).w938["kim low voltage"],"ticking W-9 on file saves it")}
   if(w===390){await card.scrollIntoViewIfNeeded();await shot(p,"v38-tax-records-390.png")}
