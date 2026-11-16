@@ -370,9 +370,11 @@ function prePrices(req,h){if(sessionUid(req)||!PRE_TOP)return h;const body=price
 // v27 perf: signed-out /pros and /jobs get the same treatment as /prices: the real page (rendered by the same VIEWS.<view>
 // the browser runs, from the public signed-out snapshot only) plus the site header inside <main>, so the heading paints
 // before the app JS. Without it the mobile Lighthouse LCP (the hero subtitle) waits on the app bundle and lands near 3.6 s.
-let PRE_VIEW={v:-1,m:new Map()};const PRE_VIEWS=new Set(["pros","jobs"]);
+// v38 perf: signed-out /myhome (the sign-in card) is prerendered the same way, with the same sign-in methods the page carries.
+let PRE_VIEW={v:-1,m:new Map()};const PRE_VIEWS=new Set(["pros","jobs","myhome"]);
 function viewHtml(v){if(PRE_VIEW.v!==VER)PRE_VIEW={v:VER,m:new Map()};if(PRE_VIEW.m.has(v))return PRE_VIEW.m.get(v);const save=api.DB;let h=null;
  try{if(PRE_VIEWS.has(v)&&api.VIEWS&&api.VIEWS[v]){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
+  if(v==="myhome"){try{vm.runInContext("AUTHM="+JSON.stringify(AUTH.methods()),ctx)}catch(e){}}
   const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
   const out=String(api.VIEWS[v](null,{})||"");if(out&&!/<script/i.test(out)&&(out.match(/<h1[\s>]/g)||[]).length===1)h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out)}}
  catch(e){h=null}finally{api.DB=save}PRE_VIEW.m.set(v,h);return h}
@@ -466,6 +468,9 @@ function withMeta(req,m){let h=INDEX().toString();const o=ORIGIN(req);const bloc
  // viewport, which made phones fetch the 1600w hero as well as the 800w one.
  const vp=/<meta name="viewport"[^>]*>/;
  h=h.replace(vp,x=>x+(slim?`<script>window.__ST=${slim}</script>`:`<script>window.__STP=fetch("/api/state",{credentials:"same-origin"}).then(function(r){return r.json()}).catch(function(){return null})</script>`));
+ // v38 perf (Lighthouse best practices on sign-in pages such as signed-out /myhome): the sign-in methods ship in the page,
+ // so the sign-in card no longer asks for them with a synchronous XHR. Same object as GET /api/auth/methods, no secrets.
+ {let am="";try{am=JSON.stringify(AUTH.methods()).replace(/</g,"\\u003c")}catch(e){}if(am)h=h.replace(vp,x=>x+`<script>window.__AUTHM=${am}</script>`)}
  // the home hero is preloaded near the top of <head> so it starts before the stylesheet and fonts
  if((m.path||"/")==="/")h=h.replace(vp,x=>x+`<link rel="preload" as="image" href="/img/hero-sm.webp" imagesrcset="/img/hero-sm.webp 800w, /img/hero.webp 1600w" imagesizes="(max-width: 900px) 100vw, 50vw" fetchpriority="high">`);
  return h}
