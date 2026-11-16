@@ -212,7 +212,7 @@ const SERVERS=[];let br=null;const errs=[];
   const {c,p}=await page(V,390,cc.ck,clock);await go(V,p,"/job/"+E.j);const t=await p.locator(".v37ap").first().innerText();ok(/Due now/.test(t)&&/started at 1am CT/.test(t),"a 2:00am ET window shows 'Due now … started at 1am CT' to the Central customer",t.slice(0,240));await c.close()}
 
  // ===== 4. honest sign-in copy =====
- const HON=/Sign in with your password or a passkey/,PROMISE=/No password needed/;
+ const HON=/Sign in with your password or a passkey/,PROMISE=/Sign in with a one-time code, a password or a passkey/;/* v40: the code-first card no longer says "No password needed" */
  const view=async(S,w,lbl,shotName)=>{const {c,p}=await page(S,w);await go(S,p,"/signup");await p.waitForSelector("#authBox");
   const o=await p.evaluate(()=>{const b=document.getElementById("authBox"),d=document.getElementById("v39codes"),s=document.getElementById("au-send");return{t:b.innerText,det:!!d,open:d?d.open:null,send:!!s,sendVis:!!(s&&s.checkVisibility()),verF:!!document.getElementById("verF"),pw:(document.getElementById("pwSection")||{}).open}});
   if(shotName)await eshot(p.locator("#authBox"),shotName);await c.close();return o};

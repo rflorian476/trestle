@@ -371,10 +371,12 @@ function prePrices(req,h){if(sessionUid(req)||!PRE_TOP)return h;const body=price
 // the browser runs, from the public signed-out snapshot only) plus the site header inside <main>, so the heading paints
 // before the app JS. Without it the mobile Lighthouse LCP (the hero subtitle) waits on the app bundle and lands near 3.6 s.
 // v38 perf: signed-out /myhome (the sign-in card) is prerendered the same way, with the same sign-in methods the page carries.
-let PRE_VIEW={v:-1,m:new Map()};const PRE_VIEWS=new Set(["pros","jobs","myhome"]);
-function viewHtml(v){if(PRE_VIEW.v!==VER)PRE_VIEW={v:VER,m:new Map()};/* v39: the sign-in card copy depends on whether codes can be delivered right now */const ck=v==="myhome"?v+"|"+JSON.stringify(AUTH.methods()):v;if(PRE_VIEW.m.has(ck))return PRE_VIEW.m.get(ck);const save=api.DB;let h=null;
+let PRE_VIEW={v:-1,m:new Map()};const PRE_VIEWS=new Set(["pros","jobs","myhome","signup"]);
+// v40: signed-out /signup is prerendered too, so its first HTML carries the same honest sign-in card the app renders.
+const PRE_AUTHV=new Set(["myhome","signup"]);
+function viewHtml(v){if(PRE_VIEW.v!==VER)PRE_VIEW={v:VER,m:new Map()};/* v39: the sign-in card copy depends on whether codes can be delivered right now */const ck=PRE_AUTHV.has(v)?v+"|"+JSON.stringify(AUTH.methods()):v;if(PRE_VIEW.m.has(ck))return PRE_VIEW.m.get(ck);const save=api.DB;let h=null;
  try{if(PRE_VIEWS.has(v)&&api.VIEWS&&api.VIEWS[v]){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
-  if(v==="myhome"){try{vm.runInContext("AUTHM="+JSON.stringify(AUTH.methods()),ctx)}catch(e){}}
+  if(PRE_AUTHV.has(v)){try{vm.runInContext("AUTHM="+JSON.stringify(AUTH.methods()),ctx)}catch(e){}}
   const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
   const out=String(api.VIEWS[v](null,{})||"");if(out&&!/<script/i.test(out)&&(out.match(/<h1[\s>]/g)||[]).length===1)h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out)}}
  catch(e){h=null}finally{api.DB=save}PRE_VIEW.m.set(ck,h);return h}

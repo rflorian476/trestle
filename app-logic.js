@@ -1279,7 +1279,7 @@ function pkFriendly(e,add){try{console.warn("passkey error",e&&e.name,e&&e.messa
 function pkSrvErr(msg){const e=Error(/^(Challenge expired, try again|This passkey isn't registered here|Too many attempts|Sign in first)/.test(String(msg||""))?String(msg):PK_MSG.server);e.sawyer=true;return e}
 const ROLE_OPTS=[["homeowner","home","Homeowner"],["business","brief","Business owner"],["pro","wrench","Pro / contractor"],["pm","users","Property or project manager"]];
 function authBox(q){const M=authMethods();q=q||{};const role=ROLE_OPTS.some(r=>r[0]===q.role)?q.role:"homeowner";
- return`<div class="card v3auth" id="authBox"><h2>Sign in or create an account</h2><p class="muted small">One step. No password needed. New here? We'll create your account.</p>
+ return`<div class="card v3auth" id="authBox"><h2>Sign in or create an account</h2><p class="muted small">Sign in with a one-time code, a password or a passkey. New here? We'll create your account.</p>
  <fieldset class="v3roles" id="roleSet"><legend>I'm a…</legend>${ROLE_OPTS.map(([v,ic,t])=>`<label class="v3role"><input type="radio" name="au-role" value="${v}" ${v===role?"checked":""}><span>${I(ic,16)}${t}</span></label>`).join("")}</fieldset>
  <div class="v3oauth">${OAUTH_P.filter(([k])=>oauthOn(M,k)).map(([k,t])=>`<a class="btn v3o" id="oa-${k}" data-p="${k}" href="/auth/oauth/${k}/start?role=${role}">${OAUTH_ICON[k]}<span>Continue with ${t}</span>${M.oauth&&M.oauth[k]==="demo"?`<em class="v3demo">demo</em>`:""}</a>`).join("")}<button class="btn v3o" id="au-passkey" type="button">${I("key",18)}<span>Sign in with a passkey</span></button></div>
  <div class="v3or"><span>or get a one-time code${M.sms==="off"?" by email":""}</span></div>
@@ -5949,7 +5949,7 @@ if(typeof document!=="undefined"){
 function v39CodesReady(M){M=M||(typeof authMethods==="function"?authMethods():null);if(!M)return true;if(M.ready&&typeof M.ready==="object")return!!(M.ready.email||M.ready.sms);return M.email==="test"||M.sms==="test"}
 const V39_NOCODE="Sawyer can't send sign-in codes by email or text in this beta yet, so a code won't arrive. Use your password, a passkey or a linked account.";
 if(typeof authBox==="function"){const ob=authBox;authBox=function(){let h=ob.apply(this,arguments);try{const M=authMethods();if(v39CodesReady(M))return h;
-  h=h.replace("One step. No password needed. New here? We'll create your account.",()=>"Sign in with your password or a passkey. New here? Create a free account with a password below.");
+  h=h.replace("Sign in with a one-time code, a password or a passkey. New here? We'll create your account.",()=>"Sign in with your password or a passkey. New here? Create a free account with a password below.");
   const k=h.indexOf('<div class="v3or">'),f=h.indexOf('<form id="verF"'),fe=f<0?-1:h.indexOf("</form>",f);
   if(k>=0&&fe>k){const inner=h.slice(k,fe+7).replace(/<div class="v3or"><span>[^<]*<\/span><\/div>/,"");h=h.slice(0,k)+`<details class="v39codes" id="v39codes"><summary>Sign-in codes by email or text: not switched on yet</summary><p class="small muted v39nc">${V39_NOCODE}</p>${inner}</details>`+h.slice(fe+7)}
   h=h.replace(/ Codes expire in 10 minutes\./,"")}catch(e){}return h}}
