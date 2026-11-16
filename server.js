@@ -374,11 +374,18 @@ function prePrices(req,h){if(sessionUid(req)||!PRE_TOP)return h;const body=price
 let PRE_VIEW={v:-1,m:new Map()};const PRE_VIEWS=new Set(["pros","jobs","myhome","signup"]);
 // v40: signed-out /signup is prerendered too, so its first HTML carries the same honest sign-in card the app renders.
 const PRE_AUTHV=new Set(["myhome","signup"]);
+// The live "Log in" card (client-post.js LOGINF) is added to /signup by the app after it mounts; the prerender carries the same static
+// markup in the same place, so the first paint already has the password log-in and the app's takeover doesn't move anything.
+const PRE_LOGINF=(()=>{try{const m=/const LOGINF=`([^`$]*)`;/.exec(fs.readFileSync(path.join(__dirname,"client-post.js"),"utf8"));return m?m[1]:""}catch(e){return""}})();
 function viewHtml(v){if(PRE_VIEW.v!==VER)PRE_VIEW={v:VER,m:new Map()};/* v39: the sign-in card copy depends on whether codes can be delivered right now */const ck=PRE_AUTHV.has(v)?v+"|"+JSON.stringify(AUTH.methods()):v;if(PRE_VIEW.m.has(ck))return PRE_VIEW.m.get(ck);const save=api.DB;let h=null;
  try{if(PRE_VIEWS.has(v)&&api.VIEWS&&api.VIEWS[v]){try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
   if(PRE_AUTHV.has(v)){try{vm.runInContext("AUTHM="+JSON.stringify(AUTH.methods()),ctx)}catch(e){}}
   const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;
-  const out=String(api.VIEWS[v](null,{})||"");if(out&&!/<script/i.test(out)&&(out.match(/<h1[\s>]/g)||[]).length===1)h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out)}}
+  let out=String(api.VIEWS[v](null,{})||"");if(PRE_AUTHV.has(v)){if(v==="signup"&&PRE_LOGINF&&!out.includes('id="loginf"')){const k=out.indexOf('<div class="authgrid');if(k>=0)out=out.slice(0,k)+PRE_LOGINF+out.slice(k)}
+   // the same password fields build-live.js adds to the browser's sign-up forms (cu-p, pms-p), so the first paint matches
+   if(!out.includes('id="cu-p"'))out=out.split('<div class="fld"><label for="cu-z">').join('<div class="fld"><label for="cu-p">Password (8+ characters)</label><input id="cu-p" name="password" type="password" autocomplete="new-password" minlength="8" required></div><div class="fld"><label for="cu-z">');
+   if(!out.includes('id="pms-p"'))out=out.split('<div class="fld"><label for="pms-z"').join('<div class="fld"><label for="pms-p">Password (8+ characters)</label><input id="pms-p" name="password" type="password" autocomplete="new-password" minlength="8"></div><div class="fld"><label for="pms-z"')}
+  if(out&&!/<script/i.test(out)&&(out.match(/<h1[\s>]/g)||[]).length===1)h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out)}}
  catch(e){h=null}finally{api.DB=save}PRE_VIEW.m.set(ck,h);return h}
 function preView(req,h,v){if(sessionUid(req)||!PRE_TOP)return h;const body=viewHtml(v);if(!body)return h;
  const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
