@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.20.0
+# Sawyer (beta) — v2.21.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.20.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.21.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -21,6 +21,16 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v38: tax records, appointment times on your own clock, clean deletes, a faster sign-in page
+
+- **Tax records** (Office → Reports, under the P&L). **Subs to 1099**: receipts in the Subcontractor category add up by who was paid (names normalized, so "Ruiz Drywall" and "ruiz  drywall" are one sub), with the year's total against that year's IRS 1099-NEC line ($600 for payments made before 2026, $2,000 for 2026 payments), a **W-9 on file** check per sub (a private yes/no, `w938`; no tax IDs are stored), a summary ("1 sub reached $2,000 in 2026; 1 W-9 still to collect. 1099-NEC forms go to them and the IRS by Feb 1, 2027", Jan 31 or the next business day) and a formula-safe **1099 worksheet (CSV)**. **Sales tax** by quarter: taxable and non-taxable sales on invoices issued, tax billed, and tax actually collected (each payment's share of its invoice's tax, by the date paid), in integer cents, with **Sales tax by quarter (CSV)**. Payments by card or payment apps are reported by the processor, and the card says it's planning help, not tax advice. Server-checked `w9Set38` (pros only, only subs that are in their receipts).
+- **Appointment times on the customer's clock** (QA v37 idea 1). A visit remembers the pro's time zone (`tz38`, from the pro's ZIP or their own pick) and the customer's (`ctz38`). The customer's Appointment card, tracker, dashboard step, reschedule sheet and the scheduled / moved / picked notices show times converted to the customer's zone with a label ("arrive 7–9am CT"), plus "Times in Central time (CT). <Pro> is on Eastern time. **Change**" (Automatic from the ZIP, or Eastern, Central, Mountain, Arizona, Pacific, Alaska, Hawaii, Atlantic; `setTz38`). Times the customer offers are converted back to the visit's clock before they're sent, and "today" for a visit is the visit's local date. When the zones differ, the pro's visit sheet says "Your times are ET. Hana sees Thu, Nov 19, arrive 7–9am CT." Zones come from the ZIP's first three digits (the main zone where a state is split), and the choice is private.
+- **The reschedule limit, in plain words** (QA v37 idea 2). Asks 5 and 6 say how many are left, the sheet shows "2 of 6 requests left", the 7th gets "You've used all 6 reschedule requests for this visit. Message <pro> to find another time.", and at the limit the card swaps **Ask to reschedule** for that note. Four times in one request: "Offer up to 3 times per request."
+- **"and N more" is a real disclosure** (QA v37 idea 3): `aria-expanded` / `aria-controls="v37aps"`, then **Show fewer visits** (`aria-expanded="true"`) collapses it again; focus stays on the toggle.
+- **SW-088: a finished job leaves with its last party.** When the homeowner and the hired pro have both deleted their accounts (in either order), the job, its quotes, the reviews written on it and its notices are removed (`v38JobsGone()` from `A.__delete13`), so `/job/<id>` is Not found and the public counts go back to the seed. While one party still has an account the job stays for their records (the pro's portfolio and reviews, the homeowner's My home). Active hires still block deletion. Jobs left by accounts deleted before v38 are removed once at start (`v38JobOrphans()`). Demo jobs are never touched.
+- **/myhome Lighthouse.** The sign-in methods ship in the page (`window.__AUTHM`, the same object as `GET /api/auth/methods`, CSP-hashed), so the sign-in card no longer makes a synchronous XHR (best practices 81 → 100), and signed-out `/myhome` arrives prerendered like `/pros` and `/jobs` (mobile perf 85 → 100, CLS 0.085 → 0). The phone tab bar's unread badge is #C42B32 (6:1 with white; it was 3.9:1, the color-contrast miss behind signed-in a11y 96 on live).
+- Tests: `node test/v38-e2e.js [shots dir]` (self-contained) is part of `test/run-all.sh`. `v37-e2e` now accepts any Sawyer version / SW cache name. SW cache is `sawyer-v38`. Code: `src/v38.js`, `src/v38.css`.
 
 ## v37: appointments customers confirm, a home history by property, exact markups
 

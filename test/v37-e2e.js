@@ -1,5 +1,5 @@
 // v37 end-to-end. Self-contained: starts its own Sawyer server (local test mode, local stand-in push service). Covers health
-// 2.20.0-sawyer / SW cache sawyer-v37, SW-085 (job-cost markup in integer hundredths of a percent: $0.01–$500 at 33.33%,
+// (any Sawyer version / SW cache since v38), SW-085 (job-cost markup in integer hundredths of a percent: $0.01–$500 at 33.33%,
 // 12.5%, 7.25%, 150%, 300% and the presets against BigInt math, saved markups, the Bill job costs sheet), Appointments (arrival windows,
 // customer Confirm / Ask to reschedule, the pro picks a time, a moved visit asks again, "On my way", phone alerts, job page /
 // tracker / dashboard / schedule UI, SW-086 confirm-needed visits stay visible, 3 times per request / 6 requests in all,
@@ -43,8 +43,8 @@ let LOCAL=null,br=null,PS=null;
 (async()=>{try{
  PS=await pushService();
  LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"});const P=()=>LOCAL.port;
- const hz=(await req(P(),"GET","/healthz")).json||{};ok(hz.v==="2.20.0-sawyer","healthz reports 2.20.0-sawyer",J(hz));
- {const sw=await req(P(),"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v37"/.test(sw.body),"service worker cache is sawyer-v37 (client assets changed)")}
+ const hz=(await req(P(),"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ {const sw=await req(P(),"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker has a Sawyer cache name")}
  const run=Math.random().toString(36).slice(2,8);
  const signupPro=async(tag,trade,zip)=>{const r=await req(P(),"POST","/api/signup",JH,J({kind:"pro",password:"v37-correct-horse",data:{name:"Vee "+tag,biz:"V37 "+tag+" "+run,email:"v37-"+tag+"-"+run+"@example.com",trade:trade||"Plumbing",zip:zip||"78704",phone:"5125550100",plan:"founding"}}));return{ck:sigCk(r),id:stateOf(r).me,email:"v37-"+tag+"-"+run+"@example.com"}};
  const signupHo=async(tag,zip)=>{const r=await req(P(),"POST","/api/signup",JH,J({kind:"customer",password:"v37-correct-horse",data:{name:"Hana "+tag+" Reyes",email:"v37-ho-"+tag+"-"+run+"@example.com",zip:zip||"78704"}}));return{ck:sigCk(r),id:stateOf(r).me,email:"v37-ho-"+tag+"-"+run+"@example.com"}};
@@ -101,7 +101,7 @@ let LOCAL=null,br=null,PS=null;
  r=await act(P(),pro.ck,"visitPick37",[VID,0]);ok(r.res.ok===false,"picking again without a request is refused");
  r=await act(P(),pro.ck,"saveVisit",[{id:VID,cust:CID,title:"Water heater install",date:D3,start:"10:00",hrs:"3",win:"120"}]);v=(r.st.visits||[]).find(x=>x.id===VID);
  ok(r.res.ok&&v.conf37.s==="pending"&&v.job37===JID,"the pro moves the visit: it needs the customer's OK again (job link kept)",J(v&&v.conf37));
- hs=await stateFor(ho.ck);n=(hs.notifs||[]).filter(x=>x.link==="visit:"+VID).pop();ok(n&&/moved "Water heater install" to .*arrive 10am–12pm\. Please confirm/.test(n.text),"the customer is asked to confirm the new time",n&&n.text);
+ hs=await stateFor(ho.ck);n=(hs.notifs||[]).filter(x=>x.link==="visit:"+VID).pop();ok(n&&/moved "Water heater install" to .*arrive 10am–12pm(?: [A-Z]{2,3})?\. Please confirm/.test(n.text),"the customer is asked to confirm the new time",n&&n.text);
  r=await act(P(),pro.ck,"saveVisit",[{id:VID,cust:CID,title:"Water heater install (bring flex lines)",date:D3,start:"10:00",hrs:"3",win:"120"}]);v=(r.st.visits||[]).find(x=>x.id===VID);ok(v.conf37.s==="pending","a title edit alone doesn't send a 'moved' notice",J(v.conf37));
  hs=await stateFor(ho.ck);ok((hs.notifs||[]).filter(x=>x.link==="visit:"+VID&&/moved .*Please confirm/.test(x.text)).length===1,"only one 'please confirm the new time' notice so far");
  // phone alerts: the customer turns them on; confirm / on my way reach the right devices

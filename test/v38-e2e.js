@@ -1,3 +1,11 @@
+// v38 end-to-end. Self-contained: starts its own Sawyer server (local test mode, local stand-in push service). Covers health
+// 2.21.0-sawyer / SW cache sawyer-v38, SW-088 (a hired job and its quotes/reviews leave the catalog once every party deleted
+// their account: both delete orders, an active hire still blocks, seed counts restored, the boot tidy, /job/<id> Not found),
+// signed-out /myhome (prerendered sign-in card, sign-in methods in the page, no synchronous XHR), appointment times on the
+// customer's clock (zones from ZIP or picked, notices, card, sheet, pro view), the 6-request limit wording, the "and N more"
+// disclosure (aria-expanded / aria-controls, Show fewer, focus) and Tax records (subs to 1099 with W-9 on file, sales tax by
+// quarter, CSVs, privacy) at 390 and 1440.
+// Usage: node test/v38-e2e.js [shots dir]
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
 const {chromium}=require("playwright");
