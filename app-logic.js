@@ -6003,11 +6003,13 @@ if(typeof document!=="undefined"){
  {const ot=v38TaxCard;v38TaxCard=function(m,y){let h=ot.apply(this,arguments);try{
    h=h.replace(/(<button type="button" class="linkbtn v39cr" data-v39cr="([^"]*)" data-v39n="([^"]*)" data-v39y="([^"]*)"[^>]*>Credit \/ refund<\/button>)/g,(x,b,k,n,yy)=>`${b}<button type="button" class="linkbtn v40ent" data-v40ent="${k}" data-v40n="${n}" data-v40y="${yy}" aria-label="Edit ${n}'s ${yy} payments and credits">Edit entries</button>`)}catch(e){console.warn(e)}return h}}
  const v40Re=()=>{const yy=scrollY;render();scrollTo(0,yy)};
+ /* the sheets swap in place; Escape / Close / Done go back to this sub's "Edit entries" button (looked up when the sheet closes, since saving re-renders the card) */
+ const v40Back=key=>{try{modalReturn={focus(){const b=[...document.querySelectorAll("[data-v40ent]")].find(x=>x.dataset.v40ent===key);if(b)b.focus()}}}catch(e){}};
  function v40EntList(key,name,y,focusId){const m=me();if(!m)return;const L=v40SubEntries(m,key,y),tot=v39SubTotal(m,key,y);
   modal(`<div class="v40ent-s"><h2 id="mtitle">${I("doc",20)} ${esc(name)} · ${esc(String(y))}</h2><p class="muted small">Payments and credits / refunds in ${esc(String(y))}. Total after credits: <b>${v39$c(Math.max(0,tot))}</b>.</p>
    <ul class="v40el">${L.map(l=>{const cr=v40IsCredit(l),c=Math.abs(v39LC(l)),what=cr?"Credit / refund":"Payment";return`<li><span class="v40el-d">${esc(v38Fd(l.date))}</span><span class="v40el-m"><b class="${cr?"v40cr":""}">${cr?"−":""}${esc(v39$c(c))}</b><small class="muted">${what}${l.note?" · "+esc(l.note):""}${l.edited40?" · edited":""}</small></span><button type="button" class="btn sm" data-v40ed="${esc(l.id)}" aria-label="Edit ${what.toLowerCase()} of ${esc(v39$c(c))} on ${esc(v38Fd(l.date))}">Edit</button></li>`}).join("")}</ul>
    <div class="actions"><button type="button" class="btn primary" data-close>Done</button></div></div>`,"v33sheet");
-  document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=()=>{closeModal();v40Re()});
+  v40Back(key);
   document.querySelectorAll("#modal [data-v40ed]").forEach(b=>b.onclick=()=>v40EditForm(b.dataset.v40ed,key,name,y));
   setTimeout(()=>{const f=focusId&&document.querySelector(`#modal [data-v40ed="${CSS.escape(focusId)}"]`)||document.querySelector("#modal [data-v40ed]");if(f)f.focus()},40)}
  function v40EditForm(id,key,name,y){const m=me(),l=m&&(DB.ledger||[]).find(x=>x&&x.id===id&&x.by===m.id);if(!l)return;const cr=v40IsCredit(l),c=Math.abs(v39LC(l)),k=v40Cap(m,l,c);
@@ -6016,6 +6018,7 @@ if(typeof document!=="undefined"){
    <div class="row2"><div class="fld"><label for="v40la">Amount</label><input id="v40la" inputmode="decimal" required autocomplete="off" value="${(c/100).toFixed(2)}" aria-describedby="v40lE"></div><div class="fld"><label for="v40ld">Date</label><input id="v40ld" type="date" value="${esc(String(l.date))}" min="${esc(String(y))}-01-01" max="${esc(String(y))}-12-31" aria-describedby="v40lE"></div></div>
    <div class="fld"><label for="v40ln">Note (optional)</label><input id="v40ln" maxlength="200" value="${esc(l.note||"")}"></div><p class="v39ze" id="v40lE" role="alert" hidden></p>
    <div class="actions"><button type="button" class="btn ghost" id="v40lBack">Back</button><button class="btn primary">Save</button></div></form>`,"v33sheet");
+  v40Back(key);
   const $=s=>document.getElementById(s),E=$("v40lE"),say=(t,f)=>{E.textContent=t||"";E.hidden=!t;["v40la","v40ld"].forEach(x=>{if(t&&x===f)$(x).setAttribute("aria-invalid","true");else $(x).removeAttribute("aria-invalid")})};
   ["v40la","v40ld","v40ln"].forEach(x=>{$(x).addEventListener("input",()=>say(""));$(x).addEventListener("change",()=>say(""))});
   $("v40lBack").onclick=()=>v40EntList(key,name,y,id);setTimeout(()=>{const a=$("v40la");if(a){a.focus();a.select()}},40);
@@ -6023,7 +6026,7 @@ if(typeof document!=="undefined"){
    const d=$("v40ld").value;if(d&&String(d).slice(0,4)!==String(y)){say(`Keep the date in ${y}. To move it to another year, delete it and log it again in that year.`,"v40ld");$("v40ld").focus();return}
    const kk=v40Cap(m,l,cc);if(kk.after<0){say(cr?`That's more than the ${v39$c(kk.room)} paid to ${name} in ${y}. A credit can bring the total down to $0.00, not below.`:`Credits to ${name} in ${y} add up to more than that. The payment has to be at least ${v39$c(kk.old-kk.total)}, or lower a credit first: the ${y} total can't go below $0.00.`,"v40la");$("v40la").focus();return}
    const r=A.editLedger40(id,{amt:(cc/100).toFixed(2),date:d,note:$("v40ln").value});if(r&&r.ok===false){say(r.msg||"That didn't save.",r.field==="date"?"v40ld":"v40la");return}
-   act(r,()=>v40EntList(key,name,y,id))}}
+   act(r,()=>{v40Re();v40EntList(key,name,y,id)})}}
  {const oa=AFTER.office;AFTER.office=function(tab){const r=oa&&oa.apply(this,arguments);try{if(tab==="reports")document.querySelectorAll("[data-v40ent]").forEach(b=>b.onclick=()=>v40EntList(b.dataset.v40ent,b.dataset.v40n,b.dataset.v40y))}catch(e){}return r}}
 }
 
