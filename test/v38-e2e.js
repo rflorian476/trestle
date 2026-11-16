@@ -1,5 +1,5 @@
 // v38 end-to-end. Self-contained: starts its own Sawyer server (local test mode, local stand-in push service). Covers health
-// 2.21.0-sawyer / SW cache sawyer-v38, SW-088 (a hired job and its quotes/reviews leave the catalog once every party deleted
+// (any Sawyer version / SW cache since v39), SW-088 (a hired job and its quotes/reviews leave the catalog once every party deleted
 // their account: both delete orders, an active hire still blocks, seed counts restored, the boot tidy, /job/<id> HTTP 404
 // Not found), signed-out /myhome (prerendered sign-in card, sign-in methods in the page, no synchronous XHR), appointment
 // times on the customer's clock (zones from ZIP or picked, notices, card, sheet, pro view), SW-089 (reschedule min date
@@ -47,8 +47,8 @@ let LOCAL=null,br=null,PS=null;
 (async()=>{try{
  PS=await pushService();
  LOCAL=await startApp(await freePort(),{PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"});const P=()=>LOCAL.port;
- const hz=(await req(P(),"GET","/healthz")).json||{};ok(hz.v==="2.21.0-sawyer","healthz reports 2.21.0-sawyer",J(hz));
- {const sw=await req(P(),"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v38"/.test(sw.body),"service worker cache is sawyer-v38 (client assets changed)")}
+ const hz=(await req(P(),"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+ {const sw=await req(P(),"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker has a Sawyer cache name")}
  const run=Math.random().toString(36).slice(2,8);
  const signupPro=async(tag,trade,zip)=>{const r=await req(P(),"POST","/api/signup",JH,J({kind:"pro",password:"v38-correct-horse",data:{name:"Vee "+tag,biz:"V38 "+tag+" "+run,email:"v38-"+tag+"-"+run+"@example.com",trade:trade||"Plumbing",zip:zip||"78704",phone:"5125550100",plan:"founding"}}));return{ck:sigCk(r),id:stateOf(r).me,email:"v38-"+tag+"-"+run+"@example.com"}};
  const signupHo=async(tag,zip)=>{const r=await req(P(),"POST","/api/signup",JH,J({kind:"customer",password:"v38-correct-horse",data:{name:"Hana "+tag+" Reyes",email:"v38-ho-"+tag+"-"+run+"@example.com",zip:zip||"78704"}}));return{ck:sigCk(r),id:stateOf(r).me,email:"v38-ho-"+tag+"-"+run+"@example.com"}};
