@@ -66,7 +66,7 @@ const BOOT34=(()=>{let o={};try{o=JSON.parse((getKV.get("boot34")||{}).v||"{}")}
 // disabled unless STAFF_DEMO_PASSWORD is set, and it never keeps the published demo password.
 const DEMO_PW=BRAND.slug+"-demo-2026";
 const isPublicHost=require("./lib/auth.js").isPublicHost;
-for(const[uid_,email]of[["u1","demo-homeowner@"+BRAND.slug+".test"],["c1","demo-pro@"+BRAND.slug+".test"],["m1","demo-pm@"+BRAND.slug+".test"],["c26","demo-remodeler@"+BRAND.slug+".test"],["b1","demo-business@"+BRAND.slug+".test"],["tv1","demo-traveler@"+BRAND.slug+".test"]]){
+for(const[uid_,email]of[["u1","demo-homeowner@"+BRAND.slug+".test"],["c1","demo-pro@"+BRAND.slug+".test"],["m1","demo-pm@"+BRAND.slug+".test"],["c26","demo-remodeler@"+BRAND.slug+".test"],["b1","demo-business@"+BRAND.slug+".test"],["tv1","demo-traveler@"+BRAND.slug+".test"],["c2","demo-electrical@"+BRAND.slug+".test"]]){
  const u=DB().users.find(x=>x.id===uid_);if(!u||db.prepare("SELECT 1 FROM accounts WHERE uid=? OR email=?").get(uid_,email))continue;
  const h=hashPw0(DEMO_PW);db.prepare("INSERT INTO accounts(uid,email,salt,hash,role,created) VALUES(?,?,?,?,?,?)").run(uid_,email,h.salt,h.hash,u.role,Date.now());u.email=email;persist()}
 {const uid_="a1",email="demo-trust@"+BRAND.slug+".test",u=DB().users.find(x=>x.id===uid_);

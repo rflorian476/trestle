@@ -17,6 +17,7 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 | Project manager (Dana, Copperline Build Group) | `demo-pm@sawyer.test` | **Crew builder** on the Tampa deck & seawall project: dated slots, available-pro suggestions, invite or book the whole crew. |
 | Business (Lakeway Dental Group) | `demo-business@sawyer.test` | Invoices to pay, multi-location requests, COIs. |
 | Traveling electrician (Marcus Delgado) | `demo-traveler@sawyer.test` | References from foremen, "Ask for a reference", status picker, saved calls and alerts with live match counts. |
+| Electrical contractor hiring travelers (Sara, Saguaro Electric) | `demo-electrical@sawyer.test` | **Your traveler calls** on the dashboard (spots hired, active applicants, how many fit). On the Ashburn data-center call, the **fit check** on each applicant: license or reciprocity for VA and free by the start date. Pipeline (`/tdash`). |
 | Trust team (Sawyer staff) | `demo-trust@sawyer.test` | **Moderation queue** (`/mod`): reported reviews and pro disputes, plus the **Verification** queue for license and insurance certificates; approve or reject with a reason. |
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.

@@ -6100,5 +6100,22 @@ if(typeof VIEWS!=="undefined"&&VIEWS.tcall){const ov=VIEWS.tcall;VIEWS.tcall=fun
    h=h.slice(0,e+4)+`<div class="v41me ${f.fits?"is-ok":f.lic.ok===false||f.start.ok===false?"is-no":""}" id="v41me"><b>${head}</b>${v41Chips(c,m)}<a class="small" href="${href("travme")}">Update your licenses or dates</a></div>`+h.slice(e+4)}}catch(e){}return h}}
 if(typeof tKCard==="function"){const ok_=tKCard;tKCard=function(c,a,st){let h=ok_.apply(this,arguments);try{const u=U(a.uid),k=h.indexOf('<div class="t6k-a">');if(u&&k>=0)h=h.slice(0,k)+v41Chips(c,u)+h.slice(k)}catch(e){}return h}}
 
+/* (2) "Your traveler calls" on the pro dashboard. A contractor who posts traveler calls sees each open call with spots
+   hired / needed, active applicants and how many of them fit, days to start, and one tap to the pipeline. An electrical
+   (or other traveling-trade) contractor with no calls yet gets a short "Post a traveler call" card instead. */
+function v41MyCalls(m){return(DB.tcalls||[]).filter(c=>c&&c.by===m.id&&!c.ownerGone36).sort((a,b)=>(a.status==="open"?0:1)-(b.status==="open"?0:1)||String(a.start||"").localeCompare(String(b.start||"")))}
+function v41DashBlock(m){const calls=v41MyCalls(m),trav=typeof TRADES_T!=="undefined"&&TRADES_T[m.trade];if(!calls.length&&!trav)return"";
+ if(!calls.length)return`<section class="v41calls" id="v41calls"><div class="ud-h"><h2>Traveler calls</h2><a href="${href("traveling")}">How it works</a></div><div class="v41cta card">${I("truck",22)}<div><b>Need hands for a big job?</b><small>Post the rate, per diem and license up front. Travelers apply free, no recruiter in the middle, no hiring fee.</small></div><a class="btn primary sm" href="${href("newtravel")}">${I("plus",14)}Post a traveler call</a></div></section>`;
+ const now=v41Now(),open=calls.filter(c=>c.status==="open"),rows=calls.slice(0,4).map(c=>{const hired=tHiredN(c),s=v41FitCount(c),d=v41Day(c.start),days=d?(typeof tDays==="function"?tDays(c):Math.ceil((d-now)/864e5)):null;
+  const when=days==null?"":days>1?`starts in ${days} days`:days===1?"starts tomorrow":days===0?"starts today":"started";
+  return`<li class="v41row" data-call="${esc(c.id)}"><a class="v41row-m" href="${href("tcall",c.id)}"><b>${esc(c.title)}</b><small>${esc(c.loc||"")}${c.state?", "+esc(c.state):""} · ${tMoney(c.rate)}/hr + ${tMoney(c.perDiem)}/day${when?" · "+when:""}${c.status!=="open"?" · "+(c.status==="filled"?"filled":"closed"):""}</small></a>
+  <span class="v41meter" role="img" aria-label="${hired} of ${c.need} hired"><i style="--f:${Math.min(100,Math.round(hired/Math.max(1,c.need)*100))}%"></i><span><b>${hired}</b>/${c.need} hired</span></span>
+  <span class="v41apps">${s.of?`<b>${s.of}</b> active · <b class="${s.n?"v41g":""}">${s.n}</b> fit`:`<span class="muted">No active applicants</span>`}</span>
+  <a class="btn sm" href="${href("tdash",null,{call:c.id})}">${I("users",14)}Pipeline</a></li>`}).join("");
+ const act=open.reduce((a,c)=>a+v41FitCount(c).of,0);
+ return`<section class="v41calls" id="v41calls"><div class="ud-h"><h2>Your traveler calls</h2><a href="${href("newtravel")}">${I("plus",14)}Post a call</a></div><div class="card v41list"><p class="small muted v41lead">${open.length} open call${open.length===1?"":"s"} · ${act} active applicant${act===1?"":"s"} to review. Fit = license (or reciprocity) for the call's state and free by the start date.</p><ul>${rows}</ul>${calls.length>4?`<a class="small" href="${href("tdash")}">All ${calls.length} calls</a>`:""}</div></section>`}
+if(typeof VIEWS!=="undefined"&&VIEWS.dash){const ov=VIEWS.dash;VIEWS.dash=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||m.role!=="contractor"||m.staff)return h;
+  const a='<div class="ud-h"><h2>Project crews</h2>',k=h.indexOf(a);if(k<0)return h;const b=v41DashBlock(m);return b?h.slice(0,k)+b+h.slice(k):h}catch(e){}return h}}
+
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};

@@ -13,3 +13,21 @@
 .v41me.is-no{border-color:#F0C7BC;background:#FDF6F4}
 .v41me a{align-self:flex-start;margin-top:4px;min-height:24px;display:inline-flex;align-items:center;text-decoration:underline;text-underline-offset:2px}
 .t6k-card .v41fit{margin:8px 0 4px}
+/* v41 dashboard: your traveler calls */
+.v41calls{margin:0 0 8px}
+.v41list{padding:6px 16px 12px}
+.v41list ul{list-style:none;margin:0;padding:0}
+.v41lead{margin:10px 0 4px}
+.v41row{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:14px;align-items:center;padding:12px 0;border-top:1px solid #E4DCCB}
+.v41row-m{display:flex;flex-direction:column;min-width:0;color:inherit;text-decoration:none}
+.v41row-m b{overflow-wrap:anywhere}
+.v41row-m small{color:#4A5160}
+.v41meter{display:flex;flex-direction:column;gap:4px;min-width:96px;font-size:13px;color:#33405A}
+.v41meter i{display:block;height:6px;border-radius:999px;background:linear-gradient(90deg,#0F2A44 var(--f),#E4DCCB var(--f))}
+.v41apps{font-size:13px;color:#33405A;white-space:nowrap}
+.v41apps .v41g{color:#1B5E3B}
+.v41row .btn{min-height:36px}
+.v41cta{display:flex;gap:14px;align-items:center;padding:14px 16px}
+.v41cta>div{flex:1;display:flex;flex-direction:column;min-width:0}
+.v41cta small{color:#4A5160}
+@media (max-width:700px){.v41row{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}.v41row-m{grid-column:1/-1}.v41apps{grid-column:1}.v41row .btn{grid-row:3;grid-column:2;justify-self:end}.v41meter{grid-column:1/-1}.v41cta{flex-wrap:wrap}}
