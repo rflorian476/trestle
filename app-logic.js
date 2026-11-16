@@ -5906,6 +5906,27 @@ if(typeof document!=="undefined"){
  {const oa=AFTER.office;AFTER.office=function(tab){const r=oa&&oa.apply(this,arguments);try{if(tab==="reports")document.querySelectorAll("[data-v39cr]").forEach(b=>b.onclick=()=>v39CrModal(b.dataset.v39cr,b.dataset.v39n,b.dataset.v39y,b.dataset.v39have))}catch(e){}return r}}
 }
 
+/* (3) Elapsed-today visits (QA v38 idea 8). A scheduled visit whose start time has passed today, on the visit's own clock,
+   no longer looks like a future open slot: inside the arrival window (or 30 minutes after an exact time) it's "Due now",
+   after that "Past start time". The customer can still ask to reschedule until the end of the visit-local day (v37Open is
+   unchanged, so SW-092 western visits after midnight Eastern stay listed); a past start drops "Confirm this time", and a
+   time offered for later today must still be ahead of the visit clock. */
+function v39AddDay(d){const[y,mo,dd]=String(d).split("-").map(Number);const t=new Date(Date.UTC(y,mo-1,dd+1));return t.toISOString().slice(0,10)}
+function v39Elapsed(v){try{if(!v||v.status!=="scheduled"||!v.date||!v.start)return null;const vt=v38VisTz(v),st=v38Inst(v.date,v.start,v.__tz||vt),now=v39Now();if(!(now>=st))return null;
+ const od=v38Wall(st,vt).date,end=v38Inst(v39AddDay(od),"00:00",vt);if(now>=end)return null;const grace=Math.max(v37Win(v),30)*6e4;return now<st+grace?"due":"past"}catch(e){return null}}
+{const ob=v37Badge;v37Badge=function(v,cust){const e=v39Elapsed(v);if(e&&v37Open(v))return e==="due"?`<span class="b7 b7-gold v39b">Due now</span>`:`<span class="b7 b7-bad v39b">Past start time</span>`;return ob.apply(this,arguments)}}
+{const oa=A.visitAsk37;A.visitAsk37=function(id,slots){const v=v8Visit(id);try{if(v&&Array.isArray(slots)){const vt=v38VisTz(v),td=v38TodayIn(vt),now=v39Now();
+  for(const s of slots){const d=v7Date(s&&s.date),t=v8T(s&&s.start);if(d&&t&&d===td&&v38Inst(d,t,vt)<=now)return{ok:false,msg:"That time today has already passed. Pick a later time today, or another day."}}}}catch(e){}return oa.apply(this,arguments)}}
+if(typeof document!=="undefined"){
+ {const oc=v37Card;v37Card=function(v){let h=oc.apply(this,arguments);try{const e=v39Elapsed(v);if(!e||!v37Open(v))return h;const m=me(),cust=m&&v.cuid===m.id;
+   const sv=cust?v38Shadow(v,v38UserTz(m)):v,tl=sv.__tzl||v38Abbr(v38VisTz(v)),t12=v8Fmt12(sv.start)+" "+tl,biz=esc(v.bizName||"Your pro");
+   const line=e==="due"?`<b>Due now.</b> ${v37Win(v)?`The arrival window started at ${esc(t12)}.`:`${biz} was due at ${esc(t12)}.`} If ${biz} hasn't arrived, message them${cust?", or ask for another time":""}.`
+    :`<b>Past start time.</b> The ${esc(t12)} start has passed and ${biz} hasn't marked the visit started. Message them${cust?", or ask to reschedule (you can ask until the end of the day)":""}.`;
+   h=h.replace(/(<p class="v37ap-s" role="status" aria-live="polite">)[\s\S]*?(<\/p>)/,(x,a,b)=>a+line+b);
+   h=h.replace(/class="card v37ap /,()=>`class="card v37ap v39-${e} `);
+   if(e==="past"){h=h.replace(/<button type="button" class="btn primary" data-v37ok="[^"]*">[\s\S]*?<\/button>/,()=>"");h=h.replace(/<button type="button" class="btn" data-v37ask=/,()=>`<button type="button" class="btn primary" data-v37ask=`)}}catch(x){}return h}}
+}
+
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};

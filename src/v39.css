@@ -7,3 +7,6 @@
 .v39est{display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px;padding:8px 10px;border-radius:10px;background:#EEF2F7;color:#1B2A3B}
 .v39est svg{flex:none;margin-top:2px}
 .v39cr{display:inline-block;font-size:13px;margin-top:2px;min-height:24px;padding:2px 0}
+/* v39 elapsed visits */
+.v37ap.v39-due{border-color:#E7C77A}
+.v37ap.v39-past{border-color:#E2B0A8}
