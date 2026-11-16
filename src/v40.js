@@ -40,7 +40,9 @@ if(typeof document!=="undefined"){
    h=h.replace(/(<button type="button" class="linkbtn v39cr" data-v39cr="([^"]*)" data-v39n="([^"]*)" data-v39y="([^"]*)"[^>]*>Credit \/ refund<\/button>)/g,(x,b,k,n,yy)=>`${b}<button type="button" class="linkbtn v40ent" data-v40ent="${k}" data-v40n="${n}" data-v40y="${yy}" aria-label="Edit ${n}'s ${yy} payments and credits">Edit entries</button>`)}catch(e){console.warn(e)}return h}}
  const v40Re=()=>{const yy=scrollY;render();scrollTo(0,yy)};
  /* the sheets swap in place; Escape / Close / Done go back to this sub's "Edit entries" button (looked up when the sheet closes, since saving re-renders the card) */
- const v40Back=key=>{try{modalReturn={focus(){const b=[...document.querySelectorAll("[data-v40ent]")].find(x=>x.dataset.v40ent===key);if(b)b.focus()}}}catch(e){}};
+ const v40Back=key=>{try{const f=()=>{const b=[...document.querySelectorAll("[data-v40ent]")].find(x=>x.dataset.v40ent===key);if(b)b.focus()};
+  /* a background sync can re-render the card right after the sheet closes: focus again if it fell back to <body> */
+  modalReturn={focus(){f();for(const ms of [120,400])setTimeout(()=>{const a=document.activeElement;if((!a||a===document.body)&&document.getElementById("modal").hidden!==false)f()},ms)}}}catch(e){}};
  function v40EntList(key,name,y,focusId){const m=me();if(!m)return;const L=v40SubEntries(m,key,y),tot=v39SubTotal(m,key,y);
   modal(`<div class="v40ent-s"><h2 id="mtitle">${I("doc",20)} ${esc(name)} · ${esc(String(y))}</h2><p class="muted small">Payments and credits / refunds in ${esc(String(y))}. Total after credits: <b>${v39$c(Math.max(0,tot))}</b>.</p>
    <ul class="v40el">${L.map(l=>{const cr=v40IsCredit(l),c=Math.abs(v39LC(l)),what=cr?"Credit / refund":"Payment";return`<li><span class="v40el-d">${esc(v38Fd(l.date))}</span><span class="v40el-m"><b class="${cr?"v40cr":""}">${cr?"−":""}${esc(v39$c(c))}</b><small class="muted">${what}${l.note?" · "+esc(l.note):""}${l.edited40?" · edited":""}</small></span><button type="button" class="btn sm" data-v40ed="${esc(l.id)}" aria-label="Edit ${what.toLowerCase()} of ${esc(v39$c(c))} on ${esc(v38Fd(l.date))}">Edit</button></li>`}).join("")}</ul>
@@ -65,3 +67,18 @@ if(typeof document!=="undefined"){
    act(r,()=>{v40Re();v40EntList(key,name,y,id)})}}
  {const oa=AFTER.office;AFTER.office=function(tab){const r=oa&&oa.apply(this,arguments);try{if(tab==="reports")document.querySelectorAll("[data-v40ent]").forEach(b=>b.onclick=()=>v40EntList(b.dataset.v40ent,b.dataset.v40n,b.dataset.v40y))}catch(e){}return r}}
 }
+
+/* (3) Prerendered sign-in handoff. Signed-out /signup (v40) and /myhome (v38) arrive prerendered (#pre11), so a visitor can
+   open "Sign in or join with a password", pick a role or start typing before the app mounts. When the app's first render
+   replaces the prerendered card, what they did carries over: open/closed sections, typed values, the chosen role and the
+   focused field (with its caret), instead of snapping back to the defaults. */
+if(typeof document!=="undefined"&&typeof render==="function"){const or=render;render=function(){const pre=document.getElementById("pre11"),box=pre&&pre.querySelector("#authBox");
+  if(!box)return or.apply(this,arguments);let st=null;
+  try{const ds=[...pre.querySelectorAll("details[id]")].map(d=>[d.id,d.open]),ins=[...pre.querySelectorAll("input[id],select[id],textarea[id]")].filter(i=>i.type!=="file"&&i.type!=="hidden").map(i=>[i.id,i.type==="radio"||i.type==="checkbox"?null:i.value,i.checked,i.type==="radio"||i.type==="checkbox"?i.checked!==i.defaultChecked:i.value!==i.defaultValue]);
+   const ae=document.activeElement,fo=ae&&pre.contains(ae)&&ae.id?ae.id:null;let sel=null;try{if(fo&&typeof ae.selectionStart==="number")sel=[ae.selectionStart,ae.selectionEnd]}catch(e){}const rs=[...pre.querySelectorAll("input[type=radio][name]")].filter(i=>i.checked&&!i.defaultChecked).map(i=>[i.name,i.value]);st={ds,ins,rs,fo,sel}}catch(e){}
+  const r=or.apply(this,arguments);
+  if(st)try{for(const [id,open] of st.ds){const d=document.getElementById(id);if(d&&d.tagName==="DETAILS"&&d.open!==open)d.open=open}
+   for(const [id,v,ck,changed] of st.ins){if(!changed)continue;const i=document.getElementById(id);if(!i)continue;if(i.type==="radio"||i.type==="checkbox"){if(i.checked!==ck){i.checked=ck;i.dispatchEvent(new Event("change",{bubbles:true}))}}else if(i.value!==v){i.value=v;i.dispatchEvent(new Event("input",{bubbles:true}))}}
+   for(const [n,v] of st.rs){const i=[...document.querySelectorAll("input[type=radio]")].find(x=>x.name===n&&x.value===v);if(i&&!i.checked){i.checked=true;i.dispatchEvent(new Event("change",{bubbles:true}))}}
+   if(st.fo){const f=document.getElementById(st.fo);if(f){f.focus({preventScroll:true});if(st.sel)try{f.setSelectionRange(st.sel[0],st.sel[1])}catch(e){}}}}catch(e){}
+  return r}}
