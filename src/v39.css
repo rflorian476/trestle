@@ -10,3 +10,7 @@
 /* v39 elapsed visits */
 .v37ap.v39-due{border-color:#E7C77A}
 .v37ap.v39-past{border-color:#E2B0A8}
+/* v39 honest sign-in copy: codes folded until delivery is on */
+.v39codes{margin:14px 0 4px;border-top:1px solid #E4DCCB;padding-top:10px}
+.v39codes>summary{cursor:pointer;font-size:14px;color:#4A5160;min-height:24px}
+.v39nc{margin:8px 0 10px}
