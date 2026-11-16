@@ -41,7 +41,8 @@ Object.assign(A,{
  addRecurring(o){const m=me();if(!m||m.acct!=="business")return{ok:false,msg:"Business accounts only"};o=o||{};if(!String(o.title||"").trim()||!CATS[o.cat])return{ok:false,msg:"Add a title and trade"};const ev=["weekly","monthly","quarterly","yearly"].includes(o.every)?o.every:"monthly";
   m.recurring=m.recurring||[];m.recurring.push({id:uid(),title:String(o.title).trim().slice(0,100),cat:o.cat,every:ev,loc:String(o.loc||"").slice(0,80),next:Date.now()+(ev==="weekly"?7:ev==="monthly"?30:ev==="quarterly"?91:365)*DAY});save();return{ok:true,msg:"Recurring job scheduled"}},
  updateMe(o){const m=me();if(!m)return{ok:false,need:"login",msg:"Sign in"};o=o||{};const nm=String(o.name||"").trim();if(nm){if(nm.length>80)return{ok:false,msg:"Name is too long"};m.name=nm}
-  if(o.zip&&ZIPS[o.zip])m.zip=o.zip;if(o.phone!==undefined){const d=String(o.phone).replace(/[^\d]/g,"");if(d&&(d.length<10||d.length>11))return{ok:false,msg:"Enter a 10-digit phone"};if(m.role!=="contractor"||d)m.phone=d?String(o.phone).trim().slice(0,20):""}
+  if(o.zip!==undefined&&String(o.zip).trim()!==""){const z=String(o.zip).trim();if(!/^\d{5}$/.test(z))return{ok:false,msg:"Enter a 5-digit ZIP."};m.zip=z}
+  if(o.phone!==undefined){const d=String(o.phone).replace(/[^\d]/g,"");if(d&&(d.length<10||d.length>11))return{ok:false,msg:"Enter a 10-digit phone"};if(m.role!=="contractor"||d)m.phone=d?String(o.phone).trim().slice(0,20):""}
   if(m.role==="contractor"){if(String(o.biz||"").trim())m.biz=String(o.biz).trim().slice(0,80);if(o.trade&&CATS[o.trade]&&o.trade!==m.trade){m.trade=o.trade;m.subs=[CATS[o.trade][0]]}
    for(const k of ["licExp","insExp"])if(o[k]){const t=Date.parse(o[k]);if(t)m[k]=t}}
   if((m.acct==="business"||m.role==="pm")&&String(o.biz||"").trim())m.biz=String(o.biz).trim().slice(0,80);

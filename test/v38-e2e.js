@@ -6,7 +6,9 @@
 // matches the visit-zone today), the 6-request limit wording including "6 of 6 requests left" before the first ask, the
 // "and N more" disclosure (aria-expanded / aria-controls, Show fewer, focus), Tax records (subs to 1099 with a year-keyed
 // line and W-9 on file, sales tax by quarter in the pro's zone, CSVs, privacy) and SW-091 (well-formed ZIPs stored as
-// entered, HI/AK/PR zones, search/distance/map fallbacks) at 390 and 1440.
+// entered, HI/AK/PR zones, search/distance/map fallbacks), SW-092 (a still-upcoming western
+// visit stays on the job page after midnight Eastern) and SW-093 (updateMe stores a well-formed
+// ZIP and refuses a malformed one) at 390 and 1440.
 // Usage: node test/v38-e2e.js [shots dir]
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
@@ -315,6 +317,52 @@ const V38N=8;
   const find=await req(P(),"GET","/find?zip=96815"),jobs=await req(P(),"GET","/jobs?zip=00901");
   ok(find.status===200&&jobs.status===200,"SW-091: /find?zip=96815 and /jobs?zip=00901 do not crash",find.status+" "+jobs.status);
   await c.close()}
+
+ // SW-092: after midnight Eastern, a still-upcoming visit that is today in a western zone stays on the job page
+ {const NOW="2026-11-16T05:30:00.000Z",MS=Date.parse(NOW);
+  const S=await startApp(await freePort(),{TEST_NOW:NOW,PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"});
+  try{
+   const su=async(kind,tag,zip)=>{const body={kind,password:"v38-correct-horse",data:Object.assign({name:(kind==="pro"?"Vee ":"Hana ")+tag,email:"v38-"+tag+"-w-"+run+"@example.com",zip},kind==="pro"?{biz:"V38 west "+tag+" "+run,trade:"Plumbing",phone:"8085550100",plan:"founding"}:{})};const r=await req(S.port,"POST","/api/signup",JH,J(body));return{ck:sigCk(r),id:stateOf(r).me}};
+   const ac=async(ck,name,args)=>{const r=await req(S.port,"POST","/api/act",Object.assign({Cookie:ck},JH),J({name,args}));return (r.json&&r.json.res)||{}};
+   const cases=[["hi","96815","2026-11-15","21:00","Hawaii-to-Hawaii 9pm HT visit is still on the job page at 7:30pm HST"],
+                ["pt","90026","2026-11-15","22:30","Pacific 10:30pm visit is still on the job page at 9:30pm PT"]];
+   for(const [tag,zip,date,start,label] of cases){
+    const pro=await su("pro",tag+"p",zip),ho=await su("customer",tag+"c",zip);
+    const j=(await ac(ho.ck,"postJob",[{title:"V38 west "+tag+" "+run,cat:"Plumbing",sub:"Water heaters",desc:"x",zip,budget:"$900",when:"This week"}])).id;
+    await ac(pro.ck,"quote",[j,900,"ok"]);await ac(ho.ck,"hire",[j,pro.id]);
+    const cid=(await ac(pro.ck,"custFromJob",[j])).id;
+    const vid=(await ac(pro.ck,"saveVisit",[{cust:cid,title:"Evening "+tag,date,start,hrs:"1",win:"0",job:j}])).id;
+    ok(j&&vid,"SW-092: scheduled the "+tag+" visit");
+    const st=await stateOf(await req(S.port,"GET","/api/state",{Cookie:ho.ck}));
+    const v=(st.visits||[]).find(x=>x.id===vid);
+    ok(v&&v.status==="scheduled"&&v.date===date,"SW-092: "+tag+" visit stays scheduled in state",v&&(v.status+" "+v.date));
+    const ctx=await br.newContext({viewport:{width:390,height:844},bypassCSP:true});
+    const [k,val]=ho.ck.split("=");await ctx.addCookies([{name:k,value:val,url:S.B}]);
+    await ctx.addInitScript(ms=>{window.__now=()=>ms},MS);
+    const pg=await ctx.newPage();pg.on("pageerror",e=>errs.push("SW-092 "+String(e).slice(0,200)));
+    await pg.goto(S.B+"/job/"+j,{waitUntil:"networkidle"});await pg.waitForTimeout(400);
+    const card=pg.locator(".v37ap").first();
+    ok(await card.count()>0, "SW-092: "+label, await pg.locator("main").innerText().then(t=>t.slice(0,240)));
+    ok(await card.locator("[data-v37ask]").count()>0,"SW-092: "+tag+" card still has Ask to reschedule");
+    const ev=await pg.evaluate(id=>{const v=v8Visit(id);return{open:v37Open(v),n:typeof v37JobVisits==="function"&&v&&v.job37?v37JobVisits((DB.jobs||[]).find(j=>j.id===v.job37),me()).length:0,today:v38WithDay(v,()=>v37Today())}},vid);
+    ok(ev.open&&ev.today===date,"SW-092: "+tag+" v37Open is true on visit-today "+date+", not Detroit tomorrow",JSON.stringify(ev));
+    await ctx.close();
+   }
+  }finally{await stopApp(S)}}
+ // SW-093: updateMe stores a well-formed ZIP as entered and refuses a malformed one (never "saved" without saving)
+ {const h=await signupHo("upz","78704");
+  let r=await act(P(),h.ck,"updateMe",[{zip:"96813"}]);
+  let me=meOf(await stateFor(h.ck));
+  ok(r.res.ok&&me.zip==="96813","SW-093: updateMe stores 96813 as entered (not left at 78704)",J({res:r.res,zip:me.zip}));
+  const {c,p}=await page(1440,h.ck);await go(p,"/");
+  const tz=await p.evaluate(()=>v38UserTz(me()));
+  ok(tz==="Pacific/Honolulu","SW-093: Automatic zone is re-derived from the new ZIP prefix",tz);
+  await c.close();
+  const before=me.zip;
+  r=await act(P(),h.ck,"updateMe",[{zip:"999",name:"Hana Still Reyes"}]);
+  me=meOf(await stateFor(h.ck));
+  ok(r.res.ok===false&&/5-digit ZIP/i.test(r.res.msg||"")&&!/saved/i.test(r.res.msg||""),"SW-093: a malformed ZIP is refused with a clear error, not 'saved'",J(r.res));
+  ok(me.zip===before,"SW-093: a refused ZIP change does not keep a successful save",me.zip)}
 ok(!errs.length,"no page errors",errs.join(" | "));
 }catch(e){failed++;console.log("FAIL crashed: "+(e&&e.stack||e))}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);try{PS&&PS.srv.close()}catch(e){}
  console.log(failed?"\n"+failed+" FAILED":"\nALL PASS");process.exit(failed?1:0)}})();

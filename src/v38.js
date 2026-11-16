@@ -68,6 +68,11 @@ function v38Shadow(v,tz){if(!v)return v;const from=v38VisTz(v);tz=tz||v38CustTz(
 /* "today" for a visit is the visit's own local date (it was always Eastern) */
 let V38_DAYTZ=null;{const ot=v37Today;v37Today=function(){if(V38_DAYTZ){const t=v38TodayIn(V38_DAYTZ);if(t)return t}return ot.apply(this,arguments)}}
 function v38WithDay(v,fn){const prev=V38_DAYTZ;V38_DAYTZ=v?v38VisTz(v):null;try{return fn()}finally{V38_DAYTZ=prev}}
+/* SW-092: listing and "is this visit still open?" must use the visit's zone, not Detroit v37Today().
+   A 9pm Hawaii visit is still today (and upcoming) at 7:30pm HST, which is already 12:30am the next
+   day in Eastern. Per-visit v38WithDay, because one job list can mix zones. */
+{const oo=v37Open;v37Open=function(v){return v38WithDay(v,()=>oo.apply(this,arguments))}}
+{const oj=v37JobVisits;v37JobVisits=function(j,m){if(!j||!m)return[];return(DB.visits||[]).filter(v=>v&&v.status!=="canceled"&&((j.cust===m.id&&v.cuid===m.id&&v.by===j.hired)||(j.hired===m.id&&v.by===m.id&&v.cuid===j.cust))&&(!v.job37||v.job37===j.id)&&(v38WithDay(v,()=>v.date>=v37Today())||["enroute","arrived"].includes(v.status))).sort((a,b)=>(a.date+a.start)<(b.date+b.start)?-1:1)}}
 function v38FixNotes(v,nb){if(!v||!v.cuid)return;const raw=v37When(v),sh=v37When(v38Shadow(v));if(raw===sh)return;(DB.notifs||[]).slice(nb).forEach(n=>{if(n&&n.to===v.cuid&&n.link==="visit:"+v.id&&typeof n.text==="string")n.text=n.text.split(raw).join(sh)})}
 {const os=A.saveVisit;A.saveVisit=function(o){const m=me(),nb=(DB.notifs||[]).length;const r=os.apply(this,arguments);try{if(!r||!r.ok||!r.id)return r;const v=v8Visit(r.id);if(!v||!m||v.by!==m.id)return r;
   v.tz38=v38UserTz(m);const cu=v.cuid?U(v.cuid):null;v.ctz38=cu?v38UserTz(cu):v.tz38;v38FixNotes(v,nb);save()}catch(e){}return r}}
@@ -82,6 +87,11 @@ function v38LimitMsg(v){return`You've used all ${V38_ASKS} reschedule requests f
   if(r&&r.ok&&v){const left=v38AsksLeft(v);if(left<=2)r.msg+=left?` ${left} reschedule request${left===1?"":"s"} left for this visit.`:" That was your last reschedule request for this visit."}return r}}
 A.setTz38=function(tz){const m=me();if(!m)return{ok:false,need:"login",msg:"Sign in first"};tz=String(tz||"");if(tz&&!v38TzOk(tz))return{ok:false,msg:"Pick one of the listed time zones."};
  if(tz)m.tz38=tz;else delete m.tz38;const z=v38UserTz(m);(DB.visits||[]).forEach(v=>{if(!v)return;if(v.cuid===m.id)v.ctz38=z});save();return{ok:true,tz:z,msg:"Times now show in "+v38Name(z)+" time ("+v38Abbr(z)+")."}};
+/* SW-093: a profile ZIP change stores any well-formed 5-digit ZIP (v3 updateMe) and, when the
+   account is still on Automatic, re-derives the zone from the new prefix onto their visits. */
+function v38ApplyZipZone(m){if(!m||(m.tz38&&v38TzOk(m.tz38)))return m?v38UserTz(m):null;const z=v38UserTz(m);
+ (DB.visits||[]).forEach(v=>{if(!v)return;if(v.cuid===m.id)v.ctz38=z;if(v.by===m.id)v.tz38=z});return z}
+{const ou=A.updateMe;A.updateMe=function(o){const m=me(),before=m&&m.zip,r=ou.apply(this,arguments);try{if(r&&r.ok&&m&&m.zip&&m.zip!==before){v38ApplyZipZone(m);save()}}catch(e){}return r}}
 if(typeof document!=="undefined"){
  /* the customer's card: their clock, a zone line, and the limit in plain words */
  {const oc=v37Card;v37Card=function(v){const m=me();if(!m||!v||v.cuid!==m.id)return oc.apply(this,arguments);const tz=v38UserTz(m),sv=v38Shadow(v,tz);let h=oc.call(this,sv);

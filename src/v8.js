@@ -45,8 +45,9 @@ if(DB&&DB.users&&!Array.isArray(DB.visits))seedV8();
 {const os=seed;seed=function(){os.apply(this,arguments);try{if(!Array.isArray(DB.visits))seedV8()}catch(e){}}}
 /* ---- next actions per role ---- */
 function v8Focus(m){if(!m)return null;if(m.focus8)return m.focus8;if(m.role==="pm")return"pm";if(m.role==="contractor")return m.trav&&!m.biz?"travel":"local";return v8IsBiz(m)?"business":"home"}
+function v8VisitDay(v){try{if(typeof v38WithDay==="function")return v38WithDay(v,()=>v37Today())}catch(e){}return v7Today()}
 function v8Next(m){const out=[],add=(icon,tone,title,sub,link,cta)=>out.push({icon,tone,title,sub,link,cta});if(!m)return out;const today=v7Today();
- if(v7Pro(m)){const vs=(DB.visits||[]).filter(v=>v.by===m.id&&v.date===today&&v.status!=="canceled").sort((a,b)=>a.start<b.start?-1:1);const nx=vs.find(v=>v.status==="scheduled"||v.status==="enroute"||v.status==="arrived");
+ if(v7Pro(m)){const vs=(DB.visits||[]).filter(v=>v.by===m.id&&v.status!=="canceled"&&v.date===v8VisitDay(v)).sort((a,b)=>a.start<b.start?-1:1);const nx=vs.find(v=>v.status==="scheduled"||v.status==="enroute"||v.status==="arrived");
   if(nx)add("route","p",nx.status==="enroute"?`On the way to ${nx.cname}`:nx.status==="arrived"?`On site at ${nx.cname}`:`Next: ${v8Fmt12(nx.start)} at ${nx.cname}`,nx.title+" · "+nx.site,href("schedule",null,{v:nx.id}),nx.status==="scheduled"?"On my way":"Update");
   const bs=(DB.bills||[]).filter(b=>b.by===m.id&&b.type==="inv");const od=bs.filter(b=>billCalc(b).st==="overdue");if(od.length)add("dollar","bad",`${od.length} overdue invoice${od.length>1?"s":""}`,v7$0(od.reduce((a,b)=>a+billCalc(b).bal,0))+" waiting. One tap sends a polite reminder.",href("office","invoices",{f:"overdue"}),"Remind");
   const done=(DB.visits||[]).filter(v=>v.by===m.id&&v.status==="done"&&!(DB.bills||[]).some(b=>b.by===m.id&&b.cust===v.cust&&b.date>=(v.log||[]).slice(-1)[0].t-864e5));if(done.length)add("receipt","gold",`Bill ${done[0].cname}`,`"${done[0].title}" is done but not invoiced yet.`,href("invedit","new",{type:"inv",cust:done[0].cust}),"Invoice");
@@ -56,7 +57,7 @@ function v8Next(m){const out=[],add=(icon,tone,title,sub,link,cta)=>out.push({ic
   if(m.trav)add("wallet","blue","Dispatch packet",`${(DB.tcalls||[]).filter(c=>c.status!=="closed").length} traveler calls open. Keep your wallet ready.`,href("wallet"),"Open")}
  else{const bs=(DB.bills||[]).filter(b=>b.cuid===m.id&&b.status!=="draft");const due=bs.filter(b=>b.type==="inv"&&billCalc(b).bal>0.004&&b.status!=="void");
   const ev=(DB.visits||[]).filter(v=>v.cuid===m.id&&["enroute","arrived"].includes(v.status));ev.forEach(v=>add("truck","p",v.status==="enroute"?`${v.bizName} is on the way`:`${v.bizName} is on site`,v.status==="enroute"?`About ${v8Eta(v)} min · ${v.title}`:v.title,href("track",v.id),"Track"));
-  const up=(DB.visits||[]).filter(v=>v.cuid===m.id&&v.status==="scheduled"&&v.date>=today).sort((a,b)=>(a.date+a.start)<(b.date+b.start)?-1:1)[0];if(up)add("cal","blue",`${v7DateNice(up.date)}, ${v8Fmt12(up.start)}: ${up.title}`,up.bizName,href("track",up.id),"Details");
+  const up=(DB.visits||[]).filter(v=>v.cuid===m.id&&v.status==="scheduled"&&v.date>=v8VisitDay(v)).sort((a,b)=>(a.date+a.start)<(b.date+b.start)?-1:1)[0];if(up)add("cal","blue",`${v7DateNice(up.date)}, ${v8Fmt12(up.start)}: ${up.title}`,up.bizName,href("track",up.id),"Details");
   if(due.length)add("dollar",due.some(b=>billCalc(b).st==="overdue")?"bad":"gold",`${due.length} invoice${due.length>1?"s":""} to pay`,v7$0(due.reduce((a,b)=>a+billCalc(b).bal,0))+" total · card or bank",href("pay",due[0].id),"Pay");
   const ests=bs.filter(b=>(b.type==="est"||b.type==="co")&&b.status==="sent");if(ests.length)add("receipt","blue",`Review ${ests[0].no} from ${ests[0].bizName}`,"Pick optional upgrades, then approve.",href("invoice",ests[0].id),"Review");
   (DB.jobs||[]).filter(j=>j.cust===m.id&&j.status==="open").forEach(j=>{const n=DB.quotes.filter(q=>q.job===j.id).length;if(n)add("quote","blue",`${n} quote${n>1?"s":""} on "${j.title}"`,"Compare price, reviews and response time side by side.",href("job",j.id),"Compare")});
@@ -82,11 +83,11 @@ VIEWS.welcome=()=>{const m=me();return`<section class="v7page"><div class="o7-wr
  <div class="v7cards3">${[["office","Run the business","Estimates, invoices, customers, timesheets and COIs. Included in $20/mo."],["cal","Schedule the crew","A week view by person. One tap tells the customer you're on the way."],["truck","Travel smart","Honest call details, per diem math, lodging and a ready-to-send packet."]].map(([i,t,s])=>`<div class="card"><h3>${I(i,18)}${t}</h3><p class="muted">${s}</p></div>`).join("")}</div></div></section>`};
 AFTER.welcome=v8BindPicker;
 /* ---- schedule & dispatch ---- */
-function v8Week(off){const d=new Date();d.setHours(12,0,0,0);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow+7*(off||0));return[...Array(7)].map((_,i)=>{const x=new Date(d);x.setDate(d.getDate()+i);return new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10)})}
+function v8Week(off,today){const d=today&&/^\d{4}-\d{2}-\d{2}$/.test(today)?new Date(today+"T12:00:00"):new Date(typeof v38Now==="function"?v38Now():typeof v37Now==="function"?v37Now():Date.now());d.setHours(12,0,0,0);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow+7*(off||0));return[...Array(7)].map((_,i)=>{const x=new Date(d);x.setDate(d.getDate()+i);return new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10)})}
 function v8Chip(v){return`<button type="button" class="vc8 s-${v.status}" data-v="${v.id}" aria-label="${esc(v.title+", "+v.cname+", "+v8Fmt12(v.start))}"><b>${v8Fmt12(v.start)} · ${esc(v.cname)}</b><span>${esc(v.title)}</span>${v.status!=="scheduled"?`<em>${V8ST[v.status][0]}</em>`:""}</button>`}
-VIEWS.schedule=(p,q)=>{const m=me();if(!v7Pro(m))return VIEWS.office();q=q||{};const off=parseInt(q.w||0,10)||0;const days=v8Week(off);const today=v7Today();const crew=v8Crew(m);
+VIEWS.schedule=(p,q)=>{const m=me();if(!v7Pro(m))return VIEWS.office();q=q||{};const off=parseInt(q.w||0,10)||0;const today=(typeof v38TodayIn==="function"&&typeof v38UserTz==="function"&&v38TodayIn(v38UserTz(m)))||v7Today();const days=v8Week(off,today);const crew=v8Crew(m);
  const vs=(DB.visits||[]).filter(v=>v.by===m.id&&v.status!=="canceled");const wk=vs.filter(v=>days.includes(v.date));
- const tv=vs.filter(v=>v.date===today).sort((a,b)=>a.start<b.start?-1:1);
+ const tv=vs.filter(v=>v.date===v8VisitDay(v)).sort((a,b)=>a.start<b.start?-1:1);
  const lanes=[...crew.map(c=>[c,wk.filter(v=>(v.crew||[]).includes(c))]),["Unassigned",wk.filter(v=>!(v.crew||[]).length)]];
  const dn=d=>new Date(d+"T12:00").toLocaleDateString("en-US",{weekday:"short"}),dd=d=>+d.slice(8);
  const hrs=lanes.map(([c,l])=>[c,l.reduce((a,v)=>a+(+v.hrs||0),0)]);

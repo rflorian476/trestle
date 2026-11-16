@@ -1185,7 +1185,8 @@ Object.assign(A,{
  addRecurring(o){const m=me();if(!m||m.acct!=="business")return{ok:false,msg:"Business accounts only"};o=o||{};if(!String(o.title||"").trim()||!CATS[o.cat])return{ok:false,msg:"Add a title and trade"};const ev=["weekly","monthly","quarterly","yearly"].includes(o.every)?o.every:"monthly";
   m.recurring=m.recurring||[];m.recurring.push({id:uid(),title:String(o.title).trim().slice(0,100),cat:o.cat,every:ev,loc:String(o.loc||"").slice(0,80),next:Date.now()+(ev==="weekly"?7:ev==="monthly"?30:ev==="quarterly"?91:365)*DAY});save();return{ok:true,msg:"Recurring job scheduled"}},
  updateMe(o){const m=me();if(!m)return{ok:false,need:"login",msg:"Sign in"};o=o||{};const nm=String(o.name||"").trim();if(nm){if(nm.length>80)return{ok:false,msg:"Name is too long"};m.name=nm}
-  if(o.zip&&ZIPS[o.zip])m.zip=o.zip;if(o.phone!==undefined){const d=String(o.phone).replace(/[^\d]/g,"");if(d&&(d.length<10||d.length>11))return{ok:false,msg:"Enter a 10-digit phone"};if(m.role!=="contractor"||d)m.phone=d?String(o.phone).trim().slice(0,20):""}
+  if(o.zip!==undefined&&String(o.zip).trim()!==""){const z=String(o.zip).trim();if(!/^\d{5}$/.test(z))return{ok:false,msg:"Enter a 5-digit ZIP."};m.zip=z}
+  if(o.phone!==undefined){const d=String(o.phone).replace(/[^\d]/g,"");if(d&&(d.length<10||d.length>11))return{ok:false,msg:"Enter a 10-digit phone"};if(m.role!=="contractor"||d)m.phone=d?String(o.phone).trim().slice(0,20):""}
   if(m.role==="contractor"){if(String(o.biz||"").trim())m.biz=String(o.biz).trim().slice(0,80);if(o.trade&&CATS[o.trade]&&o.trade!==m.trade){m.trade=o.trade;m.subs=[CATS[o.trade][0]]}
    for(const k of ["licExp","insExp"])if(o[k]){const t=Date.parse(o[k]);if(t)m[k]=t}}
   if((m.acct==="business"||m.role==="pm")&&String(o.biz||"").trim())m.biz=String(o.biz).trim().slice(0,80);
@@ -2278,8 +2279,9 @@ if(DB&&DB.users&&!Array.isArray(DB.visits))seedV8();
 {const os=seed;seed=function(){os.apply(this,arguments);try{if(!Array.isArray(DB.visits))seedV8()}catch(e){}}}
 /* ---- next actions per role ---- */
 function v8Focus(m){if(!m)return null;if(m.focus8)return m.focus8;if(m.role==="pm")return"pm";if(m.role==="contractor")return m.trav&&!m.biz?"travel":"local";return v8IsBiz(m)?"business":"home"}
+function v8VisitDay(v){try{if(typeof v38WithDay==="function")return v38WithDay(v,()=>v37Today())}catch(e){}return v7Today()}
 function v8Next(m){const out=[],add=(icon,tone,title,sub,link,cta)=>out.push({icon,tone,title,sub,link,cta});if(!m)return out;const today=v7Today();
- if(v7Pro(m)){const vs=(DB.visits||[]).filter(v=>v.by===m.id&&v.date===today&&v.status!=="canceled").sort((a,b)=>a.start<b.start?-1:1);const nx=vs.find(v=>v.status==="scheduled"||v.status==="enroute"||v.status==="arrived");
+ if(v7Pro(m)){const vs=(DB.visits||[]).filter(v=>v.by===m.id&&v.status!=="canceled"&&v.date===v8VisitDay(v)).sort((a,b)=>a.start<b.start?-1:1);const nx=vs.find(v=>v.status==="scheduled"||v.status==="enroute"||v.status==="arrived");
   if(nx)add("route","p",nx.status==="enroute"?`On the way to ${nx.cname}`:nx.status==="arrived"?`On site at ${nx.cname}`:`Next: ${v8Fmt12(nx.start)} at ${nx.cname}`,nx.title+" · "+nx.site,href("schedule",null,{v:nx.id}),nx.status==="scheduled"?"On my way":"Update");
   const bs=(DB.bills||[]).filter(b=>b.by===m.id&&b.type==="inv");const od=bs.filter(b=>billCalc(b).st==="overdue");if(od.length)add("dollar","bad",`${od.length} overdue invoice${od.length>1?"s":""}`,v7$0(od.reduce((a,b)=>a+billCalc(b).bal,0))+" waiting. One tap sends a polite reminder.",href("office","invoices",{f:"overdue"}),"Remind");
   const done=(DB.visits||[]).filter(v=>v.by===m.id&&v.status==="done"&&!(DB.bills||[]).some(b=>b.by===m.id&&b.cust===v.cust&&b.date>=(v.log||[]).slice(-1)[0].t-864e5));if(done.length)add("receipt","gold",`Bill ${done[0].cname}`,`"${done[0].title}" is done but not invoiced yet.`,href("invedit","new",{type:"inv",cust:done[0].cust}),"Invoice");
@@ -2289,7 +2291,7 @@ function v8Next(m){const out=[],add=(icon,tone,title,sub,link,cta)=>out.push({ic
   if(m.trav)add("wallet","blue","Dispatch packet",`${(DB.tcalls||[]).filter(c=>c.status!=="closed").length} traveler calls open. Keep your wallet ready.`,href("wallet"),"Open")}
  else{const bs=(DB.bills||[]).filter(b=>b.cuid===m.id&&b.status!=="draft");const due=bs.filter(b=>b.type==="inv"&&billCalc(b).bal>0.004&&b.status!=="void");
   const ev=(DB.visits||[]).filter(v=>v.cuid===m.id&&["enroute","arrived"].includes(v.status));ev.forEach(v=>add("truck","p",v.status==="enroute"?`${v.bizName} is on the way`:`${v.bizName} is on site`,v.status==="enroute"?`About ${v8Eta(v)} min · ${v.title}`:v.title,href("track",v.id),"Track"));
-  const up=(DB.visits||[]).filter(v=>v.cuid===m.id&&v.status==="scheduled"&&v.date>=today).sort((a,b)=>(a.date+a.start)<(b.date+b.start)?-1:1)[0];if(up)add("cal","blue",`${v7DateNice(up.date)}, ${v8Fmt12(up.start)}: ${up.title}`,up.bizName,href("track",up.id),"Details");
+  const up=(DB.visits||[]).filter(v=>v.cuid===m.id&&v.status==="scheduled"&&v.date>=v8VisitDay(v)).sort((a,b)=>(a.date+a.start)<(b.date+b.start)?-1:1)[0];if(up)add("cal","blue",`${v7DateNice(up.date)}, ${v8Fmt12(up.start)}: ${up.title}`,up.bizName,href("track",up.id),"Details");
   if(due.length)add("dollar",due.some(b=>billCalc(b).st==="overdue")?"bad":"gold",`${due.length} invoice${due.length>1?"s":""} to pay`,v7$0(due.reduce((a,b)=>a+billCalc(b).bal,0))+" total · card or bank",href("pay",due[0].id),"Pay");
   const ests=bs.filter(b=>(b.type==="est"||b.type==="co")&&b.status==="sent");if(ests.length)add("receipt","blue",`Review ${ests[0].no} from ${ests[0].bizName}`,"Pick optional upgrades, then approve.",href("invoice",ests[0].id),"Review");
   (DB.jobs||[]).filter(j=>j.cust===m.id&&j.status==="open").forEach(j=>{const n=DB.quotes.filter(q=>q.job===j.id).length;if(n)add("quote","blue",`${n} quote${n>1?"s":""} on "${j.title}"`,"Compare price, reviews and response time side by side.",href("job",j.id),"Compare")});
@@ -2315,11 +2317,11 @@ VIEWS.welcome=()=>{const m=me();return`<section class="v7page"><div class="o7-wr
  <div class="v7cards3">${[["office","Run the business","Estimates, invoices, customers, timesheets and COIs. Included in $20/mo."],["cal","Schedule the crew","A week view by person. One tap tells the customer you're on the way."],["truck","Travel smart","Honest call details, per diem math, lodging and a ready-to-send packet."]].map(([i,t,s])=>`<div class="card"><h3>${I(i,18)}${t}</h3><p class="muted">${s}</p></div>`).join("")}</div></div></section>`};
 AFTER.welcome=v8BindPicker;
 /* ---- schedule & dispatch ---- */
-function v8Week(off){const d=new Date();d.setHours(12,0,0,0);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow+7*(off||0));return[...Array(7)].map((_,i)=>{const x=new Date(d);x.setDate(d.getDate()+i);return new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10)})}
+function v8Week(off,today){const d=today&&/^\d{4}-\d{2}-\d{2}$/.test(today)?new Date(today+"T12:00:00"):new Date(typeof v38Now==="function"?v38Now():typeof v37Now==="function"?v37Now():Date.now());d.setHours(12,0,0,0);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow+7*(off||0));return[...Array(7)].map((_,i)=>{const x=new Date(d);x.setDate(d.getDate()+i);return new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10)})}
 function v8Chip(v){return`<button type="button" class="vc8 s-${v.status}" data-v="${v.id}" aria-label="${esc(v.title+", "+v.cname+", "+v8Fmt12(v.start))}"><b>${v8Fmt12(v.start)} · ${esc(v.cname)}</b><span>${esc(v.title)}</span>${v.status!=="scheduled"?`<em>${V8ST[v.status][0]}</em>`:""}</button>`}
-VIEWS.schedule=(p,q)=>{const m=me();if(!v7Pro(m))return VIEWS.office();q=q||{};const off=parseInt(q.w||0,10)||0;const days=v8Week(off);const today=v7Today();const crew=v8Crew(m);
+VIEWS.schedule=(p,q)=>{const m=me();if(!v7Pro(m))return VIEWS.office();q=q||{};const off=parseInt(q.w||0,10)||0;const today=(typeof v38TodayIn==="function"&&typeof v38UserTz==="function"&&v38TodayIn(v38UserTz(m)))||v7Today();const days=v8Week(off,today);const crew=v8Crew(m);
  const vs=(DB.visits||[]).filter(v=>v.by===m.id&&v.status!=="canceled");const wk=vs.filter(v=>days.includes(v.date));
- const tv=vs.filter(v=>v.date===today).sort((a,b)=>a.start<b.start?-1:1);
+ const tv=vs.filter(v=>v.date===v8VisitDay(v)).sort((a,b)=>a.start<b.start?-1:1);
  const lanes=[...crew.map(c=>[c,wk.filter(v=>(v.crew||[]).includes(c))]),["Unassigned",wk.filter(v=>!(v.crew||[]).length)]];
  const dn=d=>new Date(d+"T12:00").toLocaleDateString("en-US",{weekday:"short"}),dd=d=>+d.slice(8);
  const hrs=lanes.map(([c,l])=>[c,l.reduce((a,v)=>a+(+v.hrs||0),0)]);
@@ -5689,6 +5691,11 @@ function v38Shadow(v,tz){if(!v)return v;const from=v38VisTz(v);tz=tz||v38CustTz(
 /* "today" for a visit is the visit's own local date (it was always Eastern) */
 let V38_DAYTZ=null;{const ot=v37Today;v37Today=function(){if(V38_DAYTZ){const t=v38TodayIn(V38_DAYTZ);if(t)return t}return ot.apply(this,arguments)}}
 function v38WithDay(v,fn){const prev=V38_DAYTZ;V38_DAYTZ=v?v38VisTz(v):null;try{return fn()}finally{V38_DAYTZ=prev}}
+/* SW-092: listing and "is this visit still open?" must use the visit's zone, not Detroit v37Today().
+   A 9pm Hawaii visit is still today (and upcoming) at 7:30pm HST, which is already 12:30am the next
+   day in Eastern. Per-visit v38WithDay, because one job list can mix zones. */
+{const oo=v37Open;v37Open=function(v){return v38WithDay(v,()=>oo.apply(this,arguments))}}
+{const oj=v37JobVisits;v37JobVisits=function(j,m){if(!j||!m)return[];return(DB.visits||[]).filter(v=>v&&v.status!=="canceled"&&((j.cust===m.id&&v.cuid===m.id&&v.by===j.hired)||(j.hired===m.id&&v.by===m.id&&v.cuid===j.cust))&&(!v.job37||v.job37===j.id)&&(v38WithDay(v,()=>v.date>=v37Today())||["enroute","arrived"].includes(v.status))).sort((a,b)=>(a.date+a.start)<(b.date+b.start)?-1:1)}}
 function v38FixNotes(v,nb){if(!v||!v.cuid)return;const raw=v37When(v),sh=v37When(v38Shadow(v));if(raw===sh)return;(DB.notifs||[]).slice(nb).forEach(n=>{if(n&&n.to===v.cuid&&n.link==="visit:"+v.id&&typeof n.text==="string")n.text=n.text.split(raw).join(sh)})}
 {const os=A.saveVisit;A.saveVisit=function(o){const m=me(),nb=(DB.notifs||[]).length;const r=os.apply(this,arguments);try{if(!r||!r.ok||!r.id)return r;const v=v8Visit(r.id);if(!v||!m||v.by!==m.id)return r;
   v.tz38=v38UserTz(m);const cu=v.cuid?U(v.cuid):null;v.ctz38=cu?v38UserTz(cu):v.tz38;v38FixNotes(v,nb);save()}catch(e){}return r}}
@@ -5703,6 +5710,11 @@ function v38LimitMsg(v){return`You've used all ${V38_ASKS} reschedule requests f
   if(r&&r.ok&&v){const left=v38AsksLeft(v);if(left<=2)r.msg+=left?` ${left} reschedule request${left===1?"":"s"} left for this visit.`:" That was your last reschedule request for this visit."}return r}}
 A.setTz38=function(tz){const m=me();if(!m)return{ok:false,need:"login",msg:"Sign in first"};tz=String(tz||"");if(tz&&!v38TzOk(tz))return{ok:false,msg:"Pick one of the listed time zones."};
  if(tz)m.tz38=tz;else delete m.tz38;const z=v38UserTz(m);(DB.visits||[]).forEach(v=>{if(!v)return;if(v.cuid===m.id)v.ctz38=z});save();return{ok:true,tz:z,msg:"Times now show in "+v38Name(z)+" time ("+v38Abbr(z)+")."}};
+/* SW-093: a profile ZIP change stores any well-formed 5-digit ZIP (v3 updateMe) and, when the
+   account is still on Automatic, re-derives the zone from the new prefix onto their visits. */
+function v38ApplyZipZone(m){if(!m||(m.tz38&&v38TzOk(m.tz38)))return m?v38UserTz(m):null;const z=v38UserTz(m);
+ (DB.visits||[]).forEach(v=>{if(!v)return;if(v.cuid===m.id)v.ctz38=z;if(v.by===m.id)v.tz38=z});return z}
+{const ou=A.updateMe;A.updateMe=function(o){const m=me(),before=m&&m.zip,r=ou.apply(this,arguments);try{if(r&&r.ok&&m&&m.zip&&m.zip!==before){v38ApplyZipZone(m);save()}}catch(e){}return r}}
 if(typeof document!=="undefined"){
  /* the customer's card: their clock, a zone line, and the limit in plain words */
  {const oc=v37Card;v37Card=function(v){const m=me();if(!m||!v||v.cuid!==m.id)return oc.apply(this,arguments);const tz=v38UserTz(m),sv=v38Shadow(v,tz);let h=oc.call(this,sv);
