@@ -1,0 +1,5 @@
+/* v39 ZIP field: live hint and inline error */
+.v39zip{max-width:12ch;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.v39zh{margin:6px 0 0}
+.v39ze{margin:6px 0 0;color:#B42318;font-size:14px;font-weight:600}
+.v39zip[aria-invalid=true]{border-color:#B42318;box-shadow:0 0 0 3px rgba(180,35,24,.12)}
