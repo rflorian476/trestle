@@ -65,6 +65,8 @@ A.__delete13=function(){const m=me();if(!m)return{ok:false,msg:"Sign in first"};
  if(typeof v36CallsGone==="function")v36CallsGone(m.id);
  const keep={id:m.id,created:m.created};for(const k of Object.keys(m))delete m[k];
  Object.assign(m,keep,{name:"Former Sawyer member",role:"deleted",email:"",zip:"",deleted13:Date.now()});
+ /* v38 (SW-088): a hired job nobody on it still has an account for leaves the catalog, with its quotes */
+ if(typeof v38JobsGone==="function")v38JobsGone(m.id);
  if(typeof save==="function")save();return{ok:true,msg:"Account deleted"}};
 /* v34 (QA SW-072): a deleted owner's crew projects leave the public catalog. Projects nobody was hired onto are deleted
    outright, with their crew chat and the "new crew opening" notices that pointed at them. Staffed or finished ones stay only

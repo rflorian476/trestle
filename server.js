@@ -87,6 +87,8 @@ if(typeof ctx.sanitizeUsers==="function"&&ctx.sanitizeUsers())persist();
 if(typeof ctx.v34Orphans==="function"){const n=ctx.v34Orphans();if(n){persist();console.log("SW-072: tidied",n,"project(s) whose owner deleted their account")}}
 // v36 (SW-082): traveler calls left behind by accounts deleted before v36 are removed or closed + unlisted once at start.
 if(typeof ctx.v36CallOrphans==="function"){const n=ctx.v36CallOrphans();if(n){persist();console.log("SW-082: tidied",n,"traveler call(s) whose contractor deleted their account")}}
+// v38 (SW-088): hired jobs whose every party deleted their account before v38 are removed once at start.
+if(typeof ctx.v38JobOrphans==="function"){const n=ctx.v38JobOrphans();if(n){persist();console.log("SW-088: removed",n,"job(s) nobody on them still has an account for")}}
 // v36 (SW-081): Office customer rows linked to a staff account before the fix are unlinked once at start.
 if(typeof ctx.v36StaffUnlink==="function"){const n=ctx.v36StaffUnlink();if(n){persist();console.log("SW-081: unlinked",n,"record(s) from staff accounts")}}
 // keep meta flag on later persists
