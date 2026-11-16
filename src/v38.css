@@ -1,2 +1,13 @@
 /* v38 a11y: the unread count on the phone tab bar was white on #e5484d (3.9:1); this red is 6:1 with white text */
 #mtabs a i{background:#C42B32}
+/* v38 appointment zone line, request limit, pro-side customer clock */
+.v38tz{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:10px 0 0}
+.v38tz span{display:inline-flex;align-items:center;gap:6px}
+.v38tz .linkbtn{font-size:13px;padding:2px 0;min-height:24px}
+.v38lim{display:flex;gap:8px;align-items:flex-start;margin:12px 0 0;padding:10px 12px;border-radius:12px;background:#F3EFE6;color:#2B2F3A;border:1px solid #E4DCCB}
+.v38lim svg{flex:none;margin-top:2px;color:#0F2A44}
+.v38ctz{display:flex;gap:8px;align-items:flex-start;margin:10px 0;padding:8px 10px;border-radius:10px;background:#EEF2F7;color:#1B2A3B}
+.v38ctz svg{flex:none;margin-top:2px}
+.v38left{display:inline}
+.v37more[aria-expanded]{margin-top:8px}
+#v38less{display:inline-block;margin-top:8px}
