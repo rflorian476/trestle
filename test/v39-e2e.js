@@ -135,7 +135,7 @@ const SERVERS=[];let br=null;const errs=[];
    // the credit sheet in the browser
    await p.locator('[data-v39cr="exact line llc"]').click();await p.waitForSelector("#v39crf");await p.fill("#v39cra","2000");await p.click("#v39crf button.primary");await p.waitForTimeout(200);
    const er=await p.locator("#v39crE").innerText();ok(/down to \$0\.00, not below/.test(er),"the credit sheet refuses more than was paid, inline",er);
-   await p.fill("#v39cra","200.50");await p.fill("#v39crn","Callback, redone");await shot(p,"v39-1099-credit-sheet-1440.png");
+   await p.fill("#v39cra","200.50");ok(await p.locator("#v39crE").isHidden(),"the sheet's error clears once the amount is changed");await p.fill("#v39crn","Callback, redone");await shot(p,"v39-1099-credit-sheet-1440.png");
    await p.click("#v39crf button.primary");await p.waitForTimeout(600);t=await card.innerText();ok(/\$1,749\.50/.test(t)&&/credits −\$350\.50/.test(t),"after a $200.50 credit from the sheet the total is $1,749.50",t.slice(0,400))}
   await eshot(card,"v39-1099-credits-"+w+".png");
   await go(L,p,"/office/reports?y=2027");t=await p.locator("#v38tax").innerText();
