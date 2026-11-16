@@ -120,3 +120,49 @@ if(typeof document!=="undefined"){
  {const oa=AFTER.track;AFTER.track=function(id){const r=oa&&oa.apply(this,arguments);try{v38Bind(document.getElementById("app"))}catch(e){}return r}}
 }
 
+/* (4) Tax records in the Office (Reports): the two filings a small contractor most often gets wrong, from records Sawyer
+   already has. "Subs to 1099": receipts in the Subcontractor category grouped by who was paid, with the year's total, the
+   IRS reporting line for that year ($600 for payments made before 2026, $2,000 for 2026, inflation-adjusted after) and a
+   "W-9 on file" check per sub (w938, private to the pro, no tax IDs are stored). "Sales tax": by quarter, taxable and
+   non-taxable sales on invoices issued, tax billed, and tax actually collected (each payment's share of the invoice's tax, by
+   the date it was paid). Both download as formula-safe CSVs. Planning help, not tax advice. */
+function v38Key(s){return String(s||"").trim().replace(/\s+/g," ").toLowerCase().slice(0,80)}
+function v38Line(y){y=+y;return y<2026?600:2000}
+function v38Due(y){const d=new Date(Date.UTC(+y+1,0,31));const w=d.getUTCDay();if(w===6)d.setUTCDate(d.getUTCDate()+2);else if(w===0)d.setUTCDate(d.getUTCDate()+1);return d.toISOString().slice(0,10)}
+function v38Subs(m,y){const line=v38Line(y),by=new Map(),w9=(m&&m.w938&&typeof m.w938==="object")?m.w938:{};
+ v7Mine("ledger",m).filter(l=>l&&l.kind==="exp"&&l.cat==="Subcontractor"&&String(l.date||"").slice(0,4)===String(y)).forEach(l=>{const k=v38Key(l.vendor)||"(no name)";const o=by.get(k)||{key:k,name:String(l.vendor||"").trim()||"No name on the receipt",n:0,c:0,last:""};o.n++;o.c+=Math.round((+l.amt||0)*100);if(String(l.date)>o.last)o.last=String(l.date);by.set(k,o)});
+ const rows=[...by.values()].map(o=>Object.assign(o,{amt:o.c/100,need:o.c>=line*100&&o.key!=="(no name)",w9:!!w9[o.key]})).sort((a,b)=>b.c-a.c);
+ return{y:String(y),line,due:v38Due(y),rows,need:rows.filter(r=>r.need).length,missing:rows.filter(r=>r.need&&!r.w9).length,total:rows.reduce((a,r)=>a+r.c,0)/100}}
+function v38SubsCsv(m,y){const s=v38Subs(m,y);return[["Paid to","Payments","Total paid "+s.y,"Last payment","1099-NEC line","1099-NEC likely needed","W-9 on file"],...s.rows.map(r=>[r.name,r.n,r.amt.toFixed(2),r.last,s.line.toFixed(2),r.need?"Yes":"No",r.w9?"Yes":"No"])]}
+function v38Q(ms){return Math.floor(new Date(ms).getMonth()/3)}
+function v38Sales(m,y){const Q=[0,1,2,3].map(i=>({q:"Q"+(i+1),taxable:0,exempt:0,billed:0,coll:0,n:0}));
+ v7Mine("bills",m).filter(b=>b&&b.type==="inv"&&b.status!=="void"&&b.status!=="draft").forEach(b=>{const c=billCalc(b),sub=Math.round((c.total-c.tax)*100),tax=Math.round(c.tax*100),tot=Math.round(c.total*100);
+  if(String(new Date(b.date).getFullYear())===String(y)){const q=Q[v38Q(b.date)];q.n++;if(tax>0){q.taxable+=sub;q.billed+=tax}else q.exempt+=sub}
+  if(tax>0&&tot>0)(b.payments||[]).forEach(p=>{if(!p||String(new Date(p.date).getFullYear())!==String(y))return;const pc=Math.round((+p.amt||0)*100);Q[v38Q(p.date)].coll+=Math.round(pc*tax/tot)})});
+ const T=Q.reduce((a,q)=>({taxable:a.taxable+q.taxable,exempt:a.exempt+q.exempt,billed:a.billed+q.billed,coll:a.coll+q.coll,n:a.n+q.n}),{taxable:0,exempt:0,billed:0,coll:0,n:0});return{y:String(y),Q,T}}
+function v38SalesCsv(m,y){const s=v38Sales(m,y),f=c=>(c/100).toFixed(2);return[["Quarter","Invoices issued","Taxable sales","Non-taxable sales","Sales tax billed","Sales tax collected"],...s.Q.map(q=>[q.q+" "+s.y,q.n,f(q.taxable),f(q.exempt),f(q.billed),f(q.coll)]),["Total "+s.y,s.T.n,f(s.T.taxable),f(s.T.exempt),f(s.T.billed),f(s.T.coll)]]}
+A.w9Set38=function(vendor,on){const m=me();if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!v7Pro(m))return{ok:false,msg:"Tax records are for pros."};const k=v38Key(vendor);if(!k||k==="(no name)")return{ok:false,msg:"Pick a sub from the list."};
+ if(!v7Mine("ledger",m).some(l=>l&&l.kind==="exp"&&l.cat==="Subcontractor"&&v38Key(l.vendor)===k))return{ok:false,msg:"That sub isn't in your receipts."};
+ const w=(m.w938&&typeof m.w938==="object")?m.w938:{};if(on)w[k]=v38Now();else delete w[k];if(Object.keys(w).length>500)return{ok:false,msg:"That's a lot of subs."};m.w938=w;save();return{ok:true,msg:on?"W-9 marked on file":"W-9 unmarked"}};
+function v38Fd(iso){const[y,mo,d]=String(iso).split("-").map(Number);return new Date(Date.UTC(y,mo-1,d)).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"})}
+function v38TaxCard(m,y){y=typeof v31Year==="function"?v31Year(m,y):String(y||new Date().getFullYear());const s=v38Subs(m,y),t=v38Sales(m,y),f=c=>v7$(c/100);
+ const subs=s.rows.length?`<div class="o7-tw"><table class="o7t v38t"><caption class="sr-only">Subcontractors paid in ${esc(y)}</caption><thead><tr><th scope="col">Paid to</th><th class="num" scope="col">Total ${esc(y)}</th><th scope="col" class="hide-s">Status</th><th scope="col">W-9 on file</th></tr></thead><tbody>
+  ${s.rows.map((r,i)=>`<tr class="${r.need?"v38need":""}"><th scope="row"><b>${esc(r.name)}</b><small class="muted">${r.n} payment${r.n===1?"":"s"} · last ${esc(v38Fd(r.last))}</small></th><td class="num">${v7$(r.amt)}</td><td class="hide-s">${r.need?`<span class="b7 ${r.w9?"b7-blue":"b7-gold"}">1099-NEC likely</span>`:`<span class="muted small">Under ${v7$0(s.line)}</span>`}</td>
+  <td>${r.key==="(no name)"?`<span class="muted small">Add a name to the receipt</span>`:`<label class="v38w9"><input type="checkbox" data-v38w9="${esc(r.key)}" ${r.w9?"checked":""} aria-label="W-9 on file for ${esc(r.name)}"><span>${r.w9?"On file":"Not yet"}</span></label>`}</td></tr>`).join("")}</tbody></table></div>`
+  :`<p class="muted small">No receipts in the <b>Subcontractor</b> category for ${esc(y)} yet. Log what you pay subs (Expenses &amp; mileage, or Quick log → More… → Subcontractor) and they add up here by name.</p>`;
+ const sum=s.need?`<p class="v38sum ${s.missing?"warn":"good"}" role="status">${I(s.missing?"info":"check",15)}<span>${s.need} sub${s.need===1?"":"s"} reached ${v7$0(s.line)} in ${esc(y)}${s.missing?`; <b>${s.missing} W-9${s.missing===1?"":"s"} still to collect</b>`:", all W-9s on file"}. 1099-NEC forms go to them and the IRS by <b>${esc(v38Fd(s.due))}</b>.</span></p>`:"";
+ const qt=`<div class="o7-tw"><table class="o7t v38t"><caption class="sr-only">Sales tax by quarter, ${esc(y)}</caption><thead><tr><th scope="col">Quarter</th><th class="num" scope="col">Taxable sales</th><th class="num hide-s" scope="col">Non-taxable</th><th class="num" scope="col">Tax billed</th><th class="num" scope="col">Tax collected</th></tr></thead><tbody>
+  ${t.Q.map(q=>`<tr${q.n||q.coll?"":` class="v31pl-z"`}><th scope="row">${q.q}</th><td class="num">${f(q.taxable)}</td><td class="num hide-s">${f(q.exempt)}</td><td class="num">${f(q.billed)}</td><td class="num">${f(q.coll)}</td></tr>`).join("")}</tbody>
+  <tfoot><tr><th scope="row">Total</th><td class="num">${f(t.T.taxable)}</td><td class="num hide-s">${f(t.T.exempt)}</td><td class="num">${f(t.T.billed)}</td><td class="num">${f(t.T.coll)}</td></tr></tfoot></table></div>`;
+ return`<div class="card v38tax" id="v38tax"><div class="o7-sh"><h2>${I("doc",18)} Tax records · ${esc(y)}</h2><span class="muted small">From your receipts and invoices. Planning help, not tax advice.</span></div>
+ <div class="v38tax-g"><section aria-labelledby="v38sh"><h3 id="v38sh">Subs to 1099</h3><p class="muted small">Pay a sub (not an employee) ${v7$0(s.line)} or more in ${esc(y)} and you'll likely owe them a 1099-NEC. Get a W-9 before the first check; Sawyer only keeps a yes/no, never tax IDs. Payments by card or a payment app are reported by the processor instead.</p>${sum}${subs}
+ <div class="o9-tax-b"><button class="btn sm" id="v38SubCsv" data-y="${esc(y)}" ${s.rows.length?"":"disabled"}>${I("download",14)}1099 worksheet (CSV)</button></div></section>
+ <section aria-labelledby="v38st"><h3 id="v38st">Sales tax</h3><p class="muted small">Billed is the tax on invoices you issued that quarter. Collected is the tax inside the payments you received, by the date paid: the number most states want on a cash-basis return.</p>${qt}
+ <div class="o9-tax-b"><button class="btn sm" id="v38SalesCsv" data-y="${esc(y)}">${I("download",14)}Sales tax by quarter (CSV)</button></div></section></div></div>`}
+if(typeof document!=="undefined"){
+ {const ov=VIEWS.office;VIEWS.office=function(tab,q){let h=ov.apply(this,arguments);try{const m=me();if(m&&v7Pro(m)&&tab==="reports"){const i=h.indexOf('<div class="card o7-exp">');if(i>=0)h=h.slice(0,i)+v38TaxCard(m,(q||{}).y)+h.slice(i)}}catch(e){console.warn(e)}return h}}
+ {const oa=AFTER.office;AFTER.office=function(tab,q){const r=oa&&oa.apply(this,arguments);try{const m=me();if(!m||tab!=="reports")return r;const $=s=>document.getElementById(s);
+   const a=$("v38SubCsv");if(a)a.onclick=()=>{v7Download("sawyer-1099-worksheet-"+a.dataset.y+".csv",v7CSV(v38SubsCsv(m,a.dataset.y)));toast("1099 worksheet downloaded")};
+   const b=$("v38SalesCsv");if(b)b.onclick=()=>{v7Download("sawyer-sales-tax-"+b.dataset.y+".csv",v7CSV(v38SalesCsv(m,b.dataset.y)));toast("Sales tax report downloaded")};
+   document.querySelectorAll("[data-v38w9]").forEach(c=>c.onchange=()=>act(A.w9Set38(c.dataset.v38w9,c.checked),()=>{const y=scrollY;render();scrollTo(0,y)}))}catch(e){}return r}}
+}

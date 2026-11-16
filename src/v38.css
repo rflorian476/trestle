@@ -11,3 +11,19 @@
 .v38left{display:inline}
 .v37more[aria-expanded]{margin-top:8px}
 #v38less{display:inline-block;margin-top:8px}
+/* v38 tax records */
+.v38tax-g{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+.v38tax h3{font-size:16px;margin:4px 0 6px;color:#0F2A44}
+.v38t th small{display:block;font-weight:500}
+.v38t tbody th{font-weight:600}
+.v38need th b{color:#0F2A44}
+.v38w9{display:inline-flex;align-items:center;gap:8px;cursor:pointer;min-height:32px}
+.v38w9 input{width:18px;height:18px;accent-color:#0F2A44}
+.v38sum{display:flex;gap:8px;align-items:flex-start;margin:8px 0 10px;padding:10px 12px;border-radius:12px;font-size:14px}
+.v38sum.warn{background:#FFF4DE;color:#5E3E00;border:1px solid #F0D9A8}
+.v38sum.good{background:#E9F4EC;color:#1D4D2B;border:1px solid #C5E2CD}
+.v38sum svg{flex:none;margin-top:2px}
+@media (max-width:900px){.v38tax-g{grid-template-columns:1fr}}
+.v38tax-g>section{min-width:0}
+.v38t tbody th{text-transform:none;letter-spacing:0;font-size:14px;color:#1B2A3B}
+.v38t tbody th small{text-transform:none;letter-spacing:0;font-size:12px}

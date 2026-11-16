@@ -132,6 +132,22 @@ const V38N=8;
   r=await act(P(),h2.ck,"visitAsk37",[vid,[1,2,3,4].map(i=>({date:addD(today,6+i),start:"10:00"})),""]);ok(r.res.ok===false&&r.res.msg==="Offer up to 3 times per request.","4 times in one request: 'Offer up to 3 times per request.'",r.res.msg);
   global.LIM={p2,h2,j,vid}}
 
+ // ===== 4. Tax records: subs to 1099, sales tax =====
+ const tp=await signupPro("tax","Electrical","78704");const Y=String(new Date().getFullYear());
+ const exp=async(amt,vendor,date,cat)=>(await act(P(),tp.ck,"addLedger",[{kind:"exp",amt,cat:cat||"Subcontractor",vendor,date:date||today,job:"Panel swap"}])).res;
+ r=await exp(1500,"Ruiz Drywall");ok(r.ok!==false,"a $1,500 sub payment is logged",J(r));await exp(600.5,"ruiz  drywall");await exp(1999.99,"Kim Low Voltage");await exp(250,"Ace Hauling");await exp(4000,"Big Supply","","Materials");
+ r=await act(P(),tp.ck,"w9Set38",["Ruiz Drywall",true]);ok(r.res.ok&&meOf(r.st).w938&&meOf(r.st).w938["ruiz drywall"],"W-9 on file is saved privately (w938) under the normalized name",J(r.res));
+ r=await act(P(),tp.ck,"w9Set38",["Nobody I paid",true]);ok(r.res.ok===false,"a W-9 can only be marked for a sub in the receipts",J(r.res));
+ r=await act(P(),ho.ck,"w9Set38",["Ruiz Drywall",true]);ok(r.res.ok===false,"a homeowner can't use tax records",J(r.res));
+ {const ps=await pub();const u=(ps.users||[]).find(x=>x.id===tp.id)||{};ok(!u.w938&&!u.tz38,"the W-9 list never leaves the pro (signed-out state)");const os=await stateFor(pro.ck);const u2=(os.users||[]).find(x=>x.id===tp.id)||{};ok(!u2.w938,"another pro doesn't get it either")}
+ // a taxed invoice, paid in part
+ r=await act(P(),tp.ck,"saveCust",[{name:"Lakeway Dental",email:"v38-cust-"+run+"@example.com"}]);const TC=r.res.id;
+ r=await act(P(),tp.ck,"saveBill",[{type:"inv",cust:TC,title:"Panel swap",job:"Panel swap",tax:8.25,due:addD(today,14),lines:[{d:"200A panel",q:1,r:1000}]}]);const BID=r.res.id;ok(r.res.ok&&BID,"a taxed invoice ($1,000 + 8.25%)",J(r.res));
+ r=await act(P(),tp.ck,"saveBill",[{type:"inv",cust:TC,title:"Labor only",job:"Panel swap",tax:0,due:addD(today,14),lines:[{d:"Labor",q:2,r:250}]}]);const BID2=r.res.id;
+ for(const id of [BID,BID2])await act(P(),tp.ck,"sendBill",[id]);
+ r=await act(P(),tp.ck,"recordPay",[BID,541.25,"check"]);ok(r.res.ok!==false,"half of it is paid ($541.25)",J(r.res));
+ global.TAX={tp,Y,BID};
+
  // ===== 5. In the browser =====
  const SH=process.argv[2]||os.tmpdir();const SHOTS=process.env.V38_SHOTS||"";br=await chromium.launch();const errs=[];
  const page=async(w,cookie)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900},acceptDownloads:true,bypassCSP:true,hasTouch:w<500});
@@ -172,7 +188,7 @@ const V38N=8;
    await more.focus();await p.keyboard.press("Enter");await p.waitForTimeout(400);const less=p.locator("#v38less");
    ok(await less.count()===1&&await less.getAttribute("aria-expanded")==="true",w+": expanded, 'Show fewer visits' has aria-expanded=true");
    ok(await p.evaluate(()=>document.activeElement&&document.activeElement.id)==="v38less",w+": focus moves to the collapse button");
-   const n1=await p.locator(".v37ap").count();if(w===1440){await p.locator("#v37aps").evaluate(e=>e.scrollIntoView({block:"start"}));await p.evaluate(()=>scrollBy(0,-90));await p.waitForTimeout(200);await shot(p,"v38-visits-expander-1440.png",{fullPage:false})}
+   const n1=await p.locator(".v37ap").count();if(w===1440){const bb=await p.locator("#v37aps").boundingBox();const lb=await p.locator("#v38less").boundingBox();await shot(p,"v38-visits-expander-1440.png",{fullPage:true,clip:{x:Math.max(0,bb.x-24),y:Math.max(0,bb.y-24),width:bb.width+48,height:Math.min(1600,lb.y+lb.height-bb.y+48)}})}
    await less.click();await p.waitForTimeout(400);ok(await p.locator("#v37more").count()===1&&await p.locator(".v37ap").count()<n1,w+": Show fewer collapses the list again");
    ok(await p.evaluate(()=>document.activeElement&&document.activeElement.id)==="v37more",w+": focus returns to the expander");
    if(AXE){await p.addScriptTag({content:AXE});const ax=await p.evaluate(async()=>{const r=await axe.run(document.querySelector(".v37aps")||document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa"]}});return r.violations.filter(v=>v.impact==="serious"||v.impact==="critical").map(v=>v.id)});ok(!ax.length,w+": no serious axe issues on the visit list",J(ax))}
@@ -180,6 +196,20 @@ const V38N=8;
  // pro side: the customer's clock in the visit sheet
  {const {c,p}=await page(1440,pro.ck);await go(p,"/schedule?v="+encodeURIComponent(VID));await p.waitForTimeout(500);const t=await p.locator("#modal").innerText().catch(()=>"");
   ok(/Your times are ET/.test(t)&&/sees/.test(t)&&/ CT\b/.test(t),"the pro's visit sheet shows the customer's clock when the zones differ",t.slice(0,300));await c.close()}
+ // tax records
+ for(const w of [390,1440]){const {c,p}=await page(w,global.TAX.tp.ck);await go(p,"/office/reports");const card=p.locator("#v38tax");ok(await card.count()===1,w+": Office → Reports has Tax records");const t=await card.innerText();
+  ok(/Ruiz Drywall/i.test(t)&&/\$2,100\.50/.test(t),w+": two receipts for the same sub (different spacing/case) add up to $2,100.50",t.slice(0,500));
+  ok((w<500||/1099-NEC likely/.test(t)&&/Under \$2,000/.test(t))&&/Kim Low Voltage/i.test(t)&&/Ace Hauling/i.test(t)&&!/Big Supply/i.test(t),w+": $2,000 line for "+global.TAX.Y+": Ruiz over, Kim ($1,999.99) and Ace under, materials left out");
+  ok(/1 sub reached \$2,000/.test(t)&&/all W-9s on file/.test(t),w+": summary: 1 sub reached the line, W-9 on file",t.match(/\d+ subs? reached[^.]*\./)?.[0]);
+  ok(/Q[1-4]/.test(t)&&/\$82\.50/.test(t)&&/\$41\.25/.test(t)&&/\$1,000\.00/.test(t)&&(w<500||/\$500\.00/.test(t)),w+": sales tax: $1,000 taxable, $500 non-taxable, $82.50 billed, $41.25 collected (half paid)",t.slice(-500));
+  await noOverflow(p,w+" Office reports with tax records");
+  {const bb=await card.boundingBox();ok(bb&&bb.x>=0&&bb.x+bb.width<=w+1,w+": the Tax records card fits the screen (tables scroll inside it)",J(bb))}
+  if(w===1440){await card.scrollIntoViewIfNeeded();await shot(p,"v38-tax-records-1440.png",{clip:await card.boundingBox()});
+   const [dl]=await Promise.all([p.waitForEvent("download"),p.click("#v38SubCsv")]);const csv=fs.readFileSync(await dl.path(),"utf8");ok(/^Paid to,Payments,Total paid/.test(csv.replace(/^\ufeff/,""))&&/Ruiz Drywall,2,2100\.50/.test(csv)&&/Kim Low Voltage,1,1999\.99,[^,]*,2000\.00,No,No/.test(csv),"1099 worksheet CSV",csv.slice(0,300));
+   const [d2]=await Promise.all([p.waitForEvent("download"),p.click("#v38SalesCsv")]);const c2=fs.readFileSync(await d2.path(),"utf8");ok(/Total \d{4},2,1000\.00,500\.00,82\.50,41\.25/.test(c2),"sales tax CSV totals",c2.slice(-200));
+   await p.locator('[data-v38w9="kim low voltage"]').check();await p.waitForTimeout(400);const st=await stateFor(global.TAX.tp.ck);ok(meOf(st).w938&&meOf(st).w938["kim low voltage"],"ticking W-9 on file saves it")}
+  if(w===390){await card.scrollIntoViewIfNeeded();await shot(p,"v38-tax-records-390.png")}
+  await c.close()}
  ok(!errs.length,"no page errors",errs.join(" | "));
 }catch(e){failed++;console.log("FAIL crashed: "+(e&&e.stack||e))}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);try{PS&&PS.srv.close()}catch(e){}
  console.log(failed?"\n"+failed+" FAILED":"\nALL PASS");process.exit(failed?1:0)}})();
