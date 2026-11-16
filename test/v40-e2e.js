@@ -125,6 +125,19 @@ const SERVERS=[];let br=null;const errs=[];
    await p.click("#liForgot").catch(()=>{});await p.waitForTimeout(200);ok(/isn't switched on in this beta yet/.test(await p.evaluate(()=>document.body.innerText)),w+": app hooks are live on the prerendered page ('Forgot password?')");
    await shot(p,"v40-signup-"+w+".png");if(w===1440)await axe(p,"#app",w+" /signup");await noOverflow(p,w+" /signup");await c.close()}}
 
+ {// handoff: what a visitor does on the prerendered card before the app mounts carries over
+  const {c,p}=await page(L,390);let release;const gate=new Promise(r=>release=r);let held=0;
+  await p.route(/\/js\/a\d\.[0-9a-f]+\.js$/,async rt=>{held++;await gate;await rt.continue()});
+  await p.goto(L.B+"/signup",{waitUntil:"domcontentloaded"});await p.waitForSelector("#pre11 #authBox");
+  const pre=await p.evaluate(()=>({pw:document.getElementById("pwSection").open,app:typeof A!=="undefined"}));
+  await p.evaluate(()=>{document.getElementById("pwSection").open=true});await p.fill("#cu-n","Una Handoff");await p.check("input[name=au-role][value=business]",{force:true});
+  await p.click("#cu-e");await p.keyboard.type("una@exa");
+  release();await p.waitForFunction(()=>!document.getElementById("pre11")&&typeof A!=="undefined",null,{timeout:15000});await p.waitForTimeout(300);
+  const o=await p.evaluate(()=>({pw:document.getElementById("pwSection").open,n:document.getElementById("cu-n").value,e:document.getElementById("cu-e").value,role:(document.querySelector("input[name=au-role]:checked")||{}).value,f:document.activeElement&&document.activeElement.id,href:(document.querySelector(".v3o[data-p]")||{}).href||""}));
+  ok(held>0&&pre.pw===false&&pre.app===false,"local /signup: the prerendered card is interactive before the app JS runs",J({held,pre}));
+  ok(o.pw===true&&o.n==="Una Handoff"&&o.e==="una@exa"&&o.role==="business"&&o.f==="cu-e"&&(!o.href||/role=business/.test(o.href)),"when the app mounts, the open password section, typed values, chosen role and focus carry over",J(o));
+  await p.keyboard.type("mple.com");ok(await p.inputValue("#cu-e")==="una@example.com","typing continues where it left off (caret kept)");await c.close()}
+
  // ===== 4. edit a 1099 payment or credit in place =====
  const TP=await signup(L,"pro","tax","48226");
  {const a=o=>act(L,TP.ck,"addLedger",[o]).then(r=>r.res);const E=(id,o,ck)=>act(L,ck===undefined?TP.ck:ck,"editLedger40",[id,o]).then(r=>r.res);
@@ -168,7 +181,7 @@ const SERVERS=[];let br=null;const errs=[];
   items=await p.locator("#modal .v40el li").allInnerTexts();ok(new RegExp("−\\$"+amt+"\\.00").test(items[0])&&/edited/.test(items[0]),w+": back on the list the credit reads −$"+amt+".00 · edited",J(items));
   await p.click("#modal .actions [data-close]");await p.waitForTimeout(300);const t=await card.innerText();const tot=w===390?"2,095.67":"2,045.67";
   ok(new RegExp("\\$"+tot.replace(/[.,]/g,m=>"\\"+m)).test(t)&&new RegExp("credits −\\$"+amt+"\\.00").test(t),w+": the card shows $"+tot+" and credits −$"+amt+".00",t.slice(0,400));
-  ok(await p.evaluate(()=>{const a=document.activeElement;return!!(a&&a.dataset&&a.dataset.v40ent==="exact line llc")}),w+": focus returns to 'Edit entries'");
+  {await p.waitForFunction(()=>{const a=document.activeElement;return!!(a&&a.dataset&&a.dataset.v40ent)},null,{timeout:2000}).catch(()=>{});const fa=await p.evaluate(()=>{const a=document.activeElement;return a?a.tagName+"#"+a.id+"."+a.className+":"+((a.dataset||{}).v40ent||""):"none"});ok(/:exact line llc$/.test(fa),w+": focus returns to 'Edit entries'",fa)}
   if(w===1440){const [dl]=await Promise.all([p.waitForEvent("download"),p.click("#v38SubCsv")]);const csv=fs.readFileSync(await dl.path(),"utf8").replace(/^\ufeff/,"");
    ok(/^"'=HYPERLINK\(""http:\/\/evil\.example"",""x""\)",1,0\.00,700\.00/m.test(csv)&&/^Exact Line LLC,1,300\.00,2045\.67,/m.test(csv),"1099 worksheet CSV after edits: totals follow the edit and the formula-looking name stays quoted with a leading '",csv.slice(0,400))}
   await noOverflow(p,w+" Tax records");
