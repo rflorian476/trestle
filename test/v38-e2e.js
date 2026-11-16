@@ -1,10 +1,12 @@
 // v38 end-to-end. Self-contained: starts its own Sawyer server (local test mode, local stand-in push service). Covers health
 // 2.21.0-sawyer / SW cache sawyer-v38, SW-088 (a hired job and its quotes/reviews leave the catalog once every party deleted
-// their account: both delete orders, an active hire still blocks, seed counts restored, the boot tidy, /job/<id> Not found),
-// signed-out /myhome (prerendered sign-in card, sign-in methods in the page, no synchronous XHR), appointment times on the
-// customer's clock (zones from ZIP or picked, notices, card, sheet, pro view), the 6-request limit wording, the "and N more"
-// disclosure (aria-expanded / aria-controls, Show fewer, focus) and Tax records (subs to 1099 with W-9 on file, sales tax by
-// quarter, CSVs, privacy) at 390 and 1440.
+// their account: both delete orders, an active hire still blocks, seed counts restored, the boot tidy, /job/<id> HTTP 404
+// Not found), signed-out /myhome (prerendered sign-in card, sign-in methods in the page, no synchronous XHR), appointment
+// times on the customer's clock (zones from ZIP or picked, notices, card, sheet, pro view), SW-089 (reschedule min date
+// matches the visit-zone today), the 6-request limit wording including "6 of 6 requests left" before the first ask, the
+// "and N more" disclosure (aria-expanded / aria-controls, Show fewer, focus), Tax records (subs to 1099 with a year-keyed
+// line and W-9 on file, sales tax by quarter in the pro's zone, CSVs, privacy) and SW-091 (well-formed ZIPs stored as
+// entered, HI/AK/PR zones, search/distance/map fallbacks) at 390 and 1440.
 // Usage: node test/v38-e2e.js [shots dir]
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),crypto=require("crypto");
@@ -76,7 +78,8 @@ let LOCAL=null,br=null,PS=null;
   s=await pub();ok(!(s.jobs||[]).some(j=>j.id===id),"SW-088 a: the job is gone from signed-out /api/state",J((s.jobs||[]).filter(j=>j.id===id)));
   ok(!(s.quotes||[]).some(q=>q.job===id),"SW-088 a: its accepted quote is gone too");
   ok(!(s.reviews||[]).some(x=>x.job===id),"SW-088 a: so is the review written on it");
-  const hp=await req(P(),"GET","/job/"+id);ok(!new RegExp("V38 a water heater swap "+run).test(hp.body),"SW-088 a: the /job/<id> HTML no longer carries the title",hp.status)}
+  const hp=await req(P(),"GET","/job/"+id);ok(hp.status===404,"SW-088 a: a removed /job/<id> is HTTP 404",hp.status);
+   ok(!new RegExp("V38 a water heater swap "+run).test(hp.body),"SW-088 a: the /job/<id> HTML no longer carries the title",hp.body.slice(0,160))}
  {// (b) the pro deletes first, then the homeowner
   const ho=await signupHo("d88b"),pro=await signupPro("d88b");const id=await hiredJob("b",ho,pro);
   let r=await delAcct(pro.ck);ok(r.status===200,"SW-088 b: the hired pro deletes first",r.status);
@@ -165,7 +168,8 @@ const V38N=8;
  const shot=async(p,name,opt)=>{await p.screenshot(Object.assign({path:path.join(SH,name)},opt||{}));if(SHOTS)await p.screenshot(Object.assign({path:path.join(SHOTS,name)},opt||{}))};
  const noOverflow=async(p,lbl)=>{const ov=await p.evaluate(()=>document.documentElement.scrollWidth-innerWidth);ok(ov<=0,lbl+": no sideways scroll",ov)};
  // SW-088: the removed job is the app's Not found page
- {const {c,p}=await page(1440);await go(p,"/job/"+JOB088);const t=await p.locator("main").innerText();ok(/not found|doesn.t exist|no longer/i.test(t)&&!/water heater swap/i.test(t),"SW-088: signed-out /job/<removed id> shows Not found",t.slice(0,160));await c.close()}
+ {const raw=await req(P(),"GET","/job/"+JOB088);ok(raw.status===404,"SW-088: signed-out /job/<removed id> is HTTP 404",raw.status);
+  const {c,p}=await page(1440);await go(p,"/job/"+JOB088);const t=await p.locator("main").innerText();ok(/not found|doesn.t exist|no longer/i.test(t)&&!/water heater swap/i.test(t),"SW-088: signed-out /job/<removed id> shows Not found",t.slice(0,160));await c.close()}
  // /myhome signed out: prerendered sign-in card, no synchronous XHR, sign-in methods in the page
  {const {c,p}=await page(390);await p.addInitScript(()=>{window.__SYNC=[];const o=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u,a){if(a===false)window.__SYNC.push(String(u));return o.apply(this,arguments)}});
   const raw=await req(P(),"GET","/myhome");ok(/<div id="pre11">/.test(raw.body)&&/<h1/.test(raw.body),"signed-out /myhome arrives prerendered (sign-in card in the first HTML)");
@@ -218,6 +222,99 @@ const V38N=8;
    await p.locator('[data-v38w9="kim low voltage"]').check();await p.waitForTimeout(400);const st=await stateFor(global.TAX.tp.ck);ok(meOf(st).w938&&meOf(st).w938["kim low voltage"],"ticking W-9 on file saves it")}
   if(w===390){await card.scrollIntoViewIfNeeded();await shot(p,"v38-tax-records-390.png")}
   await c.close()}
- ok(!errs.length,"no page errors",errs.join(" | "));
+ 
+ // 6 of 6 requests left before the first ask
+ {const p3=await signupPro("six"),h3=await signupHo("six");
+  const j=(await act(P(),h3.ck,"postJob",[{title:"V38 six "+run,cat:"Plumbing",sub:"Water heaters",desc:"x",zip:"78704",budget:"$900",when:"This week"}])).res.id;
+  await act(P(),p3.ck,"quote",[j,900,"ok"]);await act(P(),h3.ck,"hire",[j,p3.id]);
+  const cc=(await act(P(),p3.ck,"custFromJob",[j])).res.id;
+  const vid=(await act(P(),p3.ck,"saveVisit",[{cust:cc,title:"Check",date:addD(today,4),start:"09:00",hrs:"1",win:"0",job:j}])).res.id;
+  const {c,p}=await page(390,h3.ck);await go(p,"/job/"+j);await p.click("[data-v37ask]");await p.waitForSelector("#v37as");
+  const t=await p.locator("#v37as").innerText();ok(/6 of 6\s*requests left/.test(t),"before the first ask the sheet says 6 of 6 requests left",t.slice(0,300));
+  await p.keyboard.press("Escape");await c.close()}
+ // SW-089: reschedule min date matches the visit-zone today (TEST_NOW=2026-11-16T05:30Z)
+ {const NOW="2026-11-16T05:30:00.000Z",MS=Date.parse(NOW);
+  const S=await startApp(await freePort(),{TEST_NOW:NOW,PUSH_TEST_ORIGIN:PS.origin,PUSH_RETRY_MS:"150"});
+  try{
+   const su=async(kind,tag,zip)=>{const body={kind,password:"v38-correct-horse",data:Object.assign({name:(kind==="pro"?"Vee ":"Hana ")+tag,email:"v38-"+tag+"-min-"+run+"@example.com",zip},kind==="pro"?{biz:"V38 min "+run,trade:"Plumbing",phone:"4045550100",plan:"founding"}:{})};const r=await req(S.port,"POST","/api/signup",JH,J(body));return{ck:sigCk(r),id:stateOf(r).me}};
+   const pro=await su("pro","atl","30307"),ho=await su("customer","aus","78704");
+   const ac=async(ck,name,args)=>{const r=await req(S.port,"POST","/api/act",Object.assign({Cookie:ck},JH),J({name,args}));return (r.json&&r.json.res)||{}};
+   const j=(await ac(ho.ck,"postJob",[{title:"V38 min "+run,cat:"Plumbing",sub:"Water heaters",desc:"x",zip:"78704",budget:"$900",when:"This week"}])).id;
+   await ac(pro.ck,"quote",[j,900,"ok"]);await ac(ho.ck,"hire",[j,pro.id]);
+   const cid=(await ac(pro.ck,"custFromJob",[j])).id;
+   const vid=(await ac(pro.ck,"saveVisit",[{cust:cid,title:"Check",date:"2026-11-16",start:"09:00",hrs:"1",win:"0",job:j}])).id;
+   ok(j&&vid,"SW-089: Atlanta pro scheduled a Nov 16 visit for an Austin customer");
+   const ctx=await br.newContext({viewport:{width:390,height:844},bypassCSP:true});
+   const [k,v]=ho.ck.split("=");await ctx.addCookies([{name:k,value:v,url:S.B}]);
+   await ctx.addInitScript(ms=>{window.__now=()=>ms},MS);
+   const pg=await ctx.newPage();pg.on("pageerror",e=>errs.push("SW-089 "+String(e).slice(0,200)));
+   await pg.goto(S.B+"/job/"+j,{waitUntil:"networkidle"});await pg.waitForTimeout(300);
+   await pg.click("[data-v37ask]");await pg.waitForSelector("#v37as");
+   const mins=await pg.$$eval('#v37as input[type=date]',is=>is.map(i=>i.min));
+   ok(mins.length>=1&&mins.every(m=>m==="2026-11-16"),"SW-089: date min is 2026-11-16 (visit-today), not the customer's Nov 15",JSON.stringify(mins));
+   await pg.evaluate(()=>{document.getElementById("v37d0").value="2026-11-15";document.getElementById("v37t0").value="09:00"});
+   await pg.click("#v37asGo");await pg.waitForTimeout(200);
+   const err=await pg.locator("#v37asE").innerText();
+   ok(/from today/.test(err),"SW-089: offering a morning on the customer's Nov 15 is refused",err);
+   await ctx.close();
+  }finally{await stopApp(S)}}
+ // SW-090: 2026-04-01T03:00Z is Q1 in America/Detroit (11pm ET Mar 31), not Q2 on a UTC host
+ {const dp=await signupPro("det","Electrical","48226");
+  const {c,p}=await page(1440,dp.ck);await go(p,"/office/reports");
+  const ms=Date.parse("2026-04-01T03:00:00.000Z");
+  const got=await p.evaluate(ms=>{
+   const m=Object.assign({},me(),{zip:"",tz38:""});
+   const keep=(DB.bills||[]).slice();
+   DB.bills=(DB.bills||[]).concat([{id:"tmp-q1",type:"inv",status:"sent",by:m.id,date:ms,tax:8.25,lines:[{d:"x",q:1,r:100}],payments:[{amt:108.25,date:ms,method:"check",by:"pro"}]}]);
+   const sl=v38Sales(m,2026),tz=v38TaxTz(m);
+   DB.bills=keep;
+   return {tz,ymd:v38YMD(ms,tz),det:v38YMD(ms,"America/Detroit"),def:v38TaxTz(null),Q:sl.Q.map(q=>({q:q.q,n:q.n,taxable:q.taxable,coll:q.coll})),line:{y2025:v38Line(2025),y2026:v38Line(2026),y2027:v38Line(2027)}};
+  },ms);
+  ok(got.def==="America/Detroit","sales tax defaults to America/Detroit when the pro has no zone",got.def);
+  ok(got.tz==="America/Detroit"&&got.ymd==="2026-03-31"&&got.det==="2026-03-31","2026-04-01T03:00Z is Mar 31 in Detroit",JSON.stringify(got));
+  ok(got.Q[0].n===1&&got.Q[1].n===0&&got.Q[0].coll>0,"SW-090: that instant lands in Q1 2026, not Q2",JSON.stringify(got.Q));
+  ok(got.line.y2025===600&&got.line.y2026===2000&&got.line.y2027===2000,"1099 line is a year-keyed table ($600 through 2025, $2,000 from 2026)",JSON.stringify(got.line));
+  await c.close()}
+ // SW-091: well-formed ZIPs are stored as entered; HI/AK/PR zones; search/distance/map don't crash
+ {const want={"96815":"Pacific/Honolulu","90001":"America/Los_Angeles","85001":"America/Phoenix","10001":"America/New_York","00901":"America/Puerto_Rico"};
+  for(const zip of Object.keys(want)){
+   const ho=await signupHo("z"+zip,zip);const me=meOf(await stateFor(ho.ck));
+   ok(me.zip===zip,"SW-091: signup stores "+zip+" exactly (not remapped to 78704)",me.zip);
+   if(zip==="96815"){
+    const pr=await signupPro("hiw","Plumbing","30307");
+    const j=(await act(P(),ho.ck,"postJob",[{title:"V38 zip "+zip+" "+run,cat:"Plumbing",sub:"Water heaters",desc:"x",zip,budget:"$900",when:"This week"}])).res.id;
+    await act(P(),pr.ck,"quote",[j,900,"ok"]);await act(P(),ho.ck,"hire",[j,pr.id]);
+    const cid=(await act(P(),pr.ck,"custFromJob",[j])).res.id;
+    const vid=(await act(P(),pr.ck,"saveVisit",[{cust:cid,title:"Check",date:addD(today,5),start:"09:00",hrs:"1",win:"0",job:j}])).res.id;
+    const vs=(await stateFor(pr.ck)).visits||[];const v=vs.find(x=>x.id===vid);
+    ok(v&&v.ctz38===want[zip],"SW-091: Automatic zone for "+zip+" is "+want[zip],v&&v.ctz38);
+   }
+  }
+  const bad=await req(P(),"POST","/api/signup",JH,J({kind:"customer",password:"v38-correct-horse",data:{name:"Bad Zip",email:"v38-badzip-"+run+"@example.com",zip:"999"}}));
+  const bst=stateOf(bad);const bme=bst.me?((bst.users||[]).find(u=>u.id===bst.me)||{}):{};
+  ok((bad.json&&bad.json.res&&bad.json.res.ok===false)||!bst.me||bme.zip!=="78704","SW-091: a malformed ZIP is not silently remapped to 78704",JSON.stringify(bad.json&&(bad.json.res||{status:bad.status})));
+  const h9=await signupHo("zchk","96815");
+  const {c,p}=await page(1440,h9.ck);await go(p,"/");
+  const got=await p.evaluate(want=>{
+   const zips=Object.keys(want),zones={},dists={},towns={};
+   zips.forEach(z=>{zones[z]=v38ZipTz(z);dists[z]=dist(z,"78704");towns[z]=townOf(z)});
+   let mapOk=true,mapErr="",searchOk=true,searchErr="";
+   try{zips.forEach(z=>{mapSVG(320,200,[{id:"p"+z,zip:z,label:z,txt:""}]);if(typeof usBox==="function")usBox([{zip:z}])})}catch(e){mapOk=false;mapErr=String(e)}
+   try{zips.forEach(z=>{if(typeof searchPros==="function")searchPros({zip:z,miles:50,q:""});if(typeof searchJobs==="function")searchJobs({zip:z,miles:50,q:""})})}catch(e){searchOk=false;searchErr=String(e)}
+   const opts=typeof zipOpts==="function"?zipOpts("96815"):"";
+   return {zones,dists,towns,mapOk,mapErr,searchOk,searchErr,optsHas:/value="96815"/.test(opts),me:me()&&me().zip};
+  },want);
+  for(const zip of Object.keys(want)){
+   ok(got.zones[zip]===want[zip],"SW-091: prefix zone for "+zip+" is "+want[zip],got.zones[zip]);
+   ok(typeof got.dists[zip]==="number"&&isFinite(got.dists[zip]),"SW-091: dist("+zip+") does not throw",got.dists[zip]);
+   ok(got.towns[zip]===zip||typeof got.towns[zip]==="string","SW-091: townOf("+zip+") does not throw",got.towns[zip]);
+  }
+  ok(got.mapOk,"SW-091: map fallback does not crash on unknown ZIPs",got.mapErr);
+  ok(got.searchOk,"SW-091: search fallback does not crash on unknown ZIPs",got.searchErr);
+  ok(got.optsHas,"SW-091: an unknown stored ZIP stays selected in location menus");
+  const find=await req(P(),"GET","/find?zip=96815"),jobs=await req(P(),"GET","/jobs?zip=00901");
+  ok(find.status===200&&jobs.status===200,"SW-091: /find?zip=96815 and /jobs?zip=00901 do not crash",find.status+" "+jobs.status);
+  await c.close()}
+ok(!errs.length,"no page errors",errs.join(" | "));
 }catch(e){failed++;console.log("FAIL crashed: "+(e&&e.stack||e))}finally{try{if(br)await br.close()}catch(e){}await stopApp(LOCAL);try{PS&&PS.srv.close()}catch(e){}
  console.log(failed?"\n"+failed+" FAILED":"\nALL PASS");process.exit(failed?1:0)}})();

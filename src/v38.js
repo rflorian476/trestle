@@ -52,6 +52,13 @@ function v38Inst(date,time,tz){const[y,mo,d]=String(date).split("-").map(Number)
 function v38Wall(ms,tz){const p=v38Parts(ms,tz),z=n=>String(n).padStart(2,"0");return{date:p.y+"-"+z(p.mo)+"-"+z(p.d),start:z(p.h)+":"+z(p.mi)}}
 function v38Conv(date,time,from,to){if(!date||!time||!from||!to||from===to)return{date,start:time};try{return v38Wall(v38Inst(date,time,from),to)}catch(e){return{date,start:time}}}
 function v38TodayIn(tz){try{return new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(v38Now()))}catch(e){return null}}
+/* SW-089: the picker's min is the later of the customer's today and the visit-zone's today, shown
+   on the customer's clock, so it matches the server (visit-local "today"). Noon on the visit clock
+   keeps that instant on visit-today in every US zone; midnight in a zone west of the visit would
+   fall back a calendar day and the picker would still offer a morning the server refuses. */
+function v38AskMin(v,tz){const ct=v38TodayIn(tz),from=v38VisTz(v),vt=v38TodayIn(from);let vd=vt;
+ try{if(vt){const w=v38Wall(v38Inst(vt,"12:00",from),tz);if(w&&w.date)vd=w.date}}catch(e){}
+ if(ct&&vd)return ct>vd?ct:vd;return vd||ct||null}
 function v38VisTz(v){if(v&&v.tz38&&v38TzOk(v.tz38))return v.tz38;return v38UserTz(typeof U==="function"&&v?U(v.by):null)}
 function v38CustTz(v){const u=typeof U==="function"&&v?U(v.cuid):null;if(u&&(u.tz38||u.zip))return v38UserTz(u);if(v&&v.ctz38&&v38TzOk(v.ctz38))return v.ctz38;return v38VisTz(v)}
 /* a copy of the visit with its day, time and offered times on the customer's clock, labeled */
@@ -89,9 +96,10 @@ if(typeof document!=="undefined"){
  /* the reschedule sheet: the customer's clock in, the visit's clock out; requests left */
  {const om=v37AskModal;v37AskModal=function(v){const m=me();if(!m||v.cuid!==m.id)return om.apply(this,arguments);if(v38AsksLeft(v)<=0){toast(v38LimitMsg(v),"err");return}
    const tz=v38UserTz(m),from=v38VisTz(v),sv=v38Shadow(v,tz);const r=om.call(this,sv);try{const f=document.getElementById("v37as");if(!f)return r;const left=v38AsksLeft(v);
-    const p=f.querySelector("p.muted.small");if(p)p.insertAdjacentHTML("beforeend",` <span class="v38left">${left===V38_ASKS?"":`<b>${left} of ${V38_ASKS}</b> requests left. `}Times are ${esc(v38Name(tz))} time (${esc(v38Abbr(tz))}).</span>`);
-    const td=v38TodayIn(tz);if(td)f.querySelectorAll('input[type=date]').forEach(i=>i.min=td);
+    const p=f.querySelector("p.muted.small");if(p)p.insertAdjacentHTML("beforeend",` <span class="v38left"><b>${left} of ${V38_ASKS}</b> requests left. Times are ${esc(v38Name(tz))} time (${esc(v38Abbr(tz))}).</span>`);
+    const td=v38AskMin(v,tz);if(td)f.querySelectorAll('input[type=date]').forEach(i=>i.min=td);
     f.onsubmit=e=>{e.preventDefault();const slots=[0,1,2].map(i=>{const d=document.getElementById("v37d"+i).value,t=document.getElementById("v37t"+i).value;return d&&t?Object.assign({},v38Conv(d,t,tz,from)):{date:d,start:t}});
+     const visToday=v38TodayIn(from);if(visToday&&slots.some(s=>s.date&&s.date<visToday)){document.getElementById("v37asE").textContent="Pick days from today up to 6 months out.";return}
      const res=A.visitAsk37(v.id,slots,document.getElementById("v37n").value);if(res&&res.ok===false){document.getElementById("v37asE").textContent=res.msg;return}closeModal();act(res,()=>{const y=scrollY;render();scrollTo(0,y)})}}catch(e){console.warn(e)}return r}}
  function v38TzModal(){const m=me();if(!m)return;const cur=m.tz38&&v38TzOk(m.tz38)?m.tz38:"",auto=v38ZipTz(m.zip);
   modal(`<form id="v38tzf" class="v38tzf"><h2 id="mtitle">${I("clock",20)} Your time zone</h2><p class="muted small">Appointment times show on this clock. Automatic uses your ZIP${m.zip?" ("+esc(m.zip)+")":""}: ${esc(v38Name(auto))} time.</p>
@@ -122,23 +130,29 @@ if(typeof document!=="undefined"){
 
 /* (4) Tax records in the Office (Reports): the two filings a small contractor most often gets wrong, from records Sawyer
    already has. "Subs to 1099": receipts in the Subcontractor category grouped by who was paid, with the year's total, the
-   IRS reporting line for that year ($600 for payments made before 2026, $2,000 for 2026, inflation-adjusted after) and a
-   "W-9 on file" check per sub (w938, private to the pro, no tax IDs are stored). "Sales tax": by quarter, taxable and
-   non-taxable sales on invoices issued, tax billed, and tax actually collected (each payment's share of the invoice's tax, by
-   the date it was paid). Both download as formula-safe CSVs. Planning help, not tax advice. */
+   IRS reporting line for that year (a year-keyed table: $600 through 2025, $2,000 from 2026; a later IRS change is a new
+   row, not a new if) and a "W-9 on file" check per sub (w938, private to the pro, no tax IDs are stored). "Sales tax": by
+   quarter, taxable and non-taxable sales on invoices issued, tax billed, and tax actually collected (each payment's share of
+   the invoice's tax, by the date it was paid), bucketed with Intl in the pro's zone (ZIP or pick, otherwise America/Detroit)
+   so a 2026-04-01T03:00Z invoice is Q1 in Detroit, not Q2 on a UTC host. Both download as formula-safe CSVs. Planning help,
+   not tax advice. */
 function v38Key(s){return String(s||"").trim().replace(/\s+/g," ").toLowerCase().slice(0,80)}
-function v38Line(y){y=+y;return y<2026?600:2000}
+const V38_1099={2011:600,2026:2000};
+function v38Line(y){y=+y;let line=600;for(const k of Object.keys(V38_1099).map(Number).sort((a,b)=>a-b)){if(k<=y)line=V38_1099[k]}return line}
+function v38TaxTz(u){if(u&&u.tz38&&v38TzOk(u.tz38))return u.tz38;if(u&&u.zip)return v38ZipTz(u.zip);return"America/Detroit"}
+function v38YMD(ms,tz){try{return new Intl.DateTimeFormat("en-CA",{timeZone:tz||"America/Detroit",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(ms))}catch(e){return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Detroit",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(ms))}}
+function v38PayYear(date,tz){const s=String(date||"");if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,4);const n=+date;if(Number.isFinite(n)&&n>1e11)return v38YMD(n,tz).slice(0,4);const t=Date.parse(s);return Number.isFinite(t)?v38YMD(t,tz).slice(0,4):""}
 function v38Due(y){const d=new Date(Date.UTC(+y+1,0,31));const w=d.getUTCDay();if(w===6)d.setUTCDate(d.getUTCDate()+2);else if(w===0)d.setUTCDate(d.getUTCDate()+1);return d.toISOString().slice(0,10)}
 function v38Subs(m,y){const line=v38Line(y),by=new Map(),w9=(m&&m.w938&&typeof m.w938==="object")?m.w938:{};
- v7Mine("ledger",m).filter(l=>l&&l.kind==="exp"&&l.cat==="Subcontractor"&&String(l.date||"").slice(0,4)===String(y)).forEach(l=>{const k=v38Key(l.vendor)||"(no name)";const o=by.get(k)||{key:k,name:String(l.vendor||"").trim()||"No name on the receipt",n:0,c:0,last:""};o.n++;o.c+=Math.round((+l.amt||0)*100);if(String(l.date)>o.last)o.last=String(l.date);by.set(k,o)});
+ v7Mine("ledger",m).filter(l=>l&&l.kind==="exp"&&l.cat==="Subcontractor"&&v38PayYear(l.date,v38TaxTz(m))===String(y)).forEach(l=>{const k=v38Key(l.vendor)||"(no name)";const o=by.get(k)||{key:k,name:String(l.vendor||"").trim()||"No name on the receipt",n:0,c:0,last:""};o.n++;o.c+=Math.round((+l.amt||0)*100);if(String(l.date)>o.last)o.last=String(l.date);by.set(k,o)});
  const rows=[...by.values()].map(o=>Object.assign(o,{amt:o.c/100,need:o.c>=line*100&&o.key!=="(no name)",w9:!!w9[o.key]})).sort((a,b)=>b.c-a.c);
  return{y:String(y),line,due:v38Due(y),rows,need:rows.filter(r=>r.need).length,missing:rows.filter(r=>r.need&&!r.w9).length,total:rows.reduce((a,r)=>a+r.c,0)/100}}
 function v38SubsCsv(m,y){const s=v38Subs(m,y);return[["Paid to","Payments","Total paid "+s.y,"Last payment","1099-NEC line","1099-NEC likely needed","W-9 on file"],...s.rows.map(r=>[r.name,r.n,r.amt.toFixed(2),r.last,s.line.toFixed(2),r.need?"Yes":"No",r.w9?"Yes":"No"])]}
-function v38Q(ms){return Math.floor(new Date(ms).getMonth()/3)}
-function v38Sales(m,y){const Q=[0,1,2,3].map(i=>({q:"Q"+(i+1),taxable:0,exempt:0,billed:0,coll:0,n:0}));
+function v38Q(ms,tz){const mo=+v38YMD(ms,tz).slice(5,7);return Math.floor((mo-1)/3)}
+function v38Sales(m,y){const tz=v38TaxTz(m),Q=[0,1,2,3].map(i=>({q:"Q"+(i+1),taxable:0,exempt:0,billed:0,coll:0,n:0}));
  v7Mine("bills",m).filter(b=>b&&b.type==="inv"&&b.status!=="void"&&b.status!=="draft").forEach(b=>{const c=billCalc(b),sub=Math.round((c.total-c.tax)*100),tax=Math.round(c.tax*100),tot=Math.round(c.total*100);
-  if(String(new Date(b.date).getFullYear())===String(y)){const q=Q[v38Q(b.date)];q.n++;if(tax>0){q.taxable+=sub;q.billed+=tax}else q.exempt+=sub}
-  if(tax>0&&tot>0)(b.payments||[]).forEach(p=>{if(!p||String(new Date(p.date).getFullYear())!==String(y))return;const pc=Math.round((+p.amt||0)*100);Q[v38Q(p.date)].coll+=Math.round(pc*tax/tot)})});
+  if(v38YMD(b.date,tz).slice(0,4)===String(y)){const q=Q[v38Q(b.date,tz)];q.n++;if(tax>0){q.taxable+=sub;q.billed+=tax}else q.exempt+=sub}
+  if(tax>0&&tot>0)(b.payments||[]).forEach(p=>{if(!p||v38YMD(p.date,tz).slice(0,4)!==String(y))return;const pc=Math.round((+p.amt||0)*100);Q[v38Q(p.date,tz)].coll+=Math.round(pc*tax/tot)})});
  const T=Q.reduce((a,q)=>({taxable:a.taxable+q.taxable,exempt:a.exempt+q.exempt,billed:a.billed+q.billed,coll:a.coll+q.coll,n:a.n+q.n}),{taxable:0,exempt:0,billed:0,coll:0,n:0});return{y:String(y),Q,T}}
 function v38SalesCsv(m,y){const s=v38Sales(m,y),f=c=>(c/100).toFixed(2);return[["Quarter","Invoices issued","Taxable sales","Non-taxable sales","Sales tax billed","Sales tax collected"],...s.Q.map(q=>[q.q+" "+s.y,q.n,f(q.taxable),f(q.exempt),f(q.billed),f(q.coll)]),["Total "+s.y,s.T.n,f(s.T.taxable),f(s.T.exempt),f(s.T.billed),f(s.T.coll)]]}
 A.w9Set38=function(vendor,on){const m=me();if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!v7Pro(m))return{ok:false,msg:"Tax records are for pros."};const k=v38Key(vendor);if(!k||k==="(no name)")return{ok:false,msg:"Pick a sub from the list."};

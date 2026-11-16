@@ -72,7 +72,7 @@ const match=(t,want)=>want instanceof RegExp?want.test(t):t===want;
    const body=pre.replace(/<script[\s\S]*?<\/script>/g,"");ok(!/<script/i.test(body.split("</main>")[0]),tag+" /job/"+id+": no scripts inside the prerendered job");
    ok(!secrets.some(s=>h.includes(s))&&!/escrow|"cases"/i.test(body),tag+" /job/"+id+": no owner-only data (quote notes, escrow, cases) in public HTML")}
   {const r=await req(S.port,"GET","/compare/j1");ok(r.status===200&&!/<div id="pre11">/.test(r.body)&&!secrets.some(s=>r.body.includes(s)),tag+" /compare/j1 is never prerendered and carries no quote notes")}
-  {const r=await req(S.port,"GET","/job/nope-x");ok(r.status===200&&!/<div id="pre11">/.test(r.body)&&tt(r.body)==="Job · Sawyer",tag+" /job/nope-x falls back to the app shell",tt(r.body))}}
+  {const r=await req(S.port,"GET","/job/nope-x");ok(r.status===404&&!/<div id="pre11">/.test(r.body)&&tt(r.body)==="Not found · Sawyer",tag+" /job/nope-x is HTTP 404 (Not found)",tt(r.body)+" "+r.status)}}
  {const r=await req(LOCAL.port,"GET","/job/j1",{Cookie:ck});ok(r.status===200&&!/<div id="pre11">/.test(r.body),"signed in: /job/j1 is not prerendered")}
  for(const w of [1440,390]){
   {const p=await page(w);await p.goto(LOCAL.B+"/job/j2");await p.waitForSelector("#app h1");await p.waitForTimeout(800);

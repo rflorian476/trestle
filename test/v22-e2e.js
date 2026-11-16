@@ -52,7 +52,7 @@ const attr=(tag,k)=>(new RegExp("\\s"+k+'="([^"]*)"').exec(tag)||[])[1];
   // ===== 2. job / compare titles =====
   for(const [u,re] of [["/job/j1",/<title>[^<·]+ · Sawyer<\/title>/],["/compare/j1",/<title>Compare bids: [^<]+ · Sawyer<\/title>/]]){const r=await req(S.port,"GET",u);
    ok(r.status===200&&re.test(r.body)&&!/hire pros you&#39;d trust/.test((r.body.match(/<title>[^<]*/)||[""])[0]),tag+" "+u+": 200 with a view-specific title",(r.body.match(/<title>[^<]*/)||[])[0])}
-  for(const u of ["/job/nope-x","/compare/nope-x","/pro/nope-x","/find","/prices","/credits","/faq","/signup","/p/c1","/t/t1"]){const r=await req(S.port,"GET",u);ok(r.status===200||(u==="/t/t1"&&r.status===404),tag+" "+u+" is served ("+r.status+")")}
+  for(const u of ["/job/nope-x","/compare/nope-x","/pro/nope-x","/find","/prices","/credits","/faq","/signup","/p/c1","/t/t1"]){const r=await req(S.port,"GET",u);ok(r.status===200||((u==="/t/t1"||u==="/job/nope-x")&&r.status===404),tag+" "+u+" is served ("+r.status+")")}
   // ===== 3. /find prerender =====
   {const r=await req(S.port,"GET","/find");const h=r.body;const pre=(h.match(/<div id="pre11">[\s\S]*$/)||[""])[0];
    ok(r.status===200&&/<div id="pre11">/.test(h)&&/<h1 class="restitle">All pros/.test(pre)&&(pre.match(/class="pcard/g)||[]).length>=3,tag+" /find: first HTML has the results heading and cards");
