@@ -31,3 +31,5 @@
 .v41cta>div{flex:1;display:flex;flex-direction:column;min-width:0}
 .v41cta small{color:#4A5160}
 @media (max-width:700px){.v41row{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}.v41row-m{grid-column:1/-1}.v41apps{grid-column:1}.v41row .btn{grid-row:3;grid-column:2;justify-self:end}.v41meter{grid-column:1/-1}.v41cta{flex-wrap:wrap}}
+/* v41 a11y: the pay-per-lead cost on the savings card (v30) was #D42A3A on #F2EFE8 (4.36:1, Lighthouse color-contrast on signed-in pro dashboards); darker red, 5.6:1 */
+.v30cmp-o .bad{color:#B42318}

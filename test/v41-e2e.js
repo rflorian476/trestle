@@ -150,7 +150,9 @@ const SERVERS=[];let br=null;const errs=[];
 
  // another pro (not the poster, no traveler profile) sees no fit chips and no applicant list
  {const {c,p}=await page(L,1300,PRO.ck);await go(L,p,"/tcall/tcd6",".t6recip");ok(await p.locator(".v41fit,#v41sum,#v41me").count()===0,"another pro sees no fit chips on someone else's call");
-  await go(L,p,"/dash","#acctBtn");ok(await p.locator("#v41calls").count()===0,"a plumber with no calls gets no traveler-calls card");await c.close()}
+  await go(L,p,"/dash","#acctBtn");ok(await p.locator("#v41calls").count()===0,"a plumber with no calls gets no traveler-calls card");
+  const bad=await p.evaluate(()=>{const b=document.querySelector("#v30out b.bad");return b?getComputedStyle(b).color:"none"});ok(bad==="rgb(180, 35, 24)"||bad==="none","savings card's pay-per-lead cost uses the darker red (4.5:1+)",bad);
+  await axe(p,"#v30cmp","savings card",["color-contrast"]);await c.close()}
  // an electrical pro with no calls gets the 'Post a traveler call' card
  {const EP=await signup(L,"pro","elec","85004",{trade:"Electrical"});ok(EP.status===200,"an electrical pro signs up",J(EP.error));
   const {c,p}=await page(L,1300,EP.ck);await go(L,p,"/dash","#v41calls");const t=await p.locator("#v41calls").innerText().catch(()=>"");
