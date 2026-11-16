@@ -121,9 +121,10 @@ function codeFrom(mail){
    const a=await req(port,"POST","/api/auth/start",jsonHeaders(),JSON.stringify({channel:"email",to:"v20-none@example.com"}));
    const b=await req(port,"POST","/api/auth/start",jsonHeaders(),JSON.stringify({channel:"email",to:"demo-homeowner@sawyer.test"}));
    assert(a.status===503&&b.status===503&&a.body===b.body&&!leak(a.json,a.body),"public host without a provider: identical 503, no code or link",a.status+" "+a.body.slice(0,160));
-   assert(/email or text provider/i.test(a.json&&a.json.error||""),"public host without a provider explains that a provider is needed");
+   const err=a.json&&a.json.error||"";
+   assert(/aren't switched on yet/i.test(err)&&/password/i.test(err)&&/passkey/i.test(err)&&/linked account/i.test(err),"public host without a provider says codes aren't switched on yet and to use a password, passkey or linked account",err);
    const sms=await req(port,"POST","/api/auth/start",jsonHeaders(),JSON.stringify({channel:"sms",to:"5125550199"}));
-   assert(sms.status===503&&/text message codes aren't available yet/i.test(sms.json&&sms.json.error||"")&&/email/i.test(sms.json.error)&&!leak(sms.json,sms.body),"public host SMS: 503 says texts aren't available yet and to use email",sms.body.slice(0,180));
+   assert(sms.status===503&&sms.json&&sms.json.error===err&&!/Use email to get a sign-in code/i.test(sms.json.error)&&!leak(sms.json,sms.body),"public host SMS: same honest 503 when email isn't ready either (no 'use email')",sms.body.slice(0,180));
    const methods=(await req(port,"GET","/api/auth/methods")).json;
    assert(methods&&methods.email==="off"&&methods.sms==="off","public host without a provider reports email and sms as off");
    const prices=await req(port,"GET","/prices");

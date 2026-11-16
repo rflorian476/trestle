@@ -1,5 +1,7 @@
 #!/bin/bash
 # Runs every e2e suite, each against its own fresh server (empty data dir, so suites don't affect each other).
+# Official count is 37: 14 shared-port suites in SUITES, then 23 self-contained suites in the second loop.
+# test/shots.js is a screenshot helper, not a suite, and is not in this runner.
 # usage: NODE_PATH=/path/to/node_modules(with playwright) bash test/run-all.sh [port]   -> prints PASS/FAIL per suite
 cd "$(dirname "$0")/.."
 PORT=${1:-8961}; B="http://localhost:$PORT"; export ADMIN_TOKEN="${ADMIN_TOKEN:-$(node -e 'process.stdout.write(require("crypto").randomBytes(18).toString("hex"))')}"

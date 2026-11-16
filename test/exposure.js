@@ -12,10 +12,18 @@ function start(port,extra){
  const child=spawn(process.execPath,[path.join(ROOT,"server.js")],{env,stdio:["ignore","pipe","pipe"]});
  let log="";child.stdout.on("data",d=>{log+=d});child.stderr.on("data",d=>{log+=d});
  return new Promise((ok,no)=>{
-  const t=setTimeout(()=>{no(new Error("server did not start\n"+log))},8000);
-  const wait=()=>{if(/live on/.test(log)){clearTimeout(t);ok({child,dir,log:()=>log})}else setTimeout(wait,30)};
-  child.on("exit",()=>{clearTimeout(t);no(new Error("server exited\n"+log))});
-  wait();
+  const t0=Date.now(),budget=30000;
+  const done=err=>{if(settled)return;settled=true;if(err)no(err);else ok({child,dir,log:()=>log})};
+  let settled=false;
+  const ping=()=>{
+   if(settled)return;
+   if(Date.now()-t0>budget)return done(new Error("server did not start\n"+log));
+   const r=http.get({hostname:"127.0.0.1",port,path:"/healthz",timeout:800},res=>{res.resume();if(res.statusCode===200)done();else setTimeout(ping,50)});
+   r.on("error",()=>setTimeout(ping,50));
+   r.on("timeout",()=>{try{r.destroy()}catch(e){}setTimeout(ping,50)});
+  };
+  child.on("exit",()=>done(new Error("server exited\n"+log)));
+  ping();
  });
 }
 function stop(s){return new Promise(ok=>{s.child.on("exit",()=>{fs.rmSync(s.dir,{recursive:true,force:true});ok()});s.child.kill("SIGTERM")})}

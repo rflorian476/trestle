@@ -93,7 +93,7 @@ function v12Stats(u){const rs=respStats(u.id)||{n:0};const D90=Date.now()-90*864
 /* service area: towns covered + "do you come to my ZIP?" */
 function v12Towns(u){const r=+u.radius||25;const seen=new Set();return Object.keys(ZIPS).map(z=>({z,d:dist(u.zip,z),t:ZIPS[z][0]})).filter(x=>x.d<=r&&!seen.has(x.t)&&seen.add(x.t)).sort((a,b)=>a.d-b.d).slice(0,14)}
 function v12AreaHTML(u){const ts=v12Towns(u);return`<div class="ar12"><div class="ar12-t"><b>${I("pin",15)}Towns covered</b><div class="ar12-c">${ts.map(x=>`<span>${esc(x.t.replace(/, [A-Z]{2}$/,""))}<small>${x.d} mi</small></span>`).join("")}</div></div>
- <form class="ar12-f" id="ar12F"><label for="ar12z">Do they come to you?</label><div class="row"><input id="ar12z" inputmode="numeric" maxlength="5" placeholder="Your ZIP" autocomplete="postal-code"><button class="btn sm">Check</button></div><p id="ar12o" class="small" aria-live="polite"></p></form></div>`}
+ <form class="ar12-f" id="ar12F"><label for="ar12z">Do they come to you?</label><div class="row"><input id="ar12z" inputmode="numeric" maxlength="10" placeholder="Your ZIP" autocomplete="postal-code"><button class="btn sm">Check</button></div><p id="ar12o" class="small" aria-live="polite"></p></form></div>`}
 
 /* book a consult */
 const CS12MODES={onsite:["home","On-site estimate","They come look at the job"],video:["play","Video call","Show them on your phone camera"],phone:["phone","Phone call","Talk it through first"]};

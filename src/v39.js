@@ -3,7 +3,7 @@ function v39Now(){return typeof __now==="function"?__now():Date.now()}
 /* (1) QA v38 idea 4: every US ZIP can be typed. The Account form and the sign-up forms (homeowner / business, project
    manager, pro onboarding) used a 45-city <select>, so a customer in an unlisted ZIP could not correct it in the UI even
    though signup / updateMe store any well-formed ZIP (SW-091 / SW-093). Now a 5-digit text field (inputmode numeric,
-   pattern [0-9]{5}, the server's rule: exactly five digits after trimming) with a live hint: the town when Sawyer knows the
+   pattern [0-9]{5}, maxlength 10 so a paste with spaces or a ZIP+4 isn't truncated, then trimmed and stripped to digits on input and paste; the server's rule: exactly five digits after trimming) with a live hint: the town when Sawyer knows the
    ZIP, otherwise the state from the 3-digit prefix, and the Automatic time zone from the prefix (v38ZipTz). A malformed ZIP
    gets an inline error and the form doesn't submit. signupPro and signupPM apply the same rule on the server (signupPM no
    longer remaps unknown ZIPs to 78704; signupPro no longer stores whatever string it was sent). */
@@ -20,24 +20,34 @@ function v39ZipHint(z,u){z=String(z||"").trim();if(!V39_ZIP.test(z))return"5 dig
  return(pl?pl+" · ":"ZIP "+z+" · ")+auto+pick}
 const V39_ZMSG="Enter a 5-digit ZIP, like 49660.";
 function v39ZipField(id,val,label,u,req){const v=String(val||"");
- return`<label for="${id}">${esc(label)}</label><input id="${id}" name="zip" class="v39zip" type="text" inputmode="numeric" pattern="[0-9]{5}" minlength="5" maxlength="5" autocomplete="postal-code" placeholder="49660" ${req===false?"":"required"} value="${esc(v39ZipOk(v)?v.trim():"")}" aria-describedby="${id}-h ${id}-e"><p class="v39zh small muted" id="${id}-h" aria-live="polite">${esc(v39ZipHint(v,u))}</p><p class="v39ze" id="${id}-e" role="alert" hidden></p>`}
+ return`<label for="${id}">${esc(label)}</label><input id="${id}" name="zip" class="v39zip" type="text" inputmode="numeric" pattern="[0-9]{5}" minlength="5" maxlength="10" autocomplete="postal-code" placeholder="49660" ${req===false?"":"required"} value="${esc(v39ZipOk(v)?v.trim():"")}" aria-describedby="${id}-h ${id}-e"><p class="v39zh small muted" id="${id}-h" aria-live="polite">${esc(v39ZipHint(v,u))}</p><p class="v39ze" id="${id}-e" role="alert" hidden></p>`}
 const V39_ZIDS={"ac-z":"ZIP code","cu-z":"ZIP code","pms-z":"ZIP code (where you're based)","ob-zip":"ZIP code (where you're based)"};
 function v39ZipSwap(h,vals,u){return String(h).replace(/<label for="(ac-z|cu-z|pms-z|ob-zip)">[^<]*<\/label><select id="\1" name="zip">[\s\S]*?<\/select>/g,(x,id)=>v39ZipField(id,vals&&vals[id]!=null?vals[id]:"",V39_ZIDS[id],u))}
 {const os=A.signupPM;if(os)A.signupPM=function(o){o=o||{};const z=String(o.zip||"").trim();if(!V39_ZIP.test(z))return{ok:false,msg:V39_ZMSG};const r=os.apply(this,arguments);try{if(r&&r.ok){const u=me();if(u&&u.role==="pm"){u.zip=z;save()}}}catch(e){}return r}}
 {const os=A.signupPro;if(os)A.signupPro=function(o){o=o||{};const z=String(o.zip||"").trim();if(!V39_ZIP.test(z))return{ok:false,msg:V39_ZMSG};o.zip=z;return os.apply(this,arguments)}}
 if(typeof document!=="undefined"){
  function v39ZipErr(i,msg){const e=document.getElementById(i.id+"-e");if(e){e.textContent=msg||"";e.hidden=!msg}if(msg)i.setAttribute("aria-invalid","true");else i.removeAttribute("aria-invalid")}
- function v39ZipCheck(i,strict){const v=i.value.trim();if(!v)return strict&&i.required?(v39ZipErr(i,V39_ZMSG),false):(v39ZipErr(i,""),true);if(/\D/.test(v)){v39ZipErr(i,"ZIP codes are numbers only. "+V39_ZMSG);return false}
+ function v39ZipDigits(s){return String(s||"").replace(/\D/g,"").slice(0,5)}
+ function v39ZipApply(i){const n=v39ZipDigits(i.value);if(i.value!==n)i.value=n;return n}
+ /* SW-094: trim and strip non-digits on input and paste, before maxlength or validation can
+    truncate a leading-space paste (" 96813 " used to become " 9681"). maxlength is 10 so a
+    ZIP+4 or spaced value can land, then we keep the first five digits. */
+ function v39ZipListen(i,onClean){if(!i||i.__v39)return;i.__v39=1;if(i.maxLength>0&&i.maxLength<10)i.maxLength=10;
+  i.addEventListener("input",()=>{v39ZipApply(i);onClean&&onClean()});
+  i.addEventListener("paste",e=>{const cd=e.clipboardData||window.clipboardData;const t=cd?cd.getData("text"):"";e.preventDefault();i.value=v39ZipDigits(t);onClean&&onClean()})}
+ function v39ZipCheck(i,strict){v39ZipApply(i);const v=i.value;if(!v)return strict&&i.required?(v39ZipErr(i,V39_ZMSG),false):(v39ZipErr(i,""),true);
   if(!V39_ZIP.test(v)){if(strict)v39ZipErr(i,V39_ZMSG);return false}v39ZipErr(i,"");return true}
- function v39ZipBind(){document.querySelectorAll("input.v39zip").forEach(i=>{if(i.__v39)return;i.__v39=1;const h=document.getElementById(i.id+"-h");
-  const u=i.id==="ac-z"?me():null;i.addEventListener("input",()=>{if(h)h.textContent=v39ZipHint(i.value,u);v39ZipCheck(i,false)});
-  i.addEventListener("invalid",e=>{e.preventDefault();v39ZipCheck(i,true);i.focus()})})}
+ function v39ZipBind(root){(root||document).querySelectorAll("input.v39zip, input[autocomplete=\"postal-code\"]").forEach(i=>{const h=document.getElementById(i.id+"-h");
+  const u=i.id==="ac-z"&&typeof me==="function"?me():null;
+  v39ZipListen(i,()=>{if(h)h.textContent=v39ZipHint(i.value,u);if(i.classList.contains("v39zip"))v39ZipCheck(i,false)});
+  if(i.classList.contains("v39zip")&&!i.__v39inv){i.__v39inv=1;i.addEventListener("invalid",e=>{e.preventDefault();v39ZipCheck(i,true);i.focus()})}})}
+ document.addEventListener("focusin",e=>{const i=e.target;if(i&&i.matches&&i.matches("input.v39zip, input[autocomplete=\"postal-code\"]"))try{v39ZipBind(i.parentNode||document)}catch(x){}});
  /* a malformed ZIP stops the form before its own submit handler runs (capture phase), with the inline error */
- document.addEventListener("submit",e=>{const f=e.target;if(!f||!f.querySelectorAll)return;const bad=[...f.querySelectorAll("input.v39zip")].find(i=>!v39ZipCheck(i,true));if(bad){e.preventDefault();e.stopImmediatePropagation();bad.focus()}},true);
+ document.addEventListener("submit",e=>{const f=e.target;if(!f||!f.querySelectorAll)return;[...f.querySelectorAll("input.v39zip, input[autocomplete=\"postal-code\"]")].forEach(v39ZipApply);const bad=[...f.querySelectorAll("input.v39zip")].find(i=>!v39ZipCheck(i,true));if(bad){e.preventDefault();e.stopImmediatePropagation();bad.focus()}},true);
  {const ov=VIEWS.account;VIEWS.account=function(){const h=ov.apply(this,arguments);try{const m=me();if(!m)return h;return v39ZipSwap(h,{"ac-z":m.zip},m)}catch(e){return h}}}
  {const ov=VIEWS.signup;VIEWS.signup=function(){const h=ov.apply(this,arguments);try{return v39ZipSwap(h,{})}catch(e){return h}}}
  {const ov=VIEWS.join;if(ov)VIEWS.join=function(){const h=ov.apply(this,arguments);try{return v39ZipSwap(h,{"ob-zip":typeof OB!=="undefined"&&OB?OB.zip:""})}catch(e){return h}}}
- for(const k of ["account","signup","join"]){const oa=AFTER[k];AFTER[k]=function(){const r=oa&&oa.apply(this,arguments);try{v39ZipBind()}catch(e){}return r}}
+ for(const k of ["account","signup","join","pro","myhome"]){const oa=AFTER[k];AFTER[k]=function(){const r=oa&&oa.apply(this,arguments);try{v39ZipBind()}catch(e){}return r}}
 }
 
 /* (2) 1099 year-end (QA v38 idea 6). A sub can be credited or refunded (a negative Subcontractor entry, "Credit / refund"

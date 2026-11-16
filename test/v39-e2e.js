@@ -6,7 +6,9 @@
 // 1099-NEC line ($600 through 2025, $2,000 for 2026, 2027+ labeled "check IRS — adjusts for inflation after 2026"),
 // (3) elapsed-today visits ("Due now" / "Past start time" on the visit's own clock, Ask stays until the end of the visit
 // day, passed times today refused, SW-092 western visits after midnight Eastern still listed) and (4) honest sign-in copy
-// while codes can't be delivered (ready.email / ready.sms) at 390 and 1440.
+// while codes can't be delivered (ready.email / ready.sms) at 390 and 1440. SW-094: ZIP paste/input
+// strips spaces and non-digits on every typed ZIP field (maxlength 10). SW-095: SMS POST /api/auth/start
+// is honest when neither channel is ready (no 'Use email to get a sign-in code').
 // Usage: node test/v39-e2e.js [shots dir]   (V39_SHOTS=dir also copies the screenshots there)
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib");
@@ -54,6 +56,17 @@ const SERVERS=[];let br=null;const errs=[];
  const eshot=async(loc,name)=>{await loc.scrollIntoViewIfNeeded();await loc.screenshot({path:path.join(SH,name)});if(SHOTS)await loc.screenshot({path:path.join(SHOTS,name)})};
  const noOverflow=async(p,lbl)=>{const ov=await p.evaluate(()=>document.documentElement.scrollWidth-innerWidth);ok(ov<=0,lbl+": no sideways scroll",ov)};
  const axe=async(p,sel,lbl)=>{if(!AXE)return;await p.addScriptTag({content:AXE});const v=await p.evaluate(async s=>{const r=await axe.run(document.querySelector(s)||document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa"]}});return r.violations.filter(v=>v.impact==="serious"||v.impact==="critical").map(v=>v.id)},sel);ok(!v.length,lbl+": no serious axe issues",J(v))};
+ const pasteZip=async(p,sel,text)=>{
+  await p.locator(sel).click();
+  await p.evaluate(({sel,text})=>{
+   const i=document.querySelector(sel);
+   i.focus();i.value="";
+   const dt=new DataTransfer();dt.setData("text/plain",text);
+   const ev=new ClipboardEvent("paste",{clipboardData:dt,bubbles:true,cancelable:true});
+   const prevented=!i.dispatchEvent(ev)||ev.defaultPrevented;
+   if(!prevented){const max=i.maxLength>0?i.maxLength:Infinity;i.value=(i.value+text).slice(0,max);i.dispatchEvent(new Event("input",{bubbles:true}))}
+  },{sel,text});
+ };
 
  // ===== 0. version =====
  {const hz=(await req(L.port,"GET","/healthz")).json||{};ok(hz.v==="2.22.0-sawyer","healthz reports 2.22.0-sawyer",J(hz));
@@ -81,12 +94,27 @@ const SERVERS=[];let br=null;const errs=[];
   ok(!e.hid&&/5-digit ZIP/.test(e.t)&&e.inv==="true"&&e.foc==="ac-z"&&e.role==="alert",w+": a 4-digit ZIP shows an inline error, focus stays on the field",J(e));
   me=meOf(await stateFor(L,HO.ck));ok(me.zip==="96813",w+": the malformed ZIP is not saved",me.zip);
   if(w===390)await eshot(p.locator("#acctForm"),"v39-zip-error-390.png");
-  await p.fill("#ac-z","49a60");e=await p.evaluate(()=>document.getElementById("ac-z-e").textContent);ok(/numbers only/.test(e),w+": letters are called out while typing",e);
+  await p.fill("#ac-z","49a60");ok((await p.inputValue("#ac-z"))==="4960",w+": letters are stripped on input (SW-094)",await p.inputValue("#ac-z"));
   await p.fill("#ac-z","49660");e=await p.evaluate(()=>({h:document.getElementById("ac-z").getAttribute("aria-invalid"),x:document.getElementById("ac-z-e").hidden,t:document.getElementById("ac-z-h").textContent}));ok(e.h===null&&e.x&&/Michigan · Automatic time zone: Eastern/.test(e.t),w+": a good ZIP clears the error (Manistee 49660: Michigan, Eastern)",J(e));
   await p.click("#acctForm button.primary");await p.waitForTimeout(500);ok(meOf(await stateFor(L,HO.ck)).zip==="49660",w+": 49660 saves");
+  if(w===390){
+   const mx=await p.evaluate(()=>document.getElementById("ac-z").maxLength);
+   ok(mx>=10||mx<0,"SW-094: Account ZIP maxlength is at least 10 (was 5, which truncated ' 96813 ' to ' 9681')",mx);
+   await pasteZip(p,"#ac-z"," 96813 ");
+   const a=await p.evaluate(()=>({v:document.getElementById("ac-z").value,h:document.getElementById("ac-z-h").textContent}));
+   ok(a.v==="96813"&&/Hawaii/.test(a.h),"SW-094: pasting ' 96813 ' into Account keeps 96813 and hints Hawaii (not ' 9681')",J(a));
+   await pasteZip(p,"#ac-z","96813-1234");
+   ok((await p.inputValue("#ac-z"))==="96813","SW-094: a ZIP+4 paste keeps the first five digits");
+  }
   await noOverflow(p,w+" Account");
   await eshot(p.locator("#acctForm"),"v39-account-zip-"+w+".png");
   if(w===1440)await axe(p,"#acctForm",w+" Account form");
+  if(w===390){
+   await go(L,p,"/myhome");
+   await p.click("#v37addP");await p.waitForSelector("#v37pz");
+   await pasteZip(p,"#v37pz"," 96813 ");
+   ok((await p.inputValue("#v37pz"))==="96813","SW-094: pasting into the My home property ZIP keeps 96813");
+  }
   await c.close()}
  // sign-up forms: typed ZIPs for homeowner/business and PM; the pro wizard's location step
  for(const w of [1440,390]){const {c,p}=await page(L,w);await go(L,p,"/signup");await p.evaluate(()=>{const d=document.getElementById("pwSection");if(d)d.open=true});
@@ -100,7 +128,15 @@ const SERVERS=[];let br=null;const errs=[];
    await p.locator("#cu-z").press("Enter");await p.waitForTimeout(800);const z=await p.evaluate(()=>me()&&me().zip);ok(z==="27514","signing up in the browser with unlisted 27514 stores it",z)}
   await go(L,p,"/join");await p.evaluate(()=>{OBS=2;render()});await p.waitForTimeout(300);
   const ob=await p.evaluate(()=>{const i=document.getElementById("ob-zip");return i&&i.tagName+":"+i.className+":"+(document.getElementById("ob-zip-h")||{}).textContent});ok(/^INPUT:v39zip/.test(ob||""),w+": pro onboarding 'Where do you work?' takes a typed ZIP",ob);
-  if(w===390){await p.fill("#ob-zip","96813");await eshot(p.locator("#obf"),"v39-join-zip-390.png")}
+  if(w===390){await p.fill("#ob-zip","96813");await eshot(p.locator("#obf"),"v39-join-zip-390.png");
+   await go(L,p,"/signup");
+   await p.evaluate(()=>{const d=document.getElementById("pwSection");if(d)d.open=true});
+   await pasteZip(p,"#cu-z"," 96813 ");
+   ok((await p.inputValue("#cu-z"))==="96813","SW-094: pasting ' 96813 ' into the sign-up ZIP keeps 96813");
+   await go(L,p,"/p/c1");
+   await p.waitForSelector("#ar12z");
+   await pasteZip(p,"#ar12z"," 96813 ");
+   ok((await p.inputValue("#ar12z"))==="96813","SW-094: pasting into the service-area ZIP keeps 96813")}
   await noOverflow(p,w+" sign-up");await c.close()}
 
  // ===== 2. 1099: credits / refunds and the year-keyed line =====
@@ -183,6 +219,9 @@ const SERVERS=[];let br=null;const errs=[];
  {const P=await startApp({RENDER:"true"});SERVERS.push(P);
   const m=(await req(P.port,"GET","/api/auth/methods")).json||{};ok(m.email==="off"&&m.ready&&m.ready.email===false&&m.ready.sms===false,"public host, no provider: ready.email/sms false",J(m));
   const st=await req(P.port,"POST","/api/auth/start",JH,J({channel:"email",to:"x-v39@example.com"}));ok(st.status===503,"POST /api/auth/start is still 503 (email/SMS not enabled; nothing turned on)",st.status);
+  const sms=await req(P.port,"POST","/api/auth/start",JH,J({channel:"sms",to:"+15555550100"}));
+  const smse=(sms.json&&sms.json.error)||"";
+  ok(sms.status===503&&/aren't switched on yet/i.test(smse)&&/password/i.test(smse)&&/passkey/i.test(smse)&&/linked account/i.test(smse)&&!/Use email to get a sign-in code/i.test(smse),"SW-095: SMS 503 when both channels are off is honest (no 'use email')",sms.body.slice(0,240));
   for(const w of [390,1440]){const o=await view(P,w,"pub","v39-signin-honest-"+w+".png");
    ok(HON.test(o.t)&&!PROMISE.test(o.t)&&!/Codes expire in 10 minutes/.test(o.t),w+": the card leads with password / passkey, no 'No password needed' promise",o.t.slice(0,300));
    ok(o.det&&o.open===false&&o.send&&!o.sendVis&&o.verF&&o.pw===true,w+": the code form stays in the page (hooks) but folded under 'not switched on yet'; password section open",J(o))}
