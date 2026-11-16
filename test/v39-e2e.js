@@ -1,6 +1,6 @@
 // v39 end-to-end. Self-contained: starts its own Sawyer servers (local test mode; a public-host simulation with no email
-// provider; Resend stand-ins answering 403 and 200; a test-clock server for visits). Covers health 2.22.0-sawyer / SW cache
-// sawyer-v39, (1) the typed 5-digit ZIP on Account and sign-up (inputmode/pattern, live town/state + Automatic time zone
+// provider; Resend stand-ins answering 403 and 200; a test-clock server for visits). Covers health (any Sawyer version /
+// SW cache since v40), (1) the typed 5-digit ZIP on Account and sign-up (inputmode/pattern, live town/state + Automatic time zone
 // hint, 96813 / 00901 / unlisted 27514 saved, malformed refused inline; PM and pro signup apply the server's ZIP rule),
 // (2) 1099 credits / refunds (integer cents, never below $0, Subcontractor only, private, not billable) and the year-keyed
 // 1099-NEC line ($600 through 2025, $2,000 for 2026, 2027+ labeled "check IRS — adjusts for inflation after 2026"),
@@ -52,6 +52,12 @@ const SERVERS=[];let br=null;const errs=[];
   if(ck){const [k,v]=ck.split("=");await c.addCookies([{name:k,value:v,url:S.B}])}if(init)await c.addInitScript(init.fn,init.arg);
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return{c,p}};
  const go=async(S,p,u)=>{await p.goto(S.B+u,{waitUntil:"networkidle"});await p.waitForTimeout(300)};
+ // v40: the Reports year view settles before it is read: wait for the year control, pick the year with it if the URL
+ // didn't land there, then wait until the Tax records card heading shows that year (the ?y=2027 check was racy under run-all).
+ const yearView=async(S,p,y)=>{await go(S,p,"/office/reports?y="+y);await p.waitForSelector("#o9Year",{timeout:15000});
+  if(await p.inputValue("#o9Year")!==String(y)){await p.selectOption("#o9Year",String(y));}
+  await p.waitForFunction(y=>{const s=document.getElementById("o9Year"),c=document.getElementById("v38tax"),h=c&&c.querySelector("h2");return s&&s.value===y&&h&&h.textContent.includes("Tax records · "+y)},String(y),{timeout:15000});
+  await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))))};
  const shot=async(p,name,opt)=>{await p.screenshot(Object.assign({path:path.join(SH,name)},opt||{}));if(SHOTS)await p.screenshot(Object.assign({path:path.join(SHOTS,name)},opt||{}))};
  const eshot=async(loc,name)=>{await loc.scrollIntoViewIfNeeded();await loc.screenshot({path:path.join(SH,name)});if(SHOTS)await loc.screenshot({path:path.join(SHOTS,name)})};
  const noOverflow=async(p,lbl)=>{const ov=await p.evaluate(()=>document.documentElement.scrollWidth-innerWidth);ok(ov<=0,lbl+": no sideways scroll",ov)};
@@ -69,8 +75,8 @@ const SERVERS=[];let br=null;const errs=[];
  };
 
  // ===== 0. version =====
- {const hz=(await req(L.port,"GET","/healthz")).json||{};ok(hz.v==="2.22.0-sawyer","healthz reports 2.22.0-sawyer",J(hz));
-  const sw=await req(L.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v39"/.test(sw.body),"service worker cache is sawyer-v39")}
+ {const hz=(await req(L.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
+  const sw=await req(L.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker has a Sawyer cache name")}
 
  // ===== 1. ZIPs: server rule for every sign-up kind, then the typed field =====
  {for(const z of ["27514","96813","00901"]){const a=await signup(L,"pm","pm"+z,z);ok(a.status===200&&meOf(a.st).zip===z,"PM signup stores "+z+" as entered (was remapped to 78704)",J({s:a.status,e:a.error,zip:meOf(a.st).zip}))}
@@ -160,7 +166,7 @@ const SERVERS=[];let br=null;const errs=[];
   r=await a(0,{kind:"exp",cat:"Subcontractor",vendor:"Exact Line LLC",amt:"-abc",date:"2026-08-01"});ok(r.ok===false&&/credit amount/.test(r.msg),"a non-number credit is refused",J(r));
   const other=await signup(L,"pro","taxother","30307");const os=await stateFor(L,other.ck);ok(!(os.ledger||[]).some(l=>l.credit39||/Exact Line/i.test(l.vendor||"")),"another pro never gets the credits");
   const pubs=await stateFor(L);ok(!(pubs.ledger||[]).length,"signed-out state carries no ledger")}
- for(const w of [390,1440]){const {c,p}=await page(L,w,TP.ck);await go(L,p,"/office/reports?y=2026");const card=p.locator("#v38tax");ok(await card.count()===1,w+": Tax records render");let t=await card.innerText();
+ for(const w of [390,1440]){const {c,p}=await page(L,w,TP.ck);await yearView(L,p,2026);const card=p.locator("#v38tax");ok(await card.count()===1,w+": Tax records render");let t=await card.innerText();
   ok(/Exact Line LLC/.test(t)&&/\$1,950\.00/.test(t)&&/credits −\$150\.00/.test(t)&&!/1 sub reached/.test(t),w+": after the credit Exact Line is $1,950.00 (under the $2,000 line), credits shown",t.slice(0,900));
   ok(!/check IRS/.test(t)&&/\$2,000 or more in 2026/.test(t),w+": 2026 states the $2,000 line plainly");
   ok(/never tax IDs/.test(t)&&!(await p.locator('#v38tax input[name*=tin i],#v38tax input[name*=ssn i],#v38tax input[name*=ein i]').count()),w+": W-9 stays yes/no, no tax ID fields");
@@ -174,11 +180,11 @@ const SERVERS=[];let br=null;const errs=[];
    await p.fill("#v39cra","200.50");ok(await p.locator("#v39crE").isHidden(),"the sheet's error clears once the amount is changed");await p.fill("#v39crn","Callback, redone");await shot(p,"v39-1099-credit-sheet-1440.png");
    await p.click("#v39crf button.primary");await p.waitForTimeout(600);t=await card.innerText();ok(/\$1,749\.50/.test(t)&&/credits −\$350\.50/.test(t),"after a $200.50 credit from the sheet the total is $1,749.50",t.slice(0,400))}
   await eshot(card,"v39-1099-credits-"+w+".png");
-  await go(L,p,"/office/reports?y=2027");t=await p.locator("#v38tax").innerText();
+  await yearView(L,p,2027);t=await p.locator("#v38tax").innerText();
   ok(/Tax records · 2027/.test(t)&&/check IRS — adjusts for inflation after 2026/.test(t)&&/1 sub reached \$2,000 \(check IRS — adjusts for inflation after 2026\) in 2027/.test(t),w+": 2027 shows $2,000 labeled 'check IRS — adjusts for inflation after 2026'",t.slice(0,500));
   if(w===390)await eshot(p.locator("#v38tax section").first(),"v39-1099-2027-390.png");
-  await go(L,p,"/office/reports?y=2025");t=await p.locator("#v38tax").innerText();ok(/\$600 or more in 2025/.test(t)&&!/check IRS/.test(t),w+": 2025 uses the $600 line, no estimate label");
-  await noOverflow(p,w+" Tax records");if(w===1440){await go(L,p,"/office/reports?y=2026");await axe(p,"#v38tax",w+" Tax records")}
+  await yearView(L,p,2025);t=await p.locator("#v38tax").innerText();ok(/\$600 or more in 2025/.test(t)&&!/check IRS/.test(t),w+": 2025 uses the $600 line, no estimate label");
+  await noOverflow(p,w+" Tax records");if(w===1440){await yearView(L,p,2026);await axe(p,"#v38tax",w+" Tax records")}
   await c.close()}
 
  // ===== 3. elapsed-today visits, on a test clock: 2026-11-16 07:30Z = 2:30am ET Nov 16 = 9:30pm HST Nov 15 =====
