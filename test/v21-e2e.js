@@ -62,7 +62,8 @@ let LOCAL=null,PUB=null,br=null;
   const RAW="Resident credentials or empty 'allowCredentials' lists are not supported at this time.";
   const tryErr=async(name,msg)=>{await p.evaluate(([n,m])=>{document.querySelectorAll("#toasts .toast").forEach(t=>t.remove());navigator.credentials.get=async()=>{throw new DOMException(m,n)}},[name,msg]);await p.click("#au-passkey");await p.waitForTimeout(500);return toasts(p)};
   let t=await tryErr("NotSupportedError",RAW);
-  ok(t.length&&t.every(x=>!/Resident|allowCredentials/.test(x))&&t.some(x=>/Passkeys aren't available in this browser, or none is set up\. Use email or a password\./.test(x)),"NotSupportedError shows fixed friendly copy, not the raw WebAuthn string",J(t));
+  ok(t.length&&t.every(x=>!/Resident|allowCredentials/.test(x))&&/* v40: the fallback names only what this host can complete (GET /api/auth/methods). Public-sim has no code delivery and no live provider, so it's "Use your password." — never email, never a passkey (that just failed). */
+   t.some(x=>/Passkeys aren't available in this browser, or none is set up\. Use your password\./.test(x))&&!t.some(x=>/email|sign-in code|passkey\.$/i.test(x.replace(/^Passkeys aren't available in this browser, or none is set up\./,""))),"NotSupportedError shows fixed friendly copy, not the raw WebAuthn string",J(t));
   ok(cons.some(x=>/passkey error/.test(x)&&/Resident/.test(x)),"the raw name/message is logged to the console",J(cons.slice(-3)));
   t=await tryErr("NotAllowedError","The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.");
   ok(t.some(x=>/cancelled or timed out/.test(x))&&!t.some(x=>/w3\.org|operation either/.test(x)),"NotAllowedError shows the cancelled/timed-out copy",J(t));
