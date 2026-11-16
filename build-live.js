@@ -32,7 +32,7 @@ c=rep(c,'<div class="fld"><label for="cu-z">','<div class="fld"><label for="cu-p
 c=rep(c,'<div class="fld"><label for="pms-z"','<div class="fld"><label for="pms-p">Password (8+ characters)</label><input id="pms-p" name="password" type="password" autocomplete="new-password" minlength="8"></div><div class="fld"><label for="pms-z"');
 c=rep(c,'<button class="linkbtn" id="resetBtn">Reset demo data</button>','');
 c=rep(c,'Demo prototype. Every business, person, license and review here is fictional.','Beta test. Every pro, customer, job and review in this beta is fictional sample data. Payments are in test mode.');
-c=rep(c,'id="acctBtn" aria-haspopup="true"','id="acctBtn" aria-label="${esc(nameOf(m).split(" ")[0])}, account menu" aria-haspopup="true"');
+c=rep(c,'id="acctBtn" aria-haspopup="true"','id="acctBtn" aria-label="${esc((ini(nameOf(m))+" "+nameOf(m).split(" ")[0]).trim())}, account menu" aria-haspopup="true"');
 c=c.split('class="mapsvg" role="img"').join('class="mapsvg" role="group"').split('class="mapsvg usmap" role="img"').join('class="mapsvg usmap" role="group"');
 c=rep(c,'class="stars" aria-label=','class="stars" role="img" aria-label=');
 c=rep(c,'Demo prototype. Every business, person, city listing, license and review here is fictional sample data.','Beta test. Every pro, customer, job and review in this beta is fictional sample data. Payments are in test mode.');
