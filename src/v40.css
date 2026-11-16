@@ -1,1 +1,11 @@
 /* ===== v40 ===== */
+/* v40 1099 entries: list and edit sheet */
+.v40ent{display:inline-block;font-size:13px;margin:2px 0 0 12px;min-height:24px;padding:2px 0}
+.v40el{list-style:none;margin:12px 0 4px;padding:0;border-top:1px solid #E4DCCB}
+.v40el li{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #E4DCCB}
+.v40el-d{flex:none;width:6.5em;font-size:14px;color:#4A5160}
+.v40el-m{flex:1;min-width:0;display:flex;flex-direction:column}
+.v40el-m b{font-variant-numeric:tabular-nums}
+.v40el-m small{overflow-wrap:anywhere}
+.v40el .v40cr{color:#1B5E3B}
+.v40el .btn{flex:none;min-height:36px}
