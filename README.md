@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.22.0
+# Sawyer (beta) — v2.23.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.22.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.23.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -21,6 +21,15 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v40: paste your ZIP, honest fallbacks, a prerendered sign-up, edit 1099 entries
+
+- **SW-096: ZIP fields take a paste again.** v39's paste handler blocked the paste (`preventDefault`) and rewrote the field itself, which cost signed-out `/myhome` its Lighthouse best-practices 100 ("Prevents users from pasting into input fields"). Now the paste lands (`maxlength` 10) and the `input` event cleans it: trims, drops a ZIP+4's +4 on purpose (`96813-1234` → `96813`, also `96813 1234`), otherwise keeps the first five digits with leading zeros (`00901`), and puts the caret after the digits it kept. The Hawaii / Puerto Rico (Atlantic) hints follow the same event. Applies to Account, homeowner/business and PM sign-up, pro onboarding, My home property ZIPs and the service-area check.
+- **Honest fallbacks.** The OAuth "Sign-in unavailable" and demo-unavailable pages (`lib/auth.js`) no longer say "Use email or a password" where codes can't be delivered. They name only what `AUTH.methods()` reports ready: a sign-in code only when `ready.email` / `ready.sms`, a password, a passkey, and a linked account only when another provider is live. On live today that reads "Use a password or a passkey". Passkey error copy in the browser and the passkey 400 follow the same rule; local test mode keeps "Use email or a password".
+- **`/signup` is prerendered** like `/myhome`: the first HTML for a signed-out visitor is the real sign-in card, built from `AUTH.methods()` (cache keyed on them), so it's honest before any JS runs (password section open, codes folded, while codes aren't on). The code-first default no longer says "One step. No password needed." It now reads "Sign in with a one-time code, a password or a passkey. New here? We'll create your account."
+- **Edit a 1099 payment or credit in place.** Tax records → each sub has **Edit entries**: a sheet lists that sub's payments and credits / refunds for the year, and **Edit** opens amount, date and note. Same rules as logging a credit: integer cents, the date stays in the entry's calendar year, and the sub's yearly total can't go below $0.00 after credits (a bigger credit says how much was paid, a smaller payment says the minimum). The inline error clears as soon as a field changes. Server-allowlisted `editLedger40` (pros, their own Subcontractor rows only). Names aren't edited here, so the 1099 worksheet CSV stays formula-safe.
+- Tests: `node test/v40-e2e.js [shots dir]` (self-contained: local test mode, a public-host simulation, a Resend stand-in answering 200) is part of `test/run-all.sh` (38 suites). `v39-e2e` waits for the Reports year view to settle (year control, then the "Tax records · 2027" heading) and accepts any Sawyer version / SW cache. SW cache is `sawyer-v40`. Code: `src/v40.js`, `src/v40.css`, `src/v39.js` (ZIP input), `src/v3.js` (default copy), `lib/auth.js` (`altWays`), `server.js` (`/signup` prerender).
+- Not changed: hosting and the data disk (SW-071 still waits on the paid-plan decision), test-mode payments, `noindex` and the beta bar. No email or SMS was switched on.
 
 ## v39: type any ZIP, 1099 credits, visits that know they've started, honest sign-in copy
 
