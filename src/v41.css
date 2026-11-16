@@ -1,0 +1,15 @@
+/* ===== v41 ===== */
+/* v41 fit check chips (applicants, pipeline cards, the traveler's own check) */
+.v41fit{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+.v41c{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12.5px;line-height:1.35;font-weight:600;background:#F1ECE2;color:#33405A}
+.v41c svg{flex:none}
+.v41-ok{background:#E6F2EA;color:#1B5E3B}
+.v41-no{background:#FBEAE6;color:#9A2A14}
+.v41-ask{background:#EEF2F7;color:#1B2A3B}
+.v41sum{display:flex;gap:8px;align-items:flex-start;margin:0 0 10px;padding:9px 12px;border-radius:10px;background:#EEF2F7;color:#1B2A3B}
+.v41sum svg{flex:none;margin-top:2px}
+.v41me{margin:12px 0 0;padding:12px 14px;border-radius:12px;border:1px solid #E4DCCB;background:#FBF9F5;display:flex;flex-direction:column;gap:4px}
+.v41me.is-ok{border-color:#B9D9C4;background:#F3F9F5}
+.v41me.is-no{border-color:#F0C7BC;background:#FDF6F4}
+.v41me a{align-self:flex-start;margin-top:4px;min-height:24px;display:inline-flex;align-items:center;text-decoration:underline;text-underline-offset:2px}
+.t6k-card .v41fit{margin:8px 0 4px}
