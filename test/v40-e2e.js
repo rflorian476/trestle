@@ -67,8 +67,8 @@ const SERVERS=[];let br=null;const errs=[];
   return{prevented,v:await p.inputValue(sel),caret:await p.evaluate(s=>document.querySelector(s).selectionStart,sel)}};
 
  // ===== 0. version =====
- {const hz=(await req(L.port,"GET","/healthz")).json||{};ok(hz.v==="2.23.0-sawyer","healthz reports 2.23.0-sawyer",J(hz));
-  const sw=await req(L.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v40"/.test(sw.body),"service worker cache is sawyer-v40")}
+ {const hz=(await req(L.port,"GET","/healthz")).json||{};ok(/^2\.(2[3-9]|[3-9]\d)\.\d+-sawyer$/.test(hz.v||""),"healthz reports a Sawyer version from 2.23.0 on",J(hz));
+  const sw=await req(L.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v(4\d|[5-9]\d)"/.test(sw.body),"service worker cache is sawyer-v40 or later")}
 
  // ===== 1. SW-096: paste is never blocked; the input event cleans it =====
  {const files=[path.join(ROOT,"public/index.html"),...fs.readdirSync(path.join(ROOT,"public/js")).filter(f=>/\.js$/.test(f)).map(f=>path.join(ROOT,"public/js",f))];

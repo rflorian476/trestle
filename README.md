@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.23.0
+# Sawyer (beta) — v2.24.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.23.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.24.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -22,6 +22,16 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v41: a fit check for traveler hiring, your traveler calls on the dashboard, a clearer account button
+
+- **Fit check on every traveler applicant.** On a traveler call, the poster sees under each applicant whether they can work it: a license card for the call's state, or one from a state the call's reciprocity line names (read from the posting, e.g. "Reciprocity accepted from TX, OK, NC, SC"; "No reciprocity" or "TX license required" accept no other state), at the level asked for (apprentice < journeyman < master; other classes such as lineman must match). Then the start date (free now, free by the start, "Free Dec 10, 10 days after the start", or marked not looking), the safety card and the number of references. The Applicants list opens with a summary ("1 of 1 active applicant fits the license and start date. This call takes journeyman cards from KY, OH, IN, TN, WV."), and the same chips are on the pipeline cards (`/tdash`). A signed-in traveler sees their own check on the call page ("You fit this call" / "Check your license first") before applying. It only informs: nobody is hidden, reordered or blocked, and Hire stays where it was. It's computed in the browser from what the poster and that traveler can already see; signed-out state still names no applicants.
+- **Your traveler calls (pro dashboard).** A contractor who posts calls sees each one (open first, then by start date) with spots hired / needed, active applicants and how many fit, days to start (same count as the call page) and a **Pipeline** button. A traveling-trade pro (electrical) with no calls gets a short "Post a traveler call" card.
+- **New demo login:** `demo-electrical@sawyer.test` (Sara Ellison, Saguaro Electric), the seeded contractor who posts the Ashburn data-center and Glendale battery-plant calls, so the hiring side of travel work can be tried.
+- **Account button a11y.** The signed-in `#acctBtn` was labelled with the first name only ("Bluebonnet, account menu") while it shows the avatar initials (Lighthouse `label-content-name-mismatch`, QA v40-test). Its name is now "BP Bluebonnet, account menu", and a real space between the initials and the first name makes the visible text "BP Bluebonnet", so the name starts with what's on screen at phone and desktop widths.
+- **Test robustness.** `v10-e2e`'s traveler status picker waits for the status data (full `/api/state` applied with `me().trav`) and then the picker, and each status change waits for the saved value, instead of fixed delays (it flaked under QA load).
+- Tests: `node test/v41-e2e.js [shots dir]` (self-contained, local test mode) is part of `test/run-all.sh` (39 suites). `v40-e2e` accepts any Sawyer version from 2.23.0 / SW cache from `sawyer-v40`. SW cache is `sawyer-v41`. Code: `src/v41.js`, `src/v41.css`, `build-live.js` (account button), `server.js` (demo login).
+- Not changed: hosting and the data disk (SW-071 still waits on the paid-plan decision), test-mode payments, `noindex` and the beta bar. No email or SMS was switched on. Known leftover: the desktop search button (`#sk8`, "Search (Control K)" vs visible "Search Ctrl K") has the same axe mismatch at desktop width only; its kbd hint is hidden on phones.
 
 ## v40: paste your ZIP, honest fallbacks, a prerendered sign-up, edit 1099 entries
 
