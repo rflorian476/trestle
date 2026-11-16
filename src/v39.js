@@ -3,7 +3,7 @@ function v39Now(){return typeof __now==="function"?__now():Date.now()}
 /* (1) QA v38 idea 4: every US ZIP can be typed. The Account form and the sign-up forms (homeowner / business, project
    manager, pro onboarding) used a 45-city <select>, so a customer in an unlisted ZIP could not correct it in the UI even
    though signup / updateMe store any well-formed ZIP (SW-091 / SW-093). Now a 5-digit text field (inputmode numeric,
-   pattern [0-9]{5}, maxlength 10 so a paste with spaces or a ZIP+4 isn't truncated, then trimmed and stripped to digits on input and paste; the server's rule: exactly five digits after trimming) with a live hint: the town when Sawyer knows the
+   pattern [0-9]{5}, maxlength 10 so a paste with spaces or a ZIP+4 isn't truncated, then trimmed and stripped to digits on input (SW-096: the paste lands, the input event cleans it); the server's rule: exactly five digits after trimming) with a live hint: the town when Sawyer knows the
    ZIP, otherwise the state from the 3-digit prefix, and the Automatic time zone from the prefix (v38ZipTz). A malformed ZIP
    gets an inline error and the form doesn't submit. signupPro and signupPM apply the same rule on the server (signupPM no
    longer remaps unknown ZIPs to 78704; signupPro no longer stores whatever string it was sent). */
@@ -27,14 +27,17 @@ function v39ZipSwap(h,vals,u){return String(h).replace(/<label for="(ac-z|cu-z|p
 {const os=A.signupPro;if(os)A.signupPro=function(o){o=o||{};const z=String(o.zip||"").trim();if(!V39_ZIP.test(z))return{ok:false,msg:V39_ZMSG};o.zip=z;return os.apply(this,arguments)}}
 if(typeof document!=="undefined"){
  function v39ZipErr(i,msg){const e=document.getElementById(i.id+"-e");if(e){e.textContent=msg||"";e.hidden=!msg}if(msg)i.setAttribute("aria-invalid","true");else i.removeAttribute("aria-invalid")}
- function v39ZipDigits(s){return String(s||"").replace(/\D/g,"").slice(0,5)}
- function v39ZipApply(i){const n=v39ZipDigits(i.value);if(i.value!==n)i.value=n;return n}
- /* SW-094: trim and strip non-digits on input and paste, before maxlength or validation can
-    truncate a leading-space paste (" 96813 " used to become " 9681"). maxlength is 10 so a
-    ZIP+4 or spaced value can land, then we keep the first five digits. */
+ /* SW-096: a ZIP+4 ("96813-1234", "96813 1234") drops its +4 explicitly; anything else keeps its first five digits, leading zeros
+    included (00901). */
+ function v39ZipDigits(s){s=String(s==null?"":s).trim();const p4=/^(\d{5})[\s\-\u2010-\u2014]?\d{4}$/.exec(s);if(p4)return p4[1];return s.replace(/\D/g,"").slice(0,5)}
+ function v39ZipApply(i){const v=i.value,n=v39ZipDigits(v);if(v===n)return n;let pos=-1;
+  try{if(document.activeElement===i&&typeof i.selectionStart==="number")pos=Math.min(n.length,v.slice(0,i.selectionStart).replace(/\D/g,"").length)}catch(e){}
+  i.value=n;if(pos>=0)try{i.setSelectionRange(pos,pos)}catch(e){}return n}
+ /* SW-094 / SW-096: maxlength is 10 so a spaced or ZIP+4 paste lands whole (" 96813 " used to become " 9681"); the input
+    event then trims it to the five-digit ZIP and puts the caret after the digits it kept. The paste itself is never
+    blocked (preventDefault on paste cost Lighthouse best practices: "Prevents users from pasting into input fields"). */
  function v39ZipListen(i,onClean){if(!i||i.__v39)return;i.__v39=1;if(i.maxLength>0&&i.maxLength<10)i.maxLength=10;
-  i.addEventListener("input",()=>{v39ZipApply(i);onClean&&onClean()});
-  i.addEventListener("paste",e=>{const cd=e.clipboardData||window.clipboardData;const t=cd?cd.getData("text"):"";e.preventDefault();i.value=v39ZipDigits(t);onClean&&onClean()})}
+  i.addEventListener("input",()=>{v39ZipApply(i);onClean&&onClean()})}
  function v39ZipCheck(i,strict){v39ZipApply(i);const v=i.value;if(!v)return strict&&i.required?(v39ZipErr(i,V39_ZMSG),false):(v39ZipErr(i,""),true);
   if(!V39_ZIP.test(v)){if(strict)v39ZipErr(i,V39_ZMSG);return false}v39ZipErr(i,"");return true}
  function v39ZipBind(root){(root||document).querySelectorAll("input.v39zip, input[autocomplete=\"postal-code\"]").forEach(i=>{const h=document.getElementById(i.id+"-h");
