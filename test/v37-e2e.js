@@ -53,6 +53,8 @@ let LOCAL=null,br=null,PS=null;
  const meOf=st=>(st.users||[]).find(u=>u.id===st.me)||{};
  const up=async(ck,file)=>{const buf=fs.readFileSync(path.join(ROOT,file));const r=await req(P(),"POST","/api/upload",{Cookie:ck,"Content-Type":"image/webp","Content-Length":buf.length},buf);return r.json&&r.json.url};
  const today=bizToday();
+ // v38: a visit's "today" and 6-month cap follow the visit's own clock (pro ZIP 78704 = Central), so near midnight Eastern they differ.
+ const vToday=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Chicago",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 
  // ===== 1. SW-085: markup in integer hundredths of a percent =====
  const mp=await signupPro("mk","Plumbing","78704");
@@ -81,10 +83,10 @@ let LOCAL=null,br=null,PS=null;
  r=await act(P(),ho2.ck,"visitConfirm37",[VID]);ok(r.res.ok===false,"another homeowner can't confirm it",J(r.res));
  r=await act(P(),pro.ck,"visitConfirm37",[VID]);ok(r.res.ok===false,"the pro can't confirm on the customer's behalf",J(r.res));
  r=await act(P(),ho2.ck,"visitAsk37",[VID,[{date:D2,start:"09:00"}],"x"]);ok(r.res.ok===false,"another homeowner can't ask to reschedule it");
- r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:addD(today,-1),start:"09:00"}],""]);ok(r.res.ok===false&&/from today/.test(r.res.msg),"a time in the past is refused",J(r.res));
+ r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:addD(vToday,-1),start:"09:00"}],""]);ok(r.res.ok===false&&/from today/.test(r.res.msg),"a time in the past is refused",J(r.res));
  r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:D2,start:""}],""]);ok(r.res.ok===false&&/day and a time/.test(r.res.msg),"a day without a time is refused",J(r.res));
  r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:D2,start:"09:00"},{date:D2,start:"10:00"},{date:D3,start:"08:00"},{date:D3,start:"12:00"}],""]);ok(r.res.ok===false&&/up to 3/.test(r.res.msg),"more than 3 times is refused",J(r.res));
- {const cap=addD(today,180),over=addD(today,181);
+ {const cap=addD(vToday,180),over=addD(vToday,181);
   r=await act(P(),ho.ck,"visitAsk37",[VID,[{date:over,start:"09:00"}],""]);ok(r.res.ok===false&&/6 months/.test(r.res.msg),"a day past the 180-day Eastern cap is refused",J({over,msg:r.res.msg}));
   r=await act(P(),pro.ck,"saveVisit",[{cust:CID,title:"Cap day check",date:D2,start:"11:00",hrs:"1",win:"0",job:JID}]);const VCAP=r.res.id;
   r=await act(P(),ho.ck,"visitAsk37",[VCAP,[{date:cap,start:"09:00"}],""]);ok(r.res.ok,"the exact 180-day Eastern cap day is accepted",J({cap,res:r.res}));
