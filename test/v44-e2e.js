@@ -108,6 +108,52 @@ const SERVERS=[];let br=null;
   ok(/ok\(false,"travel page ready \(st10Ready\)/.test(v10),"v10 st10Ready reports a timeout as a FAIL line");
   ok(/\.then\(\(\)=>true,e=>/.test(v10)&&!/timeout:90000/.test(v10),"v10 st10Ready no longer throws on a timeout (no uncaught 90s waitForFunction)");
   ok(/catch\(e=>\{console\.log\("FAIL crashed: "/.test(v10),"v10-e2e prints a FAIL line if it ever crashes, so run-all can't show a silent 28/0")}
+
+ // --- /dash perf: server-only code is not in the browser bundle
+ {const html=(await req(L.port,"GET","/")).body;const js=[...html.matchAll(/\/js\/(a\d+\.[0-9a-f]{10}\.js)/g)].map(m=>fs.readFileSync(path.join(ROOT,"public/js",m[1]),"utf8")).join("\n");
+  const logic=fs.readFileSync(path.join(ROOT,"app-logic.js"),"utf8");
+  ok(js.length>500000,"the app JS bundles are found",js.length);
+  ok(/is void, so it can't be duplicated/.test(logic)&&!/is void, so it can't be duplicated/.test(js),"dupBill42's body runs on the server (app-logic.js) and is not shipped to browsers");
+  ok(/Barton Creek Remodeling asked you to sign off/.test(logic)&&!/Barton Creek Remodeling asked you to sign off/.test(js),"demo seed builders are server-only");
+  const tot=fs.readdirSync(path.join(ROOT,"public/js")).filter(f=>/^a\d+\./.test(f)).reduce((n,f)=>n+fs.statSync(path.join(ROOT,"public/js",f)).size,0);
+  ok(tot<1120000,"app JS is under 1.12 MB raw (v43 was 1,209,463 bytes)",tot)}
+ // --- /dash perf: signed-in /dash starts with the dashboard stylesheet subset
+ {const PRO=await login(L,"demo-pro@sawyer.test");
+  const dh=(await req(L.port,"GET","/dash",{Cookie:PRO.ck})).body;const m=dh.match(/<link rel="stylesheet" href="\/css\/(dash\.[0-9a-f]{10}\.css)" id="css44" data-full="\/css\/(dashx\.[0-9a-f]{10}\.css)">/);
+  ok(!!m&&!/\/css\/app\.[0-9a-f]{10}\.css/.test(dh),"signed-in /dash links the dashboard subset (dash.*.css) with the swap-in sheet in data-full, not app.css");
+  const home=(await req(L.port,"GET","/")).body,find=(await req(L.port,"GET","/find")).body,acct=(await req(L.port,"GET","/account",{Cookie:PRO.ck})).body,dq=(await req(L.port,"GET","/dash?tab=x",{Cookie:PRO.ck})).body,dout=(await req(L.port,"GET","/dash")).body;
+  ok([home,find,acct,dq,dout].every(h=>/<link rel="stylesheet" href="\/css\/app\.[0-9a-f]{10}\.css">/.test(h)&&!/css44/.test(h)),"every other page (/, /find, /account, /dash?query, signed-out /dash) keeps the full app.css");
+  if(m){const app=fs.readdirSync(path.join(ROOT,"public/css")).find(f=>/^app\./.test(f));const A=fs.readFileSync(path.join(ROOT,"public/css",app),"utf8"),D=fs.readFileSync(path.join(ROOT,"public/css",m[1]),"utf8"),X=fs.readFileSync(path.join(ROOT,"public/css",m[2]),"utf8");
+   ok(D.length<A.length*0.25,"the dashboard subset is under a quarter of app.css",D.length+" of "+A.length);
+   ok(!/@font-face/.test(X)&&X===require(path.join(ROOT,"lib/css-split.js")).noFonts(A),"the swap-in sheet is app.css minus @font-face, rule for rule");
+   const r1=await req(L.port,"GET","/css/"+m[1]),r2=await req(L.port,"GET","/css/"+m[2]);ok(r1.status===200&&r2.status===200&&/immutable/.test(r1.headers["cache-control"]||"")&&/text\/css/.test(r2.headers["content-type"]||""),"both sheets are served as immutable CSS")}
+  const snap=()=>{const out=[];for(const e of document.querySelectorAll("body *")){if(e.closest("#modal,#toasts"))continue;/* a running CSS animation (the PM art) changes transform/opacity frame to frame */if(e.getAnimations&&e.getAnimations().length){out.push(e.tagName+" (animated)");continue}const s=getComputedStyle(e);let o="";for(let i=0;i<s.length;i++){const k=s[i];if(/^(transition|animation)/.test(k))continue;o+=k+":"+s.getPropertyValue(k)+";"}for(const pe of["::before","::after"]){const t=getComputedStyle(e,pe);if(t.content&&t.content!=="none")o+=pe+t.content+t.color+t.width+t.height+t.background}out.push(e.tagName+"."+(typeof e.className==="string"?e.className:"")+"|"+o)}return out};
+  for(const [acct,w] of [["demo-pro",390],["demo-electrical",1300],["demo-homeowner",390],["demo-pm",1300]]){const U=await login(L,acct+"@sawyer.test");
+const {c,p}=await page(L,w,U.ck);const errs=[];p.on("pageerror",e=>errs.push(e.message));
+   await p.goto(L.B+"/dash",{waitUntil:"networkidle"});await p.waitForFunction(()=>typeof CSS44!=="undefined"&&typeof me==="function"&&!!me(),null,{timeout:30000});await p.waitForTimeout(500);
+   const st=await p.evaluate(()=>({why:CSS44.why,done:CSS44.done,sub:!!document.getElementById("css44"),x:!!document.getElementById("css44x")}));
+   ok(st.sub&&!st.done&&!st.x,w+" "+acct+": the dashboard renders on the subset alone (nothing on it needed the full sheet)",JSON.stringify(st));
+   const a=await p.evaluate(snap);
+   await p.evaluate(()=>new Promise(r=>{css44Full("test");const f=document.getElementById("css44x");if(!f)return r();if(f.sheet)return setTimeout(r,200);f.addEventListener("load",()=>setTimeout(r,200))}));
+   const b=await p.evaluate(snap);const diff=a.length!==b.length?["count "+a.length+" vs "+b.length]:a.map((x,i)=>x===b[i]?null:x.slice(0,120)).filter(Boolean);
+   ok(diff.length===0,w+" "+acct+": every element's computed style is identical on the subset and after the full sheet is added ("+a.length+" elements)",diff.slice(0,3).join(" | "));
+   const after=await p.evaluate(()=>({sub:!!document.getElementById("css44"),x:!!(document.getElementById("css44x")&&document.getElementById("css44x").sheet)}));ok(after.sub&&after.x,w+" "+acct+": the subset (with the fonts) stays and the swap-in sheet loads after it",JSON.stringify(after));
+   ok(!errs.length,w+" "+acct+": no page errors",errs.join(" | "));await c.close()}
+  // what triggers the swap
+  {const {c,p}=await page(L,390,PRO.ck);await p.goto(L.B+"/dash",{waitUntil:"networkidle"});await p.waitForFunction(()=>typeof CSS44!=="undefined",null,{timeout:30000});
+   await p.mouse.move(5,300);await p.dispatchEvent("body","pointerdown").catch(()=>{});await p.evaluate(()=>window.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true})));
+   await p.waitForTimeout(200);const w1=await p.evaluate(()=>CSS44.why);ok(/^input:pointerdown$/.test(w1),"the first tap swaps in the full sheet",w1);await c.close()}
+  {const {c,p}=await page(L,390,PRO.ck);await p.goto(L.B+"/dash",{waitUntil:"networkidle"});await p.waitForFunction(()=>typeof CSS44!=="undefined"&&typeof go==="function",null,{timeout:30000});
+   await p.evaluate(()=>go("find"));await p.waitForFunction(()=>!!(document.getElementById("css44x")&&document.getElementById("css44x").sheet),null,{timeout:10000}).catch(()=>{});
+   const r=await p.evaluate(()=>({why:CSS44.why,x:!!(document.getElementById("css44x")||{}).sheet}));ok(/^route:find$/.test(r.why)&&r.x,"an in-app route change swaps in the full sheet",JSON.stringify(r));
+   const full=await (await br.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,hasTouch:true})).newPage();await full.goto(L.B+"/find",{waitUntil:"networkidle"});
+   const sig=pg=>pg.evaluate(()=>{const e=document.querySelector("#app h1")||document.querySelector("#app");const s=getComputedStyle(e);return[s.fontFamily,s.fontSize,s.fontWeight,s.color].join("|")});
+   const s1=await sig(p),s2=await sig(full);ok(s1===s2,"/find reached from the dashboard is styled like a fresh /find",s1+" vs "+s2);await full.context().close();
+   await p.screenshot({path:path.join(SH,"v44-find-from-dash-390.png")});await c.close()}
+  {const {c,p}=await page(L,1300,PRO.ck);await p.goto(L.B+"/dash",{waitUntil:"load"});await p.waitForFunction(()=>typeof CSS44!=="undefined",null,{timeout:30000});
+   await p.waitForFunction(()=>CSS44.done,null,{timeout:12000}).catch(()=>{});const r=await p.evaluate(()=>({why:CSS44.why,x:!!document.getElementById("css44x")}));
+   ok(r.why==="idle"&&r.x,"with no interaction the full sheet is added once the page has been idle a few seconds",JSON.stringify(r));await p.screenshot({path:path.join(SH,"v44-dash-1300.png")});await c.close()}
+ }
 //@@V44MORE@@
 
  if(failed)throw new Error(failed+" check(s) failed");
