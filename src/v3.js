@@ -186,7 +186,11 @@ function v42AcctBind(){const $=s=>document.getElementById(s);if($("addPasskey"))
 function v42AcctRefresh(shown){const p=v42AcctLoad();if(!p)return;p.then(r=>{if(!r||r.error||typeof r!=="object")return;const m=me(),el=document.getElementById("signinMethods");if(!m||!el||ROUTE.v!=="account")return;
  if(shown&&JSON.stringify(r)===shown)return;
  /* the card goes through every VIEWS.account layer (v39 wording etc.), then the AFTER.account chain rebinds it (v18's password dialog); the profile form being typed in is left alone */
- const t=document.createElement("div");t.innerHTML=VIEWS.account(ROUTE.p,ROUTE.q);const nc=t.querySelector("#signinMethods");if(!nc)return;el.replaceWith(nc);
+ const t=document.createElement("div");t.innerHTML=VIEWS.account(ROUTE.p,ROUTE.q);const nc=t.querySelector("#signinMethods");if(!nc)return;
+ /* v44: update the card in place (same #signinMethods node, attributes synced, children replaced) instead of replaceWith,
+    so anything holding the card (focus, screen readers, tests) keeps a live node; AFTER.account below rebinds the new buttons */
+ for(const a of[...el.attributes])if(!nc.hasAttribute(a.name))el.removeAttribute(a.name);for(const a of[...nc.attributes])if(el.getAttribute(a.name)!==a.value)el.setAttribute(a.name,a.value);
+ if(el.innerHTML!==nc.innerHTML)el.innerHTML=nc.innerHTML;
  const ph=document.getElementById("ac-p");if(ph&&!ph.value&&r.phone&&document.activeElement!==ph)ph.value=r.phone;AFTER.account(ROUTE.p,ROUTE.q)})}
 function v42AcctWarm(){setTimeout(()=>{try{if(typeof me==="function"&&me()&&!V42AC&&!(typeof ROUTE!=="undefined"&&ROUTE.v==="account"))v42AcctLoad()}catch(e){}},2500);
  document.addEventListener("pointerdown",e=>{try{const a=e.target&&e.target.closest&&e.target.closest('#acctBtn,a[href="/account"],a[href="#/account"]');if(a&&me()&&!V42AC)v42AcctLoad()}catch(x){}},{passive:true,capture:true})}

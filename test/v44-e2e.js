@@ -78,6 +78,29 @@ const SERVERS=[];let br=null;
   const qd=await act(L,Q.ck,"dupBill42",[q1.res.id,k]);ok(qd.res.ok&&qd.res.id&&qd.res.id!==b1.res.id,"the same key string in another business mints that business's own draft",J(qd.res));
   // no key: unchanged behaviour (after the 15s lock a deliberate second duplicate still works is covered by v43)
   const nk=await act(L,P.ck,"dupBill42",[B1]);ok(nk.res.ok&&nk.res.id,"a call without a key still works",J(nk.res))}
+
+ // --- account card: v42AcctRefresh updates #signinMethods in place, v18 password dialog still binds
+ {const U=await signup(L,"customer","acct","78704");ok(U.status===200&&U.ck,"account fixture signs up",J(U.error));
+  for(const w of[390,1300]){const {c,p}=await page(L,w,U.ck);await go(L,p,"/account","#signinMethods");
+   await p.waitForFunction(()=>{const e=document.getElementById("signinMethods");return e&&!e.hasAttribute("aria-busy")&&/@example\.com/.test(e.innerText)},null,{timeout:15000}).catch(()=>{});
+   // cold visit: placeholder node is the node that receives the real card
+   const cold=await p.evaluate(()=>{V42AC=null;V42ACP=null;window.__ACI=null;window.__ACP=null;go("account");const e=document.getElementById("signinMethods");window.__n44=e;return{busy:!!(e&&e.hasAttribute("aria-busy"))}});
+   await p.waitForFunction(()=>{const e=document.getElementById("signinMethods");return e&&!e.hasAttribute("aria-busy")&&/@example\.com/.test(e.innerText)},null,{timeout:15000}).catch(()=>{});
+   const c1=await p.evaluate(()=>{const e=document.getElementById("signinMethods");return{same:e===window.__n44,conn:window.__n44.isConnected,busy:e.hasAttribute("aria-busy"),n:document.querySelectorAll("#signinMethods").length,t:e.innerText.slice(0,120)}});
+   ok(cold.busy&&c1.same&&c1.conn&&!c1.busy&&c1.n===1,w+": cold visit fills the placeholder card in place (same node, aria-busy cleared, one card)",J({cold,c1}));
+   // stale cache: corrected in place
+   await p.evaluate(()=>{V42AC.info=Object.assign({},V42AC.info,{password:false});go("dash")});await p.waitForTimeout(150);
+   const s0=await p.evaluate(()=>{go("account");const e=document.getElementById("signinMethods");window.__n44=e;return/not set/.test(e.innerText)});
+   await p.waitForFunction(()=>/Password set/.test((document.getElementById("signinMethods")||{}).innerText||""),null,{timeout:15000}).catch(()=>{});
+   const s1=await p.evaluate(()=>{const e=document.getElementById("signinMethods");return{same:e===window.__n44,conn:window.__n44.isConnected,set:/Password set/.test(e.innerText)}});
+   ok(s0&&s1.same&&s1.conn&&s1.set,w+": a stale card is corrected in place (no replaceWith; the held node stays attached)",J({s0,s1}));
+   await p.waitForTimeout(1200);
+   const s2=await p.evaluate(()=>({same:document.getElementById("signinMethods")===window.__n44,busy:!!V42ACP}));ok(s2.same,w+": the card node is still the same after any follow-up refresh",J(s2));
+   await p.click("#setPw");await p.waitForSelector("#modal #pw18",{timeout:8000}).catch(()=>{});
+   const dlg=await p.evaluate(()=>({v18:!!document.querySelector("#modal #pw18"),confirm:!!document.getElementById("npw2"),cur:!!document.getElementById("cpw")}));
+   ok(dlg.v18&&dlg.confirm&&dlg.cur,w+": Change opens the v18 password dialog (confirm + current fields) after the in-place update",J(dlg));
+   if(w===390)await p.screenshot({path:path.join(SH,"v44-account-pwdialog-390.png")});
+   await c.close()}}
 //@@V44MORE@@
 
  if(failed)throw new Error(failed+" check(s) failed");
