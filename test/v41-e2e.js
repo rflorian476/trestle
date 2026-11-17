@@ -212,7 +212,7 @@ const SERVERS=[];let br=null;const errs=[];
  {const raw=await req(L.port,"GET","/dash",{Cookie:EC.ck});
   ok(raw.status===200&&/<div id="pre11">/.test(raw.body)&&/<h1[\s>]/.test(raw.body)&&!/class="sk11/.test(raw.body),"signed-in /dash first HTML is prerendered (heading, no skeleton)",String(raw.status)+" "+((raw.body.match(/<h1[^>]*>[^<]+/)||[""])[0]));
   ok(/<link rel="preload" href="\/fonts\/plus-jakarta-sans-600\.woff2"[^>]*as="font"/.test(raw.body),"signed-in /dash preloads the heading font (Plus Jakarta 600) so the prerendered h1 paints in the first frame");
-  ok(/header\.top\{min-height:/.test(fs.readFileSync(path.join(ROOT,"src/v41.css"),"utf8"))||true,"header reserve is in source");
+  {const css41=fs.readFileSync(path.join(ROOT,"src/v41.css"),"utf8");ok(/(^|\})\s*header\.top\{min-height:\s*6\dpx\}/m.test(css41)&&/@media \(max-width:700px\)\{header\.top\{min-height:\s*60px\}\}/.test(css41),"header reserve is in source (header.top min-height on desktop and 60px at phone width)",css41.slice(-200))}
   const {c,p}=await page(L,390,EC.ck);
   await p.addInitScript(()=>{window.__syncX=[];const o=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u,a){if(a===false)window.__syncX.push(String(m)+" "+String(u));return o.apply(this,arguments)}});
   await go(L,p,"/dash","#acctBtn");
