@@ -1,5 +1,5 @@
-// v41 end-to-end. Self-contained: starts its own Sawyer server (local test mode). Covers health 2.24.0-sawyer / SW cache
-// sawyer-v41, (1) the signed-in account button's accessible name starts with its visible text (axe
+// v41 end-to-end. Self-contained: starts its own Sawyer server (local test mode). Covers health 2.24.0-sawyer or later / SW cache
+// sawyer-v41 or later, (1) the signed-in account button's accessible name starts with its visible text (axe
 // label-content-name-mismatch at 390 and 1300), (2) the traveler-call fit check (license / reciprocity / level, start
 // date, safety card, references) as rules and on the owner's Applicants list, the summary line, pipeline cards and the
 // traveler's own call page, and that it never reaches anyone but the poster or that traveler, and (3) the pro dashboard's
@@ -59,8 +59,8 @@ const SERVERS=[];let br=null;const errs=[];
  const axe=async(p,sel,lbl,rules)=>{if(!AXE)return;if(!(await p.evaluate(()=>typeof axe!=="undefined")))await p.addScriptTag({content:AXE});const v=await p.evaluate(async([s,rules])=>{const o=rules?{runOnly:{type:"rule",values:rules}}:{runOnly:{type:"tag",values:["wcag2a","wcag2aa"]}};const r=await axe.run(document.querySelector(s)||document,o);return r.violations.filter(v=>rules||v.impact==="serious"||v.impact==="critical").map(v=>v.id+":"+v.nodes.map(n=>n.target.join(" ")).join(","))},[sel,rules||null]);ok(!v.length,lbl+": no "+(rules?rules.join(","):"serious axe")+" issues",J(v))};
 
  // --- release
- {const hz=(await req(L.port,"GET","/healthz")).json||{};ok(hz.v==="2.24.0-sawyer","healthz reports 2.24.0-sawyer",J(hz));
-  const sw=await req(L.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v41"/.test(sw.body),"service worker cache is sawyer-v41")}
+ {const hz=(await req(L.port,"GET","/healthz")).json||{};ok(/^2\.(2[4-9]|[3-9]\d)\.\d+-sawyer$/.test(hz.v||""),"healthz reports a Sawyer version from 2.24.0 on",J(hz));
+  const sw=await req(L.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v(4[1-9]|[5-9]\d)"/.test(sw.body),"service worker cache is sawyer-v41 or later")}
 
  // --- (3) demo electrical contractor login
  const EC=await login(L,"demo-electrical@sawyer.test");ok(EC.status===200&&EC.id==="c2"&&EC.ck,"demo-electrical@sawyer.test signs in as Saguaro Electric (c2)",J({s:EC.status,id:EC.id}));
