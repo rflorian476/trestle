@@ -57,18 +57,26 @@ let tv=await as("demo-remodeler@sawyer.test");await tv.reload();await tv.waitFor
 await nav(tv,"/travel?tab=travelers");
 // v41: condition-based. Wait for the status data itself (full /api/state applied, me().trav present), then for the
 // picker that renders from it. A slow fetch under load just takes longer; a missing picker still fails fast once the data is there.
-const st10Ready=()=>tv.waitForFunction(()=>typeof __PART!=="undefined"&&!__PART&&typeof me==="function"&&!!me()&&!!me().trav&&(location.pathname+location.hash).includes("/travel"),null,{timeout:90000,polling:100});
-const st10Picker=async()=>{await st10Ready();await tv.waitForSelector("#t10St .t10seg",{timeout:15000}).catch(()=>{})};
+// v44: st10Ready waits up to 45s; on a timeout it reloads the /travel route once and waits again. If that also times out
+// it prints a FAIL line (so run-all counts it honestly) instead of throwing an uncaught crash that left a silent 28/0 log.
+const st10Cond=()=>typeof __PART!=="undefined"&&!__PART&&typeof me==="function"&&!!me()&&!!me().trav&&(location.pathname+location.hash).includes("/travel");
+const st10Wait=t=>tv.waitForFunction(st10Cond,null,{timeout:t,polling:100}).then(()=>true,e=>{console.log("note: st10Ready wait timed out after "+t+"ms ("+String(e&&e.message||e).split("\n")[0].slice(0,120)+")");return false});
+const st10Ready=async route=>{if(await st10Wait(45000))return true;console.log("note: st10Ready retrying the /travel navigation once");
+ try{await nav(tv,route)}catch(e){console.log("note: retry navigation failed: "+String(e&&e.message||e).split("\n")[0].slice(0,120))}
+ const r=await st10Wait(45000);if(!r)ok(false,"travel page ready (st10Ready) after one retry of "+route);return r};
+const st10Picker=async route=>{if(!(await st10Ready(route)))return false;await tv.waitForSelector("#t10St .t10seg",{timeout:15000}).catch(()=>{});return true};
 const st10Is=(f,arg)=>tv.waitForFunction(f,arg,{timeout:30000,polling:100}).then(()=>true,()=>false);
-await st10Picker();
+const st10Ok=await st10Picker("/travel?tab=travelers");
+if(st10Ok){
 ok(await tv.$("#t10St .t10seg"),"traveler sees 4-way status picker");
 await tv.click("#t10St label:has(input[value=onjob])");const d=new Date(Date.now()+20*864e5).toISOString().slice(0,10);await tv.fill("#t10d",d);await tv.click("#t10save");await st10Is(()=>me().trav.st10==="onjob"&&!me().trav.availNow&&!!document.querySelector("#t10St .b10-open"));
 ok(await tv.evaluate(()=>me().trav.st10==="onjob"&&!me().trav.availNow),"status saved: on a call until date");ok(await tv.$("#t10St .b10-open"),"on a call ending within 45 days still shows Open to travel");
 await tv.click("#t10St label:has(input[value=off])");await st10Is(()=>me().trav.st10==="off");ok(await tv.evaluate(()=>me().trav.st10==="off"),"status saved: not looking");
-await nav(tv,"/travel?tab=travelers&open=1");await st10Picker();const hidden=await tv.evaluate(()=>!document.querySelector(`a[href*="${me().id}"].t5c-t`));ok(hidden,"'Open to travel' filter hides travelers who aren't looking");
+await nav(tv,"/travel?tab=travelers&open=1");await st10Picker("/travel?tab=travelers&open=1");const hidden=await tv.evaluate(()=>!document.querySelector(`a[href*="${me().id}"].t5c-t`));ok(hidden,"'Open to travel' filter hides travelers who aren't looking");
 await tv.click("#t10St label:has(input[value=now])");await st10Is(()=>me().trav.availNow&&me().trav.st10==="now");ok(await tv.evaluate(()=>me().trav.availNow&&me().trav.st10==="now"),"available now syncs the quick switch");
 await nav(tv,"/travel?tab=travelers&open=1");ok(await tv.$(".t6tv .b10-open"),"cards show the Open to travel badge");await shot(tv,"desktop-traveler-status");
 await tv.uncheck("#tAvail");await tv.waitForTimeout(800);ok(await tv.evaluate(()=>!me().trav.availNow&&me().trav.st10==="soon"),"quick switch off falls back to 'available soon'");await tv.check("#tAvail");await tv.waitForTimeout(600);
+}
 const tm=await as(null,390);await nav(tm,"/travel?tab=travelers&open=1");ok((await tm.$$(".t6tv")).length>0,"signed-out visitors can filter Open to travel");await shot(tm,"mobile-travelers-open");
 ok(!errs.length,"no page errors"+(errs.length?": "+[...new Set(errs)].slice(0,4).join(" | "):""));
-console.log(fail?fail+" FAILED":"ALL PASS");await br.close();process.exit(fail?1:0)})().catch(e=>{console.error(e);process.exit(1)});
+console.log(fail?fail+" FAILED":"ALL PASS");await br.close();process.exit(fail?1:0)})().catch(e=>{console.log("FAIL crashed: "+String(e&&e.message||e).split("\n")[0].slice(0,300));console.error(e);process.exit(1)});

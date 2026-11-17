@@ -101,6 +101,13 @@ const SERVERS=[];let br=null;
    ok(dlg.v18&&dlg.confirm&&dlg.cur,w+": Change opens the v18 password dialog (confirm + current fields) after the in-place update",J(dlg));
    if(w===390)await p.screenshot({path:path.join(SH,"v44-account-pwdialog-390.png")});
    await c.close()}}
+
+ // --- v10-e2e st10Ready: one retry of /travel, and a timeout is a logged FAIL line (static check of the suite source)
+ {const v10=fs.readFileSync(path.join(ROOT,"test/v10-e2e.js"),"utf8");
+  ok(/const st10Ready=async route=>/.test(v10)&&/retrying the \/travel navigation once/.test(v10)&&/await nav\(tv,route\)/.test(v10),"v10 st10Ready retries the /travel navigation once");
+  ok(/ok\(false,"travel page ready \(st10Ready\)/.test(v10),"v10 st10Ready reports a timeout as a FAIL line");
+  ok(/\.then\(\(\)=>true,e=>/.test(v10)&&!/timeout:90000/.test(v10),"v10 st10Ready no longer throws on a timeout (no uncaught 90s waitForFunction)");
+  ok(/catch\(e=>\{console\.log\("FAIL crashed: "/.test(v10),"v10-e2e prints a FAIL line if it ever crashes, so run-all can't show a silent 28/0")}
 //@@V44MORE@@
 
  if(failed)throw new Error(failed+" check(s) failed");
