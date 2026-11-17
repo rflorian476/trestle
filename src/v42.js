@@ -32,7 +32,10 @@ A.dupBill42=function(id,key){const m=me();if(!m)return{ok:false,need:"login",msg
  const keyS=key==null||key===""?"":String(key).slice(0,80);
  /* SW-105: an optional idempotency key always returns the same draft. A short per-source lock (15s) makes two parallel
     calls — or a double-click that bypassed the UI busy-guard — return the draft that is already in flight. */
- if(keyS){const same=(DB.bills||[]).find(b=>b&&b.by===m.id&&b.dup42&&b.dup42.key===keyS);if(same)return reuse(same)}
+ /* v44 (SW-105 follow-up): the key is scoped to (owner, source, key). A key already used on a different source is
+    refused, so a reused or mistyped key can never open some other invoice's draft. */
+ if(keyS){const keyed=(DB.bills||[]).filter(b=>b&&b.by===m.id&&b.dup42&&b.dup42.key===keyS);const same=keyed.find(b=>b.dup42.from===src.id);if(same)return reuse(same);
+  if(keyed.length)return{ok:false,code:"key_reused",msg:"That request key was already used to copy a different invoice, so nothing was copied. Try again from "+(src.no||"this invoice")+"."}}
  const held=v42DupLock&&v42DupLock.get(lockK);if(held&&held.id&&Date.now()-held.t<V42_DUP_MS){const ex=v7Bill(held.id);if(ex&&ex.by===m.id&&ex.status==="draft")return reuse(ex)}
  const recent=(DB.bills||[]).find(b=>b&&b.by===m.id&&b.status==="draft"&&b.dup42&&b.dup42.from===src.id&&(Date.now()-(b.date||0))<V42_DUP_MS);
  if(recent){if(v42DupLock)v42DupLock.set(lockK,{id:recent.id,t:Date.now()});return reuse(recent)}
