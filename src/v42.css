@@ -4,3 +4,15 @@
 .v42sk{display:inline-block;width:9em;max-width:45%;height:.9em;border-radius:6px;background:linear-gradient(90deg,#ECE7DD,#F5F1EA,#ECE7DD);background-size:200% 100%;vertical-align:-1px;margin-left:4px;animation:v42sk 1.2s ease-in-out infinite}
 @keyframes v42sk{0%{background-position:100% 0}100%{background-position:-100% 0}}
 @media (prefers-reduced-motion:reduce){.v42sk{animation:none}}
+/* Duplicate / Bill again */
+.v42again{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.v42again .o9-ic{flex:none}
+.v42again-t{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.v42again-t small{line-height:1.45}
+.v42again .btn{flex:none;min-height:44px}
+.v42dup-d{margin:10px 0 0}
+#bDup42,#v42lockDup{min-height:44px}
+#v42lockDup{margin-left:8px}
+.v42dupn{display:flex;gap:10px;align-items:flex-start;background:#EEF2F7;border-color:#C9D4E5;color:#1B2A3B;line-height:1.5}
+.v42dupn .i{flex:none;margin-top:3px;color:#1F3A68}
+@media (max-width:600px){.v42again .btn{width:100%;justify-content:center}}
