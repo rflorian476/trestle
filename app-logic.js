@@ -1368,7 +1368,8 @@ VIEWS.credits=()=>`<section class="page narrow prose"><div class="pagehead"><h1>
 /* ===== v5: Travel work (traveling electricians first, any trade later) + polish ===== */
 const TRADES_T={Electrical:{w:"electrician",ws:"electricians",lic:["Apprentice","Journeyman","Master","Residential wireman","Lineman","Low-voltage / data"],specs:["Data center","Industrial","Solar / BESS","Commercial","Substation","Motor controls","PLC / instrumentation","Conduit bending","Fire alarm","Low voltage","MV terminations","Foreman"]}};
 const T_TYPES=["Data center","Industrial","Solar","Commercial"];
-const T_STATES=["AL","AZ","CA","CO","FL","GA","IA","IL","IN","KY","LA","MI","MN","MO","NC","NE","NM","NV","NY","OH","OK","OR","PA","SC","TN","TX","UT","VA","WA","WI","WY"];
+/* v42 (SW-103): traveler calls, profiles, filters and alerts take all 50 states plus DC and PR (was a 31-state subset, so a call in Hawaii was refused). */
+const T_STATES=["AK","AL","AR","AZ","CA","CO","CT","DC","DE","FL","GA","HI","IA","ID","IL","IN","KS","KY","LA","MA","MD","ME","MI","MN","MO","MS","MT","NC","ND","NE","NH","NJ","NM","NV","NY","OH","OK","OR","PA","PR","RI","SC","SD","TN","TX","UT","VA","VT","WA","WI","WV","WY"];
 const T_UNION=["Union","Non-union","Open shop"];
 const T_OSHA=["None","OSHA 10","OSHA 30"];
 const V5_ACTIONS=["saveTravel","travAvail","postTravel","applyTravel","withdrawTravel","decideTravel","inviteTraveler","closeTravel"];
@@ -6088,7 +6089,12 @@ function v41Accepts(c){const own=String(c&&c.lstate||"").toUpperCase();
  return{own,recip:v41ParseRecip(c&&c.recip).filter(s=>s!==own)}}
 /* calendar days to the start date in the call's zone (job state, else the poster's), not UTC midnight. */
 function v41StateZip(st){st=String(st||"").toUpperCase();if(!st||typeof ZIPS!=="object"||!ZIPS)return"";for(const z of Object.keys(ZIPS)){const lab=String((ZIPS[z]&&ZIPS[z][0])||"");if(lab.slice(-2)===st||lab.slice(-3,-1)===st)return z}return""}
-function v41CallTz(c){const st=c&&(c.state||c.lstate);const z=v41StateZip(st);if(z&&typeof v38ZipTz==="function")return v38ZipTz(z);const u=typeof U==="function"&&c?U(c.by):null;if(typeof v38UserTz==="function")return v38UserTz(u);return"America/New_York"}
+/* v42 (SW-103): every state plus DC and PR has a zone (the one most of the state keeps), so a call in Hawaii or Alaska
+   counts days on Honolulu / Anchorage calendars. Before, only states with a town in the built-in ZIP list resolved and
+   the rest fell back to Eastern. */
+const V42_STZ={AL:"America/Chicago",AK:"America/Anchorage",AZ:"America/Phoenix",AR:"America/Chicago",CA:"America/Los_Angeles",CO:"America/Denver",CT:"America/New_York",DE:"America/New_York",DC:"America/New_York",FL:"America/New_York",GA:"America/New_York",HI:"Pacific/Honolulu",ID:"America/Denver",IL:"America/Chicago",IN:"America/New_York",IA:"America/Chicago",KS:"America/Chicago",KY:"America/New_York",LA:"America/Chicago",ME:"America/New_York",MD:"America/New_York",MA:"America/New_York",MI:"America/New_York",MN:"America/Chicago",MS:"America/Chicago",MO:"America/Chicago",MT:"America/Denver",NE:"America/Chicago",NV:"America/Los_Angeles",NH:"America/New_York",NJ:"America/New_York",NM:"America/Denver",NY:"America/New_York",NC:"America/New_York",ND:"America/Chicago",OH:"America/New_York",OK:"America/Chicago",OR:"America/Los_Angeles",PA:"America/New_York",PR:"America/Puerto_Rico",RI:"America/New_York",SC:"America/New_York",SD:"America/Chicago",TN:"America/Chicago",TX:"America/Chicago",UT:"America/Denver",VT:"America/New_York",VA:"America/New_York",WA:"America/Los_Angeles",WV:"America/New_York",WI:"America/Chicago",WY:"America/Denver"};
+function v42StateTz(st){return V42_STZ[String(st||"").trim().toUpperCase()]||""}
+function v41CallTz(c){const st=c&&(c.state||c.lstate);const sz=v42StateTz(st);if(sz)return sz;const z=v41StateZip(st);if(z&&typeof v38ZipTz==="function")return v38ZipTz(z);const u=typeof U==="function"&&c?U(c.by):null;if(typeof v38UserTz==="function")return v38UserTz(u);return"America/New_York"}
 function v41TodayIn(tz){try{return new Intl.DateTimeFormat("en-CA",{timeZone:tz||"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(v41Now()))}catch(e){return new Intl.DateTimeFormat("en-CA",{year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(v41Now()))}}
 function v41CalDays(start,today){const a=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(start||"")),b=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(today||""));if(!a||!b)return NaN;return Math.round((Date.UTC(+a[1],+a[2]-1,+a[3])-Date.UTC(+b[1],+b[2]-1,+b[3]))/864e5)}
 function v41TDays(c){if(!c||!/^\d{4}-\d{2}-\d{2}$/.test(String(c.start||"")))return NaN;return v41CalDays(c.start,v41TodayIn(v41CallTz(c)))}

@@ -1,7 +1,8 @@
 /* ===== v5: Travel work (traveling electricians first, any trade later) + polish ===== */
 const TRADES_T={Electrical:{w:"electrician",ws:"electricians",lic:["Apprentice","Journeyman","Master","Residential wireman","Lineman","Low-voltage / data"],specs:["Data center","Industrial","Solar / BESS","Commercial","Substation","Motor controls","PLC / instrumentation","Conduit bending","Fire alarm","Low voltage","MV terminations","Foreman"]}};
 const T_TYPES=["Data center","Industrial","Solar","Commercial"];
-const T_STATES=["AL","AZ","CA","CO","FL","GA","IA","IL","IN","KY","LA","MI","MN","MO","NC","NE","NM","NV","NY","OH","OK","OR","PA","SC","TN","TX","UT","VA","WA","WI","WY"];
+/* v42 (SW-103): traveler calls, profiles, filters and alerts take all 50 states plus DC and PR (was a 31-state subset, so a call in Hawaii was refused). */
+const T_STATES=["AK","AL","AR","AZ","CA","CO","CT","DC","DE","FL","GA","HI","IA","ID","IL","IN","KS","KY","LA","MA","MD","ME","MI","MN","MO","MS","MT","NC","ND","NE","NH","NJ","NM","NV","NY","OH","OK","OR","PA","PR","RI","SC","SD","TN","TX","UT","VA","VT","WA","WI","WV","WY"];
 const T_UNION=["Union","Non-union","Open shop"];
 const T_OSHA=["None","OSHA 10","OSHA 30"];
 const V5_ACTIONS=["saveTravel","travAvail","postTravel","applyTravel","withdrawTravel","decideTravel","inviteTraveler","closeTravel"];
