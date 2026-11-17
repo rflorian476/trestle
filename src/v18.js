@@ -46,7 +46,7 @@ function pw18Open(mode){const m=me()||{};
    go.textContent="Save password";if(r.error){say(r.error);check();const c=$("cpw");if(c&&/current/i.test(r.error)){c.focus();c.select()}return}
    closeModal();toast(has?"Password changed. Other devices were signed out.":"Password saved");render()};
   setTimeout(()=>{const first=$("cpw")||$("npw");if(first&&!f.contains(document.activeElement))first.focus()},60)})}
-function pw18Forgot(){let info={};try{info=__xhr("GET","/api/account")||{}}catch(e){}
+function pw18Forgot(){const run=info=>{info=info||{};
  const ch=info.email?"email":info.phone?"sms":"",to=info.email||info.phone||"";
  if(!ch){openModal(`<h2>Forgot your current password?</h2><p class="muted">This account has no email or phone for a one-time code. Sign out and use "Forgot password?" on the sign-in page, or sign in with a passkey or a linked account.</p>`);return}
  openModal(`<h2>Reset with a one-time code</h2><p class="muted">We'll ${ch==="email"?"email":"text"} a 6-digit code to <b>${esc(to)}</b>. Enter it here, then set a new password. You won't need the old one.</p>
@@ -57,5 +57,5 @@ function pw18Forgot(){let info={};try{info=__xhr("GET","/api/account")||{}}catch
    if(r.error){toast(r.error,"err");return}b.textContent="Send a new code";b.classList.remove("primary");$("pw18Code").hidden=false;
    $("pw18Note").textContent=r.test&&r.code?"Test mode: no "+(ch==="email"?"email":"text")+" provider is set up on this server, so your code is "+r.code+".":"Sent. It expires in 10 minutes.";$("pw18c").focus()};
   $("pw18Code").onsubmit=async e=>{e.preventDefault();const code=$("pw18c").value.replace(/\D/g,"");if(code.length!==6){say("Enter the 6 digits from the code.");return}
-   const r=await jpost("/api/auth/verify",{channel:ch,to,code});if(r.error){say(r.error);return}pw18Open("reset")}})}
+   const r=await jpost("/api/auth/verify",{channel:ch,to,code});if(r.error){say(r.error);return}pw18Open("reset")}})};__when(typeof __xhr==="function"?__xhr("GET","/api/account"):{},run)}
 if(typeof AFTER!=="undefined"){const oa=AFTER.account;AFTER.account=function(){if(oa)oa.apply(this,arguments);const b=document.getElementById("setPw");if(!b)return;b.onclick=()=>pw18Open(/Change/.test(b.textContent)?"change":"add")}}

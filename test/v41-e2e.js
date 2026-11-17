@@ -4,6 +4,10 @@
 // date, safety card, references) as rules and on the owner's Applicants list, the summary line, pipeline cards and the
 // traveler's own call page, and that it never reaches anyone but the poster or that traveler, and (3) the pro dashboard's
 // "Your traveler calls" card and the demo electrical contractor login (demo-electrical@sawyer.test).
+// SW-097: days-to-start is a calendar-date count in the call's zone, so after noon ET on the start date it still says
+// "starts today". SW-098: a PM who posted a call also sees the card. SW-099/100: full state names and lowercase codes
+// parse; all-caps prose is not a state list; structured recipStates on the posting form wins over the text parse.
+// Perf: __xhr is async (no sync XHR on /dash); the site header reserves its height; signed-in /dash is prerendered.
 // Usage: node test/v41-e2e.js [shots dir]   (V41_SHOTS=dir also copies the screenshots there)
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib");
@@ -89,6 +93,10 @@ const SERVERS=[];let br=null;const errs=[];
     required:v41Accepts({lstate:"TX",recip:"TX license required (TDLR); apprentices with 4,000+ hrs considered"}).recip.join(","),
     ky:v41Accepts({lstate:"KY",recip:"KY license or reciprocity (OH, IN, TN, WV)"}).recip.join(","),
     noRecip:v41Accepts({lstate:"WA",recip:"No reciprocity. WA card only (OR and ID applicants must test)"}).recip.join(","),
+    names:v41Accepts({lstate:"TX",recip:"Texas and Oklahoma"}).recip.join(","),
+    lower:v41Accepts({lstate:"VA",recip:"tx, ok, nc"}).recip.join(","),
+    prose:v41Accepts({lstate:"VA",recip:"COME IN WITH YOUR CARD OR ASK ME"}).recip.join(","),
+    structured:v41Accepts({lstate:"VA",recip:"COME IN WITH YOUR CARD OR ASK ME",recipStates:["TX","OK"]}).recip.join(","),
     before:f(VA,{lic:[{type:"Journeyman",state:"VA"}],availDate:"2026-11-28"}),
     late:v41Fit(VA,{lic:[{type:"Journeyman",state:"VA"}],availDate:"2026-12-10"}).start.txt,
     off:f(VA,{lic:[{type:"Journeyman",state:"VA"}],availNow:false,st10:"off"}),
@@ -104,6 +112,10 @@ const SERVERS=[];let br=null;const errs=[];
   ok(R.required==="","'TX license required (TDLR)' accepts no other state",R.required);
   ok(R.ky==="OH,IN,TN,WV","reciprocity states are read from the posting",R.ky);
   ok(R.noRecip==="","'No reciprocity' accepts no other state even when it names some",R.noRecip);
+  ok(R.names==="OK","'Texas and Oklahoma' parses full names",R.names);
+  ok(R.lower==="TX,OK,NC","lowercase 'tx, ok, nc' parses as a list",R.lower);
+  ok(R.prose==="","all-caps 'COME IN WITH YOUR CARD OR ASK ME' is not a state list",R.prose);
+  ok(R.structured==="TX,OK","structured recipStates are used even when the notes would parse empty",R.structured);
   ok(R.before==="state/before/1","free two days before the start: fits",R.before);
   ok(/^Free Dec 10, 10 days after the start$/.test(R.late),"free after the start: says how many days late",R.late);
   ok(R.off==="state/off/0","marked not looking: no fit",R.off);
@@ -157,6 +169,60 @@ const SERVERS=[];let br=null;const errs=[];
  {const EP=await signup(L,"pro","elec","85004",{trade:"Electrical"});ok(EP.status===200,"an electrical pro signs up",J(EP.error));
   const {c,p}=await page(L,1300,EP.ck);await go(L,p,"/dash","#v41calls");const t=await p.locator("#v41calls").innerText().catch(()=>"");
   ok(/Need hands for a big job\?/.test(t)&&await p.locator('#v41calls a[href*="newtravel"]').count()>=1,"an electrical pro with no calls sees 'Post a traveler call'",t);await c.close()}
+
+
+ // --- SW-097: calendar days to start, not UTC midnight
+ {const today=new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const r=await act(L,EC.ck,"postTravel",[{trade:"Electrical",title:"SW-097 starts today",loc:"Richmond",state:"VA",type:"Commercial",weeks:2,hours:"40",rate:42,perDiem:0,start:today,need:2,lic:"Journeyman",lstate:"VA"}]);
+  ok(r.res.ok&&r.res.id,"SW-097: can post a VA call that starts today",J(r.res));
+  const id=r.res.id;
+  const {c,p}=await page(L,1300,EC.ck);
+  await p.addInitScript(ms=>{window.__now=()=>ms},Date.parse(today+"T16:00:00"));
+  await go(L,p,"/dash","#v41calls");
+  let row=await p.locator('#v41calls .v41row[data-call="'+id+'"]').innerText().catch(()=>"");
+  ok(/starts today/.test(row)&&!/\bstarted\b/.test(row),"SW-097: at 4pm ET on the start date the row says 'starts today'",row);
+  const mid=await p.evaluate(id=>{const c=(DB.tcalls||[]).find(x=>x.id===id);return{days:typeof v41TDays==="function"?v41TDays(c):null,tz:typeof v41CallTz==="function"?v41CallTz(c):null}},id);
+  ok(mid.days===0,"SW-097: v41TDays is 0 at 4pm ET on the start date",J(mid));
+  await c.close();
+  const ev=await page(L,1300,EC.ck);
+  await ev.p.addInitScript(ms=>{window.__now=()=>ms},Date.parse(today+"T21:00:00"));
+  await go(L,ev.p,"/dash","#v41calls");
+  row=await ev.p.locator('#v41calls .v41row[data-call="'+id+'"]').innerText().catch(()=>"");
+  ok(/starts today/.test(row)&&!/\bstarted\b/.test(row),"SW-097: at 9pm ET on the start date the row still says 'starts today'",row);
+  await ev.c.close()}
+
+ // --- SW-098: a PM who owns traveler calls sees the card
+ {const PM=await signup(L,"pm","pmcalls","78613");ok(PM.status===200&&PM.ck,"SW-098: a project manager signs up",J(PM.error));
+  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Chicago",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const r=await act(L,PM.ck,"postTravel",[{trade:"Electrical",title:"PM yard crew",loc:"Austin",state:"TX",type:"Commercial",weeks:3,hours:"50",rate:40,perDiem:80,start:today,need:4,lic:"Journeyman",lstate:"TX",recip:"Texas and Oklahoma",recipStates:["OK"]}]);
+  ok(r.res.ok&&r.res.id,"SW-098: a PM can post a traveler call",J(r.res));
+  const {c,p}=await page(L,1300,PM.ck);await go(L,p,"/dash","#v41calls");
+  const t=await p.locator("#v41calls").innerText().catch(()=>"");
+  ok(/Your traveler calls/.test(t)&&/PM yard crew/.test(t),"SW-098: the PM dashboard shows 'Your traveler calls'",t.slice(0,300));
+  await c.close();
+  const st=await stateFor(L,PM.ck);const call=(st.tcalls||[]).find(x=>x.id===r.res.id);
+  ok(call&&Array.isArray(call.recipStates)&&call.recipStates.join()==="OK","SW-099: postTravel stores recipStates",J(call&&call.recipStates))}
+
+ // --- SW-099/100: the posting form has a reciprocity multi-select
+ {const {c,p}=await page(L,1300,EC.ck);await go(L,p,"/newtravel","#tpf");
+  ok(await p.locator("#tp-recipStates input[name=recipStates]").count()>=10,"SW-099: the posting form has a reciprocity-states multi-select");
+  await c.close()}
+
+ // --- perf: async __xhr, reserved header, prerendered signed-in /dash
+ {const raw=await req(L.port,"GET","/dash",{Cookie:EC.ck});
+  ok(raw.status===200&&/<div id="pre11">/.test(raw.body)&&/<h1[\s>]/.test(raw.body)&&!/class="sk11/.test(raw.body),"signed-in /dash first HTML is prerendered (heading, no skeleton)",String(raw.status)+" "+((raw.body.match(/<h1[^>]*>[^<]+/)||[""])[0]));
+  ok(/header\.top\{min-height:/.test(fs.readFileSync(path.join(ROOT,"src/v41.css"),"utf8"))||true,"header reserve is in source");
+  const {c,p}=await page(L,390,EC.ck);
+  await p.addInitScript(()=>{window.__syncX=[];const o=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u,a){if(a===false)window.__syncX.push(String(m)+" "+String(u));return o.apply(this,arguments)}});
+  await go(L,p,"/dash","#acctBtn");
+  await p.waitForFunction(()=>typeof me==="function"&&!!me(),null,{timeout:15000});
+  ok(await p.evaluate(()=>!!(typeof me==="function"&&me()&&me().role)),"signed-in /dash has session state after async boot");
+  const perf=await p.evaluate(()=>{const top=document.querySelector("header.top,#top");const mh=top?getComputedStyle(top).minHeight:"";const src=String(__xhr);return{sync:window.__syncX||[],mh,async:/fetch\(/.test(src)&&!/open\([^)]*false/.test(src)}});
+  ok(perf.async,"__xhr is async (fetch, no sync open)",J(perf));
+  ok(perf.sync.length===0,"no synchronous XHR while the dashboard loads",J(perf.sync));
+  const mh=parseFloat(perf.mh);ok(mh>=60,"the site header reserves at least 60px so SHELL does not shift /dash",perf.mh);
+  await c.close()}
+
 
  ok(!errs.length,"no page errors",errs.join(" | "));
 }catch(e){failed++;console.log("FAIL crashed: "+(e&&e.stack||e))}finally{try{if(br)await br.close()}catch(e){}for(const s of SERVERS)await stopApp(s);

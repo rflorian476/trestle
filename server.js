@@ -391,6 +391,18 @@ function preView(req,h,v){if(sessionUid(req)||!PRE_TOP)return h;const body=viewH
  const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
+// v41 perf: a signed-in /dash is prerendered from that person's snapshot so the first HTML already has the
+// dashboard heading (LCP) instead of the short skeleton, and JS waits for that paint the same way as other prerendered pages.
+// The site header is reserved in CSS (min-height on #top) so SHELL filling it doesn't shift the page. Never cached.
+function dashHtml(req){const uid=sessionUid(req);if(!uid||!api.VIEWS||!api.VIEWS.dash)return null;const save=api.DB;let h=null;
+ try{try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}
+  const st=JSON.parse(JSON.stringify(snapshot(uid)));st.theme="light";if(!Array.isArray(st.recent))st.recent=[];api.DB=st;
+  const out=String(api.VIEWS.dash(null,{})||"");
+  if(out&&!/<script/i.test(out)&&(out.match(/<h1[\s>]/g)||[]).length===1)h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out)}
+ catch(e){h=null}finally{api.DB=save}return h}
+function preDash(req,h){if(!sessionUid(req))return h;const body=dashHtml(req);if(!body)return h;
+ const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
+ return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 // v22 perf: signed-out /find gets the same treatment as /prices: the real search results (rendered by the same VIEWS.find
 // the browser runs, from the public snapshot, with the same query) and the site header inside <main>, so the page paints
 // before the app JS. Cached per query string and data version; the app re-renders it in place when it mounts.
@@ -652,7 +664,9 @@ const server=http.createServer(async(req,res)=>{
     if(v==="job"&&jid){const html=withMeta(req,{title:"Not found · Sawyer",desc:"That job isn't available.",path:p.replace(/\/$/,""),noindex:true});return sendHtml(res,req,404,html)}}
    // v27: a signed-in pro opening /join goes to the dashboard setup flow, not a second (blank) signup wizard
    if(v==="join"){const su=sessionUid(req);const su_=su&&(DB().users||[]).find(x=>x.id===su);if(su_&&su_.role==="contractor"){res.writeHead(302,{Location:"/dash?setup=1","Cache-Control":"no-store"});return res.end()}}
-   if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:TITLE(v,(/^\/[a-z0-9]{2,20}\/([^/?]{1,120})/.exec(p)||[])[1]||null),desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});return sendHtml(res,req,200,v==="prices"?prePrices(req,html):v==="find"&&/^\/find\/?$/.test(p)?preFind(req,html,url.search):PRE_VIEWS.has(v)&&/^\/[a-z]+\/?$/.test(p)&&!url.search?preView(req,html,v):html)}
+   if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:TITLE(v,(/^\/[a-z0-9]{2,20}\/([^/?]{1,120})/.exec(p)||[])[1]||null),desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});
+    const dash=v==="dash"&&!!sessionUid(req)&&/^\/dash\/?$/.test(p)&&!url.search;
+    return sendHtml(res,req,200,dash?preDash(req,html):v==="prices"?prePrices(req,html):v==="find"&&/^\/find\/?$/.test(p)?preFind(req,html,url.search):PRE_VIEWS.has(v)&&/^\/[a-z]+\/?$/.test(p)&&!url.search?preView(req,html,v):html,dash?{"Cache-Control":"no-store"}:undefined)}
    return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/\">Go to the home page</a></p>")}
   return send(res,404,{error:"Not found"})}
  if(req.method==="POST"&&p==="/api/upload")return upload(req,res);

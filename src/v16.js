@@ -1,8 +1,8 @@
 /* v16: (1) SW-018 partial profile state guard, (2) expiry reminders on one schedule, (3) honest dashboard numbers and first-run guidance. */
 // (1) A signed-out /p/<id> page starts with only that profile's data (see client-pre.js). Any other page waits for the
-// full public state first (one quick synchronous load), so search, other profiles and the home page never render from
+// full public state first (one fetch, then render), so search, other profiles and the home page never render from
 // the slim copy.
-if(typeof document!=="undefined"&&typeof render==="function"&&typeof __fullSync==="function"){const r16=render;render=function(){try{if(!__partOk())__fullSync()}catch(e){}return r16.apply(this,arguments)}}
+if(typeof document!=="undefined"&&typeof render==="function"&&typeof __fullSync==="function"){const r16=render;render=function(){try{if(!__partOk()){const p=__fullSync();if(p&&typeof p.then==="function")return p.then(()=>r16.apply(this,arguments))}}catch(e){}return r16.apply(this,arguments)}}
 
 // (2) Records: one expiry schedule, and vendor COIs that carry a real expiry date.
 // Pros' own licenses and policies already get notices 60, 30 and 7 days out and on the day (v9Sweep); the server now runs

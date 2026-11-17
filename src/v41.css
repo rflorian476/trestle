@@ -33,3 +33,7 @@
 @media (max-width:700px){.v41row{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}.v41row-m{grid-column:1/-1}.v41apps{grid-column:1}.v41row .btn{grid-row:3;grid-column:2;justify-self:end}.v41meter{grid-column:1/-1}.v41cta{flex-wrap:wrap}}
 /* v41 a11y: the pay-per-lead cost on the savings card (v30) was #D42A3A on #F2EFE8 (4.36:1, Lighthouse color-contrast on signed-in pro dashboards); darker red, 5.6:1 */
 .v30cmp-o .bad{color:#B42318}
+
+/* v41 perf: reserve the site header so signed-in /dash doesn't shift when SHELL fills #top (QA CLS 0.085). */
+header.top{min-height:68px}
+@media (max-width:700px){header.top{min-height:60px}}

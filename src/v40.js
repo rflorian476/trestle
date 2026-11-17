@@ -63,8 +63,8 @@ if(typeof document!=="undefined"){
   $("v40lf").onsubmit=e=>{e.preventDefault();const cc=v39Cents($("v40la").value);if(!cc){say(cr?"Enter the credit amount, like 150.00.":"Enter the payment amount, like 1200.00.","v40la");$("v40la").focus();return}
    const d=$("v40ld").value;if(d&&String(d).slice(0,4)!==String(y)){say(`Keep the date in ${y}. To move it to another year, delete it and log it again in that year.`,"v40ld");$("v40ld").focus();return}
    const kk=v40Cap(m,l,cc);if(kk.after<0){say(cr?`That's more than the ${v39$c(kk.room)} paid to ${name} in ${y}. A credit can bring the total down to $0.00, not below.`:`Credits to ${name} in ${y} add up to more than that. The payment has to be at least ${v39$c(kk.old-kk.total)}, or lower a credit first: the ${y} total can't go below $0.00.`,"v40la");$("v40la").focus();return}
-   const r=A.editLedger40(id,{amt:(cc/100).toFixed(2),date:d,note:$("v40ln").value});if(r&&r.ok===false){say(r.msg||"That didn't save.",r.field==="date"?"v40ld":"v40la");return}
-   act(r,()=>{v40Re();v40EntList(key,name,y,id)})}}
+   __when(A.editLedger40(id,{amt:(cc/100).toFixed(2),date:d,note:$("v40ln").value}),r=>{if(r&&r.ok===false){say(r.msg||"That didn't save.",r.field==="date"?"v40ld":"v40la");return}
+   act(r,()=>{v40Re();v40EntList(key,name,y,id)})})}}
  {const oa=AFTER.office;AFTER.office=function(tab){const r=oa&&oa.apply(this,arguments);try{if(tab==="reports")document.querySelectorAll("[data-v40ent]").forEach(b=>b.onclick=()=>v40EntList(b.dataset.v40ent,b.dataset.v40n,b.dataset.v40y))}catch(e){}return r}}
 }
 

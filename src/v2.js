@@ -145,7 +145,7 @@ const respLine=cid=>{const r=respStats(cid);return r.n?`Median first reply <b>${
 async function v2upload(file,opts){if(!file)throw Error("Choose a photo");if(!/^image\/(jpeg|png|webp)$/.test(file.type))throw Error("JPEG, PNG or WebP images only");if(file.size>5*1024*1024)throw Error("Photos must be 5 MB or smaller");
  const headers={"Content-Type":file.type};if(opts&&opts.kind==="coi")headers["x-sawyer-upload"]="coi";
  const r=await fetch("/api/upload",{method:"POST",headers,body:file,credentials:"same-origin"});const j=await r.json().catch(()=>({error:"Upload failed"}));if(!j.ok)throw Error(j.error||"Upload failed");return j.url}
-function v2pull(){try{const r=__xhr("GET","/api/state");if(r&&r.state)__applyState(r.state)}catch(e){}}
+function v2pull(){try{if(typeof __xhr!=="function")return;return __when(__xhr("GET","/api/state"),r=>{if(r&&r.state)__applyState(r.state)})}catch(e){}}
 
 /* ---------- PHOTO-TO-QUOTE ---------- */
 let ESTF={cat:"",size:"medium",urg:"soon",zip:"",desc:""};let ESTPHOTO=null;
@@ -170,7 +170,7 @@ VIEWS.estimate=(id)=>{const m=me();
 AFTER.estimate=(id)=>{const f=document.getElementById("estf");if(!f)return;const sync=()=>{const o=readForm(f);ESTF={cat:o.cat||"",size:o.size||"medium",urg:o.urg||"soon",zip:o.zip||ESTF.zip,desc:o.desc||""}};
  f.addEventListener("change",e=>{if(e.target.id==="es-desc"){sync();return}if(e.target.id==="es-photo"){const file=e.target.files[0];if(file){if(!/^image\/(jpeg|png|webp)$/.test(file.type)){toast("JPEG, PNG or WebP images only","bad");e.target.value="";return}if(file.size>5*1024*1024){toast("Photos must be 5 MB or smaller","bad");e.target.value="";return}ESTPHOTO={file,preview:URL.createObjectURL(file)}}}sync();const y=scrollY;render();scrollTo(0,y)});
  let t;f.querySelector("#es-desc").addEventListener("input",()=>{clearTimeout(t);t=setTimeout(()=>{sync();const out=document.getElementById("estOut");if(out&&ESTF.cat)out.outerHTML=estCard(estimateRange(ESTF),ESTF)},250)});
- f.onsubmit=async e=>{e.preventDefault();sync();if(!me())return go("signup",null,{next:"/estimate"});const b=document.getElementById("esGo");b.disabled=true;try{let url="";if(ESTPHOTO)url=await v2upload(ESTPHOTO.file);const r=A.saveEstimate(Object.assign({},ESTF,{photo:url}));if(r.ok){ESTPHOTO=null;ESTF.desc="";act(r);go("estimate",r.id)}else{act(r);b.disabled=false}}catch(err){toast(err.message,"bad");b.disabled=false}}};
+ f.onsubmit=async e=>{e.preventDefault();sync();if(!me())return go("signup",null,{next:"/estimate"});const b=document.getElementById("esGo");b.disabled=true;try{let url="";if(ESTPHOTO)url=await v2upload(ESTPHOTO.file);const r=await Promise.resolve(A.saveEstimate(Object.assign({},ESTF,{photo:url})));if(r&&r.ok){ESTPHOTO=null;ESTF.desc="";act(r);go("estimate",r.id)}else{act(r);b.disabled=false}}catch(err){toast(err.message,"bad");b.disabled=false}}};
 
 /* ---------- BID COMPARE ---------- */
 VIEWS.compare=(jid)=>{const j=DB.jobs.find(x=>x.id===jid),m=me();if(!j)return VIEWS.notfound();if(!m||m.id!==j.cust)return`<section class="page narrow">${empty("lock","Only the job owner can compare bids","Bids are private between you and the pros who sent them.")}</section>`;

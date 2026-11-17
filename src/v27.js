@@ -58,7 +58,7 @@ function v27QuickQuote(jid){const j=DB.jobs.find(x=>x.id===jid),m=me();if(!j||!m
  <div class="fld"><label for="v27qn">What's included</label><textarea id="v27qn" name="note" rows="3" maxlength="1000">${esc(note)}</textarea></div>
  <div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" id="v27qs">${I("send",16)}Send quote</button></div><p class="muted small">No lead fee. Quoting is included in your plan.</p></form></div>`);
  document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);v27EstBind(document.getElementById("v27qf"),"v27qp","v27qn");
- const f=document.getElementById("v27qf");f.onsubmit=e=>{e.preventDefault();const o=readForm(f);const r=A.quote(jid,o.price,o.note,o.days);if(r&&r.ok){closeModal();act(r,render)}else act(r)};
+ const f=document.getElementById("v27qf");f.onsubmit=e=>{e.preventDefault();const o=readForm(f);__when(A.quote(jid,o.price,o.note,o.days),r=>{if(r&&r.ok){closeModal();act(r,render)}else act(r)})};
  setTimeout(()=>{const b=document.getElementById("v27qs");b&&b.focus()},30)}
 function v27BindQ(){document.querySelectorAll("[data-v27q]").forEach(b=>b.onclick=e=>{e.preventDefault();v27QuickQuote(b.dataset.v27q)})}
 {const oa=AFTER.dash;AFTER.dash=function(){const r=oa&&oa.apply(this,arguments);try{v27BindQ()}catch(e){}return r}}

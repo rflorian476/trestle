@@ -100,7 +100,7 @@ if(typeof document!=="undefined"){
   document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);const $=s=>document.getElementById(s);setTimeout(()=>{const a=$("v39cra");if(a)a.focus()},40);
   ["v39cra","v39crd"].forEach(id=>$(id).addEventListener("input",()=>{const E=$("v39crE");E.textContent="";E.hidden=true}));
   $("v39crf").onsubmit=e=>{e.preventDefault();const E=$("v39crE"),say=t=>{E.textContent=t;E.hidden=!t};const c=v39Cents($("v39cra").value);if(!c){say("Enter the credit amount, like 150.00.");return}if(c>+have){say(`That's more than the ${v39$c(+have)} paid to ${name} in ${y}. A credit can bring the total down to $0.00, not below.`);return}
-   const r=A.addLedger({kind:"exp",cat:"Subcontractor",vendor:name,amt:"-"+(c/100).toFixed(2),date:$("v39crd").value,note:$("v39crn").value,credit:true});if(r&&r.ok===false){say(r.msg||"That didn't save.");return}closeModal();act(r,()=>{const yy=scrollY;render();scrollTo(0,yy)})}}
+   __when(A.addLedger({kind:"exp",cat:"Subcontractor",vendor:name,amt:"-"+(c/100).toFixed(2),date:$("v39crd").value,note:$("v39crn").value,credit:true}),r=>{if(r&&r.ok===false){say(r.msg||"That didn't save.");return}closeModal();act(r,()=>{const yy=scrollY;render();scrollTo(0,yy)})})}}
  {const oa=AFTER.office;AFTER.office=function(tab){const r=oa&&oa.apply(this,arguments);try{if(tab==="reports")document.querySelectorAll("[data-v39cr]").forEach(b=>b.onclick=()=>v39CrModal(b.dataset.v39cr,b.dataset.v39n,b.dataset.v39y,b.dataset.v39have))}catch(e){}return r}}
 }
 

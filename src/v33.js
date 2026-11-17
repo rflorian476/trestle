@@ -32,7 +32,7 @@ function v33FuModal(qid){const m=me(),q=(DB.quotes||[]).find(x=>x.id===qid),j=q&
  <p class="err" id="v33fe" role="alert"></p><div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" id="v33fs">${I("send",16)}Send follow-up</button></div></form></div>`);
  document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);
  const f=document.getElementById("v33ff");f.onsubmit=e=>{e.preventDefault();if(f.__busy)return;f.__busy=1;const b=document.getElementById("v33fs");b.disabled=true;b.setAttribute("aria-busy","true");
-  const r=A.followUp33(qid,document.getElementById("v33ft").value);if(r&&r.ok){closeModal();act(r,()=>render())}else{f.__busy=0;b.disabled=false;b.removeAttribute("aria-busy");document.getElementById("v33fe").textContent=(r&&r.msg)||"That didn't send. Try again."}}}
+  __when(A.followUp33(qid,document.getElementById("v33ft").value),r=>{if(r&&r.ok){closeModal();act(r,()=>render())}else{f.__busy=0;b.disabled=false;b.removeAttribute("aria-busy");document.getElementById("v33fe").textContent=(r&&r.msg)||"That didn't send. Try again."}})}}
 
 /* (2) Quick log from the dashboard. Pros log a receipt or a trip in a few taps without opening The Office (built for the
    phone at the supply house: the amount field opens the number pad, category is one tap, the receipt photo opens the camera).
@@ -73,13 +73,13 @@ function v33QlBind(kind){document.querySelectorAll("#modal [data-close]").forEac
   else{const n=parseFloat(String(o.amt||"").replace(/[$,\s]/g,""));if(!(n>0))return err("Enter the receipt total.");o.amt=Math.round(n*100)/100;if(o.catx)o.cat=o.catx}
   delete o.rt;delete o.catx;f.__busy=1;const b=document.getElementById("v33qs");b.disabled=true;b.setAttribute("aria-busy","true");
   const fi=document.getElementById("v33pf");if(fi&&fi.files&&fi.files[0]){try{o.photo=await v2upload(fi.files[0])}catch(x){f.__busy=0;b.disabled=false;b.removeAttribute("aria-busy");return err(x.message||"The photo didn't upload. Try again.")}}
-  const r=A.addLedger(o);if(!r||!r.ok){f.__busy=0;b.disabled=false;b.removeAttribute("aria-busy");return err((r&&r.msg)||"That didn't save. Try again.")}
+  const r=await Promise.resolve(A.addLedger(o));if(!r||!r.ok){f.__busy=0;b.disabled=false;b.removeAttribute("aria-busy");return err((r&&r.msg)||"That didn't save. Try again.")}
   const what=kind==="mile"?`${(Math.round(o.miles*10)/10).toLocaleString("en-US")} mi${o.to?" to "+o.to:""} · about ${v7$(o.miles*MILE_RATE)} deduction`:`${v7$(o.amt)} · ${o.cat||"Materials"}${o.vendor?" · "+o.vendor:""}`;
   const box=document.querySelector("#modal .v33qm");if(!box)return;
   box.innerHTML=`<div class="v33done" role="status"><span class="v33ok">${I("check",22)}</span><h2 id="mtitle">${kind==="mile"?"Trip logged":"Receipt logged"}</h2><p>${esc(what)}</p><p class="muted small">It's in The Office under Expenses &amp; mileage.</p>
    <div class="actions v33da"><button type="button" class="btn ghost" id="v33un">Undo</button><button type="button" class="btn" id="v33ag">Log another</button><button type="button" class="btn primary" id="v33dn">Done</button></div></div>`;
   const id=r.id;document.getElementById("v33dn").onclick=()=>{closeModal();render()};document.getElementById("v33ag").onclick=()=>{box.innerHTML=v33QlForm(kind);v33QlBind(kind)};
-  document.getElementById("v33un").onclick=()=>{const u=id?A.delLedger(id):{ok:false,msg:"Delete it in The Office."};if(u&&u.ok){closeModal();toast(kind==="mile"?"Trip removed":"Receipt removed");render()}else toast((u&&u.msg)||"Couldn't undo","err")};
+  document.getElementById("v33un").onclick=async()=>{const u=id?await Promise.resolve(A.delLedger(id)):{ok:false,msg:"Delete it in The Office."};if(u&&u.ok){closeModal();toast(kind==="mile"?"Trip removed":"Receipt removed");render()}else toast((u&&u.msg)||"Couldn't undo","err")};
   document.getElementById("v33dn").focus()}}
 
 /* both pro dashboard cards go right under "Here's what's next" */

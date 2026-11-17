@@ -18,8 +18,9 @@ v27EstBind=function(f,pid,nid){const s=f&&f.querySelector("#v27es");if(!s)return
    is sent; it comes back only if the quote was refused (so the pro can fix the price and try again). */
 function v28Guard(f){if(!f||f.__v28g)return;const h=f.onsubmit;if(typeof h!=="function")return;f.__v28g=1;
  f.onsubmit=function(e){if(e&&e.preventDefault)e.preventDefault();if(f.__busy)return false;f.__busy=1;const bs=[...f.querySelectorAll('button:not([type="button"])')];bs.forEach(b=>{b.disabled=true;b.setAttribute("aria-busy","true")});
-  const oq=A.quote;let sent=false;A.quote=function(){const r=oq.apply(this,arguments);sent=!!(r&&r.ok);return r};
-  try{return h.call(this,e)}finally{A.quote=oq;if(!sent){f.__busy=0;bs.forEach(b=>{b.disabled=false;b.removeAttribute("aria-busy")})}}}}
+  const unlock=()=>{f.__busy=0;bs.forEach(b=>{b.disabled=false;b.removeAttribute("aria-busy")})};
+  const oq=A.quote;let sent=false;A.quote=function(){sent=true;return Promise.resolve(oq.apply(this,arguments)).then(r=>{if(!r||!r.ok)unlock();return r})};
+  try{return h.call(this,e)}finally{A.quote=oq;if(!sent)unlock()}}}
 {const oq=v27QuickQuote;v27QuickQuote=function(){const r=oq.apply(this,arguments);try{v28Guard(document.getElementById("v27qf"))}catch(e){}return r}}
 {const oq=quoteModal;quoteModal=function(){const r=oq.apply(this,arguments);try{v28Guard(document.getElementById("qf"))}catch(e){}return r}}
 

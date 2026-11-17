@@ -81,7 +81,7 @@ AFTER.post=(p,q)=>{const f=document.getElementById("w11F");if(!f)return;let s=w1
   if(k===2){if(s.bud==="custom"&&!String(s.budget||"").trim()){toast("Add your budget, or pick Not sure yet","err");return}return step(3)}
   if(!m)return go("signup",null,{as:"customer",next:"/post?step=3"});
   const o={title:s.title,desc:s.desc,cat:s.cat,sub:s.sub||"",zip:s.zip,budget:w11Budget(s),when:W11WHENTXT[s.urg||"soon"],urgent:s.urg==="emergency"||s.urg==="urgent",photos:s.photos||[],size:s.size||"medium"};if(s.invite)o.invite=s.invite;
-  const r=A.postJob(o);if(r&&r.ok){if(s.invite){try{A.send(s.invite,`Hi! I just sent you a quote request: "${o.title}".`)}catch(e){}}try{sessionStorage.removeItem(W11K)}catch(e){}act({ok:true,msg:"Request sent. Your matched pros are below."},()=>go("job",r.id,{new:1}))}else act(r)}};
+  __when(A.postJob(o),r=>{if(r&&r.ok){if(s.invite){try{A.send(s.invite,`Hi! I just sent you a quote request: "${o.title}".`)}catch(e){}}try{sessionStorage.removeItem(W11K)}catch(e){}act({ok:true,msg:"Request sent. Your matched pros are below."},()=>go("job",r.id,{new:1}))}else act(r)})}};
 /* postJob: photos, size, the range we showed (server-side rules) */
 {const op=A.postJob;A.postJob=function(o){o=o||{};const r=op.call(this,o);if(r&&r.ok){const j=(DB.jobs||[]).find(x=>x.id===r.id);if(j){const ph=(Array.isArray(o.photos)?o.photos:[]).filter(u=>UPLOAD_RE.test(String(u))).slice(0,6);if(ph.length)j.rphotos=ph;if(EST_SIZE[o.size])j.size11=o.size;
  try{const e=estimateRange({cat:j.cat,size:j.size11||"medium",urg:j.urgent?"urgent":"soon",zip:j.zip,desc:j.title+" "+j.desc});j.est11={low:e.low,high:e.high}}catch(e){}save()}}return r}}

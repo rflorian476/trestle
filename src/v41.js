@@ -8,12 +8,33 @@
    away: the contractor still decides, the check only says what Sawyer can see from the posting and the profile. */
 const V41_ST=["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","PR","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 const V41_LV=["apprentice","journeyman","master"];
-function v41Now(){try{if(typeof window!=="undefined"&&typeof window.__now==="function")return window.__now()}catch(e){}return Date.now()}
+function v41Now(){try{if(typeof window!=="undefined"&&typeof window.__now==="function")return window.__now()}catch(e){}try{if(typeof __now==="function")return __now()}catch(e){}return Date.now()}
 function v41Norm(s){return String(s||"").trim().toLowerCase()}
-/* states a call accepts: its own state plus any state codes named in the reciprocity line */
-function v41Accepts(c){const own=String(c&&c.lstate||"").toUpperCase(),r=String(c&&c.recip||"");
- const named=[...new Set((r.match(/\b[A-Z]{2}\b/g)||[]).filter(x=>V41_ST.includes(x)&&x!==own))];
- const none=/\bno reciprocity\b|\breciprocity not accepted\b/i.test(r);return{own,recip:none?[]:named}}
+/* full names, case-insensitive. Codes (any case) only count in a list of 2+ states or a reciprocity-phrase sentence. */
+const V41_NAME={alabama:"AL",alaska:"AK",arizona:"AZ",arkansas:"AR",california:"CA",colorado:"CO",connecticut:"CT",delaware:"DE","district of columbia":"DC",florida:"FL",georgia:"GA",hawaii:"HI",idaho:"ID",illinois:"IL",indiana:"IN",iowa:"IA",kansas:"KS",kentucky:"KY",louisiana:"LA",maine:"ME",maryland:"MD",massachusetts:"MA",michigan:"MI",minnesota:"MN",mississippi:"MS",missouri:"MO",montana:"MT",nebraska:"NE",nevada:"NV","new hampshire":"NH","new jersey":"NJ","new mexico":"NM","new york":"NY","north carolina":"NC","north dakota":"ND",ohio:"OH",oklahoma:"OK",oregon:"OR",pennsylvania:"PA","puerto rico":"PR","rhode island":"RI","south carolina":"SC","south dakota":"SD",tennessee:"TN",texas:"TX",utah:"UT",vermont:"VT",virginia:"VA",washington:"WA","west virginia":"WV",wisconsin:"WI",wyoming:"WY"};
+function v41IsSt(c){return V41_ST.includes(String(c||"").toUpperCase())}
+function v41ParseRecip(txt){const raw=String(txt||"");if(!raw.trim())return[];if(/\bno reciprocity\b|\breciprocity not accepted\b/i.test(raw))return[];
+ const names=Object.keys(V41_NAME).sort((a,b)=>b.length-a.length),nameRe=new RegExp("\\b("+names.join("|")+")\\b","gi"),out=[];
+ const add=c=>{c=String(c||"").toUpperCase();if(v41IsSt(c)&&!out.includes(c))out.push(c)};
+ let m;while((m=nameRe.exec(raw)))add(V41_NAME[m[1].toLowerCase()]);
+ const tokRe=new RegExp("\\b(?:"+names.join("|")+"|[A-Za-z]{2})\\b","gi"),toks=[];
+ tokRe.lastIndex=0;while((m=tokRe.exec(raw))){const w=m[0],code=w.length===2?w.toUpperCase():V41_NAME[w.toLowerCase()];if(code&&v41IsSt(code))toks.push({code,i:m.index,j:m.index+w.length})}
+ const gapOk=(a,b)=>/^\s*([,\/]|and|,?\s*and)\s*$/i.test(raw.slice(a.j,b.i));
+ for(let i=0;i<toks.length;){let j=i;while(j+1<toks.length&&gapOk(toks[j],toks[j+1]))j++;if(j>i){for(let k=i;k<=j;k++)add(toks[k].code);i=j+1}else i++}
+ const phrase=/\b(reciprocity|licensed in|accepts?|accepted)\b/i;
+ const word=new Set("or in me hi id la an at be by do if is it my no of on so to up us we am he as".split(" "));
+ if(phrase.test(raw)){for(const sent of raw.split(/(?<=[.!?])\s+/)){if(!phrase.test(sent))continue;const tr=/\b([A-Za-z]{2})\b/g;let x;while((x=tr.exec(sent))){if(word.has(x[1].toLowerCase())&&x[1]!==x[1].toUpperCase())continue;if(v41IsSt(x[1]))add(x[1])}}}
+ return out}
+/* states a call accepts: structured recipStates when the poster picked them, otherwise parsed from the reciprocity line (full names, or codes in a list / reciprocity phrase). */
+function v41Accepts(c){const own=String(c&&c.lstate||"").toUpperCase();
+ if(Array.isArray(c&&c.recipStates)&&c.recipStates.length){return{own,recip:[...new Set(c.recipStates.map(s=>String(s||"").toUpperCase()).filter(s=>v41IsSt(s)&&s!==own))]}}
+ return{own,recip:v41ParseRecip(c&&c.recip).filter(s=>s!==own)}}
+/* calendar days to the start date in the call's zone (job state, else the poster's), not UTC midnight. */
+function v41StateZip(st){st=String(st||"").toUpperCase();if(!st||typeof ZIPS!=="object"||!ZIPS)return"";for(const z of Object.keys(ZIPS)){const lab=String((ZIPS[z]&&ZIPS[z][0])||"");if(lab.slice(-2)===st||lab.slice(-3,-1)===st)return z}return""}
+function v41CallTz(c){const st=c&&(c.state||c.lstate);const z=v41StateZip(st);if(z&&typeof v38ZipTz==="function")return v38ZipTz(z);const u=typeof U==="function"&&c?U(c.by):null;if(typeof v38UserTz==="function")return v38UserTz(u);return"America/New_York"}
+function v41TodayIn(tz){try{return new Intl.DateTimeFormat("en-CA",{timeZone:tz||"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(v41Now()))}catch(e){return new Intl.DateTimeFormat("en-CA",{year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(v41Now()))}}
+function v41CalDays(start,today){const a=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(start||"")),b=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(today||""));if(!a||!b)return NaN;return Math.round((Date.UTC(+a[1],+a[2]-1,+a[3])-Date.UTC(+b[1],+b[2]-1,+b[3]))/864e5)}
+function v41TDays(c){if(!c||!/^\d{4}-\d{2}-\d{2}$/.test(String(c.start||"")))return NaN;return v41CalDays(c.start,v41TodayIn(v41CallTz(c)))}
 function v41LvOk(have,need){const h=v41Norm(have),n=v41Norm(need);if(!n)return true;if(h===n)return true;const hi=V41_LV.indexOf(h),ni=V41_LV.indexOf(n);return hi>=0&&ni>=0&&hi>=ni}
 function v41Day(d){return/^\d{4}-\d{2}-\d{2}$/.test(String(d||""))?new Date(d+"T12:00:00").getTime():0}
 function v41Fit(c,t){t=t||{};const lic=Array.isArray(t.lic)?t.lic:[],A_=v41Accepts(c),need=String(c&&c.lic||"").trim(),out={};
@@ -51,19 +72,24 @@ if(typeof VIEWS!=="undefined"&&VIEWS.tcall){const ov=VIEWS.tcall;VIEWS.tcall=fun
    h=h.slice(0,e+4)+`<div class="v41me ${f.fits?"is-ok":f.lic.ok===false||f.start.ok===false?"is-no":""}" id="v41me"><b>${head}</b>${v41Chips(c,m)}<a class="small" href="${href("travme")}">Update your licenses or dates</a></div>`+h.slice(e+4)}}catch(e){}return h}}
 if(typeof tKCard==="function"){const ok_=tKCard;tKCard=function(c,a,st){let h=ok_.apply(this,arguments);try{const u=U(a.uid),k=h.indexOf('<div class="t6k-a">');if(u&&k>=0)h=h.slice(0,k)+v41Chips(c,u)+h.slice(k)}catch(e){}return h}}
 
-/* (2) "Your traveler calls" on the pro dashboard. A contractor who posts traveler calls sees each open call with spots
+/* (2) "Your traveler calls" on the dashboard. Anyone who can post traveler calls (contractors and PMs) and who has posted them sees each open call with spots
    hired / needed, active applicants and how many of them fit, days to start, and one tap to the pipeline. An electrical
-   (or other traveling-trade) contractor with no calls yet gets a short "Post a traveler call" card instead. */
+   (or other traveling-trade) account with no calls yet gets a short "Post a traveler call" card instead. */
 function v41MyCalls(m){return(DB.tcalls||[]).filter(c=>c&&c.by===m.id&&!c.ownerGone36).sort((a,b)=>(a.status==="open"?0:1)-(b.status==="open"?0:1)||String(a.start||"").localeCompare(String(b.start||"")))}
 function v41DashBlock(m){const calls=v41MyCalls(m),trav=typeof TRADES_T!=="undefined"&&TRADES_T[m.trade];if(!calls.length&&!trav)return"";
  if(!calls.length)return`<section class="v41calls" id="v41calls"><div class="ud-h"><h2>Traveler calls</h2><a href="${href("traveling")}">How it works</a></div><div class="v41cta card">${I("truck",22)}<div><b>Need hands for a big job?</b><small>Post the rate, per diem and license up front. Travelers apply free, no recruiter in the middle, no hiring fee.</small></div><a class="btn primary sm" href="${href("newtravel")}">${I("plus",14)}Post a traveler call</a></div></section>`;
- const now=v41Now(),open=calls.filter(c=>c.status==="open"),rows=calls.slice(0,4).map(c=>{const hired=tHiredN(c),s=v41FitCount(c),d=v41Day(c.start),days=d?(typeof tDays==="function"?tDays(c):Math.ceil((d-now)/864e5)):null;
-  const when=days==null?"":days>1?`starts in ${days} days`:days===1?"starts tomorrow":days===0?"starts today":"started";
+ const open=calls.filter(c=>c.status==="open"),rows=calls.slice(0,4).map(c=>{const hired=tHiredN(c),s=v41FitCount(c),days=v41TDays(c);
+  const when=!Number.isFinite(days)?"":days>1?`starts in ${days} days`:days===1?"starts tomorrow":days===0?"starts today":"started";
   return`<li class="v41row" data-call="${esc(c.id)}"><a class="v41row-m" href="${href("tcall",c.id)}"><b>${esc(c.title)}</b><small>${esc(c.loc||"")}${c.state?", "+esc(c.state):""} · ${tMoney(c.rate)}/hr + ${tMoney(c.perDiem)}/day${when?" · "+when:""}${c.status!=="open"?" · "+(c.status==="filled"?"filled":"closed"):""}</small></a>
   <span class="v41meter" role="img" aria-label="${hired} of ${c.need} hired"><i style="--f:${Math.min(100,Math.round(hired/Math.max(1,c.need)*100))}%"></i><span><b>${hired}</b>/${c.need} hired</span></span>
   <span class="v41apps">${s.of?`<b>${s.of}</b> active · <b class="${s.n?"v41g":""}">${s.n}</b> fit`:`<span class="muted">No active applicants</span>`}</span>
   <a class="btn sm" href="${href("tdash",null,{call:c.id})}">${I("users",14)}Pipeline</a></li>`}).join("");
  const act=open.reduce((a,c)=>a+v41FitCount(c).of,0);
  return`<section class="v41calls" id="v41calls"><div class="ud-h"><h2>Your traveler calls</h2><a href="${href("newtravel")}">${I("plus",14)}Post a call</a></div><div class="card v41list"><p class="small muted v41lead">${open.length} open call${open.length===1?"":"s"} · ${act} active applicant${act===1?"":"s"} to review. Fit = license (or reciprocity) for the call's state and free by the start date.</p><ul>${rows}</ul>${calls.length>4?`<a class="small" href="${href("tdash")}">All ${calls.length} calls</a>`:""}</div></section>`}
-if(typeof VIEWS!=="undefined"&&VIEWS.dash){const ov=VIEWS.dash;VIEWS.dash=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||m.role!=="contractor"||m.staff)return h;
-  const a='<div class="ud-h"><h2>Project crews</h2>',k=h.indexOf(a);if(k<0)return h;const b=v41DashBlock(m);return b?h.slice(0,k)+b+h.slice(k):h}catch(e){}return h}}
+function v41DashInsert(h,block){if(!block||!h)return h;const marks=['<div class="ud-h"><h2>Project crews</h2>','<div class="ud-h"><h2>Your projects</h2>'];
+ for(const a of marks){const k=h.indexOf(a);if(k>=0)return h.slice(0,k)+block+h.slice(k)}
+ const g=h.indexOf('<div class="ud-grid">');if(g>=0)return h.slice(0,g)+block+h.slice(g);
+ const w=h.indexOf('<div class="wrap ud-body">');if(w>=0){const i=h.indexOf(">",w);if(i>=0)return h.slice(0,i+1)+block+h.slice(i+1)}
+ return h+block}
+if(typeof VIEWS!=="undefined"&&VIEWS.dash){const ov=VIEWS.dash;VIEWS.dash=function(){let h=ov.apply(this,arguments);try{const m=me();if(!m||m.staff||(typeof canPostT==="function"?!canPostT(m):(m.role!=="contractor"&&m.role!=="pm")))return h;
+  return v41DashInsert(h,v41DashBlock(m))}catch(e){}return h}}

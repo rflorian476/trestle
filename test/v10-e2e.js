@@ -13,7 +13,7 @@ const shot=async(p,n)=>{if(OUT){fs.mkdirSync(OUT,{recursive:true});await p.scree
 {const p=await as(null);await p.waitForTimeout(1500);ok(await p.evaluate(()=>[...document.fonts].filter(f=>f.family.includes("Jakarta")&&f.status==="loaded").length>=2),"Plus Jakarta Sans actually loads");await p.close()}
 // --- pro makes a fresh estimate for the homeowner and sends it
 let pro=await as("demo-pro@sawyer.test");await nav(pro,"/office/estimates");
-const est=await pro.evaluate(()=>{const s=v7Bill("bbc11001");const o=JSON.parse(JSON.stringify(s));delete o.id;delete o.no;delete o.sig10;o.status="draft";o.title="v10 test: replace water heater";const r=A.saveBill(o);if(!r||!r.ok)return {err:r&&r.msg};const s2=A.sendBill(r.id);return{id:r.id,sent:s2&&s2.ok}});
+const est=await pro.evaluate(async()=>{const s=v7Bill("bbc11001");const o=JSON.parse(JSON.stringify(s));delete o.id;delete o.no;delete o.sig10;o.status="draft";o.title="v10 test: replace water heater";const r=await Promise.resolve(A.saveBill(o));if(!r||!r.ok)return {err:r&&r.msg};const s2=await Promise.resolve(A.sendBill(r.id));return{id:r.id,sent:s2&&s2.ok}});
 ok(est.id&&est.sent,"pro creates and sends an estimate");
 await nav(pro,"/invoice/"+est.id);ok(await pro.$(".s10-wait"),"pro sees 'Waiting for e-signature'");
 // --- homeowner signs on a phone
@@ -33,9 +33,9 @@ await nav(pro,"/invoice/"+est.id);ok(await pro.$(".s10-doc"),"pro sees the signa
 const conv=await pro.evaluate(id=>A.convertEst(id),est.id);ok(conv&&conv.ok&&conv.id,"approved estimate turns into an invoice");
 if(conv&&conv.id){await nav(pro,"/invoice/"+conv.id);ok((await pro.textContent(".s10-from")||"").includes("Dana Whitaker"),"invoice shows 'Based on estimate, signed by'");await shot(pro,"desktop-invoice-from-signed-estimate")}
 // --- recurring invoices actually generate when due
-const rec=await pro.evaluate(()=>{const t=v7Today();const inv=(DB.bills||[]).find(b=>b.id==="bbc11005");const n0=DB.bills.filter(b=>b.recFrom9===inv.id).length;
- const s=A.setRecurring(inv.id,{every:"week",next:t,auto:true});const r=A.sweep9();const after=DB.bills.filter(b=>b.recFrom9===inv.id);const nb=after[after.length-1];
- const r2=A.sweep9();const after2=DB.bills.filter(b=>b.recFrom9===inv.id).length;const v=v7Bill(inv.id).rec9;A.setRecurring(inv.id,{every:"off"});
+const rec=await pro.evaluate(async()=>{const t=v7Today();const inv=(DB.bills||[]).find(b=>b.id==="bbc11005");const n0=DB.bills.filter(b=>b.recFrom9===inv.id).length;
+ const s=await Promise.resolve(A.setRecurring(inv.id,{every:"week",next:t,auto:true}));const r=await Promise.resolve(A.sweep9());const after=DB.bills.filter(b=>b.recFrom9===inv.id);const nb=after[after.length-1];
+ const r2=await Promise.resolve(A.sweep9());const after2=DB.bills.filter(b=>b.recFrom9===inv.id).length;const v=v7Bill(inv.id).rec9;await Promise.resolve(A.setRecurring(inv.id,{every:"off"}));
  return{set:s&&s.ok,made:after.length-n0,st:nb&&nb.status,sent:!!(nb&&nb.sent),next:v.next,today:t,again:after2-after.length,sameTotal:nb&&billCalc(nb).total===billCalc(inv).total,cuid:nb&&nb.cuid===inv.cuid}});
 ok(rec.set&&rec.made===1,"due recurring invoice generates exactly one new invoice");ok(rec.st==="sent"&&rec.sent&&rec.cuid,"auto-send recurring invoice goes to the customer");
 ok(rec.sameTotal,"generated invoice copies the lines and total");ok(rec.next>rec.today&&rec.again===0,"schedule moves forward and a second sweep makes nothing");
@@ -53,7 +53,7 @@ const led=await pro.evaluate(()=>(DB.ledger||[]).filter(l=>l.vendor==="Home Depo
 ok(await pro.$("a.r10-th img"),"receipt thumbnail in the expense list");
 const forged=await pro.evaluate(()=>A.addLedger({kind:"exp",amt:"5",vendor:"x",photo:"/u/0123456789abcdef0123456789abcdef.jpg"}));ok(forged&&!forged.ok,"server refuses a receipt photo the user didn't upload");
 // --- traveler status + open to travel
-let tv=await as("demo-remodeler@sawyer.test");await tv.reload();await tv.waitForFunction(()=>typeof A!=="undefined"&&typeof A.saveTravel==="function"&&typeof me==="function"&&!!me());await tv.evaluate(()=>A.saveTravel({trade:"Electrical",headline:"Journeyman, commercial + industrial",home:"Ludington, MI",lic:[{type:"Journeyman",state:"MI"}],states:["MI","OH","IN"],availNow:true,yrs:9,osha:"OSHA 30"}));
+let tv=await as("demo-remodeler@sawyer.test");await tv.reload();await tv.waitForFunction(()=>typeof A!=="undefined"&&typeof A.saveTravel==="function"&&typeof me==="function"&&!!me());await tv.evaluate(async()=>{await Promise.resolve(A.saveTravel({trade:"Electrical",headline:"Journeyman, commercial + industrial",home:"Ludington, MI",lic:[{type:"Journeyman",state:"MI"}],states:["MI","OH","IN"],availNow:true,yrs:9,osha:"OSHA 30"}))});
 await nav(tv,"/travel?tab=travelers");
 // v41: condition-based. Wait for the status data itself (full /api/state applied, me().trav present), then for the
 // picker that renders from it. A slow fetch under load just takes longer; a missing picker still fails fast once the data is there.

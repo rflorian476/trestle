@@ -110,7 +110,7 @@ if(typeof document!=="undefined"){
     const td=v38AskMin(v,tz);if(td)f.querySelectorAll('input[type=date]').forEach(i=>i.min=td);
     f.onsubmit=e=>{e.preventDefault();const slots=[0,1,2].map(i=>{const d=document.getElementById("v37d"+i).value,t=document.getElementById("v37t"+i).value;return d&&t?Object.assign({},v38Conv(d,t,tz,from)):{date:d,start:t}});
      const visToday=v38TodayIn(from);if(visToday&&slots.some(s=>s.date&&s.date<visToday)){document.getElementById("v37asE").textContent="Pick days from today up to 6 months out.";return}
-     const res=A.visitAsk37(v.id,slots,document.getElementById("v37n").value);if(res&&res.ok===false){document.getElementById("v37asE").textContent=res.msg;return}closeModal();act(res,()=>{const y=scrollY;render();scrollTo(0,y)})}}catch(e){console.warn(e)}return r}}
+     __when(A.visitAsk37(v.id,slots,document.getElementById("v37n").value),res=>{if(res&&res.ok===false){document.getElementById("v37asE").textContent=res.msg;return}closeModal();act(res,()=>{const y=scrollY;render();scrollTo(0,y)})})}}catch(e){console.warn(e)}return r}}
  function v38TzModal(){const m=me();if(!m)return;const cur=m.tz38&&v38TzOk(m.tz38)?m.tz38:"",auto=v38ZipTz(m.zip);
   modal(`<form id="v38tzf" class="v38tzf"><h2 id="mtitle">${I("clock",20)} Your time zone</h2><p class="muted small">Appointment times show on this clock. Automatic uses your ZIP${m.zip?" ("+esc(m.zip)+")":""}: ${esc(v38Name(auto))} time.</p>
    <div class="fld"><label for="v38tzs">Time zone</label><select id="v38tzs"><option value="">Automatic (${esc(v38Name(auto))}, ${esc(v38Abbr(auto))})</option>${V38_TZ.map(z=>`<option value="${z[0]}" ${z[0]===cur?"selected":""}>${esc(z[1])} (${z[2]})</option>`).join("")}</select></div>

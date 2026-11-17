@@ -69,7 +69,7 @@ if(typeof DB!=="undefined"&&DB&&DB.users&&!Array.isArray(DB.cases)){try{seedV9()
 /* ---- client: links, titles ---- */
 {const ol=linkTo;linkTo=function(l){const[a,b]=String(l||"").split(":");if(a==="case")return go("case",b);if(a==="office"&&b)return go("office",b);return ol(l)}}
 if(typeof TITLES!=="undefined")Object.assign(TITLES,{case:"Resolution case",cases:"Resolution cases"});
-let V9SW=false;function v9Tick(){const m=me();if(V9SW||!m)return;V9SW=true;setTimeout(()=>{try{const r=A.sweep9();if(r&&r.n){const y=scrollY;render();scrollTo(0,y)}}catch(e){}},1200)}
+let V9SW=false;function v9Tick(){const m=me();if(V9SW||!m)return;V9SW=true;setTimeout(()=>{try{__when(A.sweep9(),r=>{if(r&&r.n){const y=scrollY;render();scrollTo(0,y)}})}catch(e){}},1200)}
 /* ---- Office: recurring tab, invoice repeat card, tax-year export, onboarding card hides when done ---- */
 if(typeof OTABS!=="undefined"&&!OTABS.some(t=>t[0]==="recurring"))OTABS.splice(2,0,["recurring","Recurring","repeat"]);
 {const os=oStart;oStart=function(m){const h=os(m);return /You're set up/.test(h)?"":h}}
@@ -120,7 +120,7 @@ function v9CaseModal(jid){const m=me(),j=DB.jobs.find(x=>x.id===jid);if(!j)retur
  <div class="fld"><label for="c9w">What would make it right?</label><input id="c9w" name="want" placeholder="${cu?"Come back and fix it, or a partial refund":"Pay the remaining balance"}"></div>
  <div class="fld"><label for="c9a">Amount in question (optional)</label><input id="c9a" name="amt" inputmode="decimal" placeholder="0"></div>
  <p class="small muted o9-note">${I("lock",14)}Keep it to this job. No phone numbers or threats. Cases are reviewed by a person, never a bot.</p><div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary">${I("flag",16)}Open case</button></div></form>`);
- document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);document.getElementById("c9f").onsubmit=e=>{e.preventDefault();const r=A.openCase(jid,readForm(e.target));if(r.ok){closeModal();act(r,()=>go("case",r.id))}else act(r)}}
+ document.querySelectorAll("#modal [data-close]").forEach(x=>x.onclick=closeModal);document.getElementById("c9f").onsubmit=e=>{e.preventDefault();__when(A.openCase(jid,readForm(e.target)),r=>{if(r&&r.ok){closeModal();act(r,()=>go("case",r.id))}else act(r)})}}
 {const ov=VIEWS.job;VIEWS.job=(id,...r)=>{const h=ov(id,...r),m=me(),j=(DB.jobs||[]).find(x=>x.id===id);const card=v9CaseCard(j,m);if(!card)return h;const k=h.lastIndexOf("</section>");return k<0?h+card:h.slice(0,k)+`<div class="o9-jcw">${card}</div>`+h.slice(k)}}
 {const oa=AFTER.job;AFTER.job=(id,...r)=>{oa&&oa(id,...r);document.querySelectorAll("[data-case9]").forEach(b=>b.onclick=()=>v9CaseModal(b.dataset.case9))}}
 VIEWS.case=(id)=>{const m=me();if(!m)return VIEWS.signup(null,{next:"/case/"+id});const c=v9Case(id);

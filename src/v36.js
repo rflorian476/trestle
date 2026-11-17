@@ -84,7 +84,7 @@ function v36JcModal(){const m=me(),b=BED;if(!m||!b)return;const all=v36Unbilled(
  document.querySelectorAll("[data-v36mk]").forEach(x=>x.onclick=()=>{M.value=x.dataset.v36mk;setMk(M.value)});
  document.getElementById("v36jcGo").onclick=()=>{const pick=rows().filter(L=>st.sel.has(L.id)).sort((a,b)=>String(a.date).localeCompare(String(b.date))||(a.kind==="mile")-(b.kind==="mile"));if(!pick.length)return;try{const f=document.getElementById("bedF");f&&f.oninput&&f.oninput({target:f})}catch(e){}
   b.lines=(b.lines||[]).filter(l=>l.d||l.r);pick.forEach(L=>b.lines.push(Object.assign(v36CostLine(L,st.mk),{opt:false,on:true})));if(!b.job&&st.job)b.job=st.job;
-  if(st.mk!==v36Mk(m)){const r=A.mk36(st.mk);if(r&&r.ok===false)toast(r.msg,"err")}
+  if(st.mk!==v36Mk(m)){__when(A.mk36(st.mk),r=>{if(r&&r.ok===false)toast(r.msg,"err")})}
   closeModal();const y=scrollY;render();scrollTo(0,y);toast(`Added ${pick.length} job cost${pick.length===1?"":"s"}`)};
  draw()}
 {const ov=VIEWS.invedit;VIEWS.invedit=function(id,q){let h=ov.apply(this,arguments);try{const m=me();if(!m||!v7Pro(m)||!BED||BED.type!=="inv"||h.indexOf('id="bedF"')<0)return h;
@@ -147,7 +147,7 @@ function v36PhCard(b){const P=v36Ph(b),c=v7Cust(b.cust),cp=(c&&Array.isArray(c.p
  <p class="muted small v36pc-s" id="v36pcS" role="status"></p></div>`}
 {const ov=VIEWS.invoice;VIEWS.invoice=function(id){let h=ov.apply(this,arguments);try{const m=me(),b=v7Bill(id);if(!m||!b||b.by!==m.id||b.status==="void")return h;const a='<aside class="o7-side">';const k=h.indexOf(a);
   return k<0?h:h.slice(0,k+a.length)+v36PhCard(b)+h.slice(k+a.length)}catch(e){return h}}}
-function v36PhSave(b,list,msg){const r=A.billPhotos36(b.id,list);const s=document.getElementById("v36pcS");if(r&&r.ok===false){if(s)s.textContent=r.msg;toast(r.msg,"err");return r}act(r,()=>{const y=scrollY;render();scrollTo(0,y)});return r}
+function v36PhSave(b,list,msg){return __when(A.billPhotos36(b.id,list),r=>{const s=document.getElementById("v36pcS");if(r&&r.ok===false){if(s)s.textContent=r.msg;toast(r.msg,"err");return r}act(r,()=>{const y=scrollY;render();scrollTo(0,y)});return r})}
 {const oa=AFTER.invoice;AFTER.invoice=function(id){const r=oa&&oa.apply(this,arguments);try{const b=v7Bill(id);if(!b)return r;
   document.querySelectorAll("[data-v36ph]").forEach(x=>x.onclick=()=>v36Lightbox(b,+x.dataset.v36ph));
   const pc=document.getElementById("v36pc");if(!pc)return r;const cur=()=>v36Ph(b).map(p=>({src:p.src,tag:p.tag,cap:p.cap}));
