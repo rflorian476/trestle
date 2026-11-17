@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.25.0
+# Sawyer (beta) — v2.26.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.25.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.26.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -23,6 +23,10 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
 
+## v43: unique invoice numbers, no duplicating a void bill, one draft from a parallel Bill again
+
+- **Unique invoice numbers (SW-106).** The next invoice, estimate or change-order number is one past the highest existing number of that type for that business (`v7Next`). Voids and drafts count, so a number is never reused. The server will not save a second bill with the same business, type and number — it mints the next free one (or refuses if it cannot). On boot, any existing collision is repaired by giving the newer bill a new number. The demo seed numbers estimates, invoices and change orders on separate counters (EST-1001…, INV-1001…, CO-1001…), so a fresh seed's next INV, EST and CO never collide with a leftover like CO-1010.
+
 ## v42: duplicate an invoice ("Bill again"), traveler calls in all 50 states, a faster Account page
 
 - **Duplicate an invoice or estimate.** Every invoice and estimate a pro owns has **Duplicate** in its Actions, and Office → **Invoices** opens with a **Bill <customer> again?** card for the last invoice sent (not a draft or void, customer still on file) with **Duplicate last invoice**. The copy is a new draft with its own number: same customer, title, job name, site, kind, line items, tax, deposit (estimates) and notes; dated today in the pro's own zone; due in as many days as the original gave (1–120, else 14), or for an estimate valid for as long as the original (else 30). **Not copied:** payments, reminders, sent / viewed / approved history, photos of the work, the P.O. number (a new bill usually needs a new P.O.) and job-cost lines (a receipt or trip can only be billed once; **Bill job costs** adds new ones). It opens in the editor with a note saying what was copied, its timeline says "Duplicated from INV-…", and nothing reaches the customer until the pro presses Send. An invoice locked by payments offers **Duplicate instead** in the editor (the "void it and issue a new one" path). Change orders (they belong to one estimate), other pros' bills, customers and signed-out callers are refused on the server (`dupBill42`). Payments stay in test mode.
@@ -30,7 +34,7 @@ Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, M
 - **SW-102: Washington, D.C.** In a reciprocity line, "Washington DC", "Washington, D.C.", "Washington, DC" and a bare "D.C." mean DC (they used to read as WA, or WA and DC). "Washington state", plain "Washington" and "WA" are still Washington.
 - **SW-103: all 50 states plus DC and PR.** Traveler calls, traveler profiles, filters, alerts and the reciprocity picker used a 31-state list, so a call in Hawaii was refused ("Pick the job state.") and Alaska, Vermont, Maine and others were missing. They now take all 52. Days-to-start counts on the call's own calendar from a full state-to-zone table: `Pacific/Honolulu` for HI, `America/Anchorage` for AK, `America/Puerto_Rico` for PR, and for a state with two zones the one most of it keeps (TX Central, FL / MI / IN / KY Eastern, ID Mountain, OR Pacific). At 11:30 pm on Nov 30 in Honolulu (already Dec 1 in the East) a Dec 1 Hawaii call says "starts tomorrow"; at 12:05 am it says "starts today".
 - **Test hygiene.** `v41-e2e`'s "header reserve is in source" ended in `||true`, so it could never fail. It now requires the desktop `header.top` min-height rule and the 60px phone rule in `src/v41.css`.
-- Tests: `node test/v42-e2e.js [shots dir]` (self-contained, local test mode) is part of `test/run-all.sh` (40 suites). `v41-e2e` accepts any Sawyer version from 2.24.0 / SW cache from `sawyer-v41`. SW cache is `sawyer-v42`. Code: `src/v42.js`, `src/v42.css`, `src/v3.js` (Account), `src/v41.js` (D.C., state zones), `src/v5.js` (`T_STATES`), `client-pre.js` and `build-live.js` (loader waits for the account fetch), `server.js` (head fetch, `dupBill42` allowlist).
+- Tests: `node test/v43-e2e.js [shots dir]` (self-contained, local test mode) is part of `test/run-all.sh` (41 suites). `v42-e2e` accepts any Sawyer version from 2.25.0 / SW cache from `sawyer-v42`. SW cache is `sawyer-v43`. Code: `src/v7.js` (invoice numbers), `src/v42.js` (`dupBill42`), `src/v9.js` (recurring mint), `server.js` (boot repair, SW cache).
 
 ## v41: a fit check for traveler hiring, your traveler calls on the dashboard, a clearer account button
 
