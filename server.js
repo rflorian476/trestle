@@ -402,6 +402,10 @@ function dashHtml(req){const uid=sessionUid(req);if(!uid||!api.VIEWS||!api.VIEWS
  catch(e){h=null}finally{api.DB=save}return h}
 function preDash(req,h){if(!sessionUid(req))return h;const body=dashHtml(req);if(!body)return h;
  const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
+ // v41 perf (signed-in /dash LCP 4.0s on pro dashboards): the dashboard heading is Plus Jakarta 600, which wasn't
+ // preloaded, so the heading text waited out the font block period and painted after the app JS started (Lighthouse
+ // then counted all app JS toward LCP). Preload the same faces /find does so the heading paints with the first frame.
+ h=h.replace(/(<link rel="preload" href="\/fonts\/plus-jakarta-sans-800\.woff2"[^>]*>)/,x=>x+FIND_FONTS);
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 // v22 perf: signed-out /find gets the same treatment as /prices: the real search results (rendered by the same VIEWS.find
 // the browser runs, from the public snapshot, with the same query) and the site header inside <main>, so the page paints
