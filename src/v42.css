@@ -1,0 +1,6 @@
+/* ===== v42 ===== */
+/* SW-101: the Account sign-in methods card keeps its shape while the async GET /api/account answers (rare: a signed-in
+   /account page fetches it from <head> and boot waits for it; in-app visits use the copy fetched after load). */
+.v42sk{display:inline-block;width:9em;max-width:45%;height:.9em;border-radius:6px;background:linear-gradient(90deg,#ECE7DD,#F5F1EA,#ECE7DD);background-size:200% 100%;vertical-align:-1px;margin-left:4px;animation:v42sk 1.2s ease-in-out infinite}
+@keyframes v42sk{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){.v42sk{animation:none}}

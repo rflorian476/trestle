@@ -15,6 +15,8 @@ function __liveLoad(){const empty={v:1,users:[],jobs:[],reviews:[],msgs:[],quote
  function take(st){if(!st)return empty;if(st.partial){__PART=st.partial;__fullLater()}const p=__prefs();st.theme="light";st.recent=Array.isArray(p.recent)?p.recent:(p.recent||[]);LIVEV=st._v||0;return st}
  function fromRes(r){return take(r&&r.state?r.state:(r&&r.users?r:null))}
  if(window.__ST){const st=window.__ST;window.__ST=null;return take(st)}
- const req=window.__STP||(typeof __xhr==="function"?__xhr("GET","/api/state"):null);
+ let req=window.__STP||(typeof __xhr==="function"?__xhr("GET","/api/state"):null);
  window.__STP=null;
+ // v42 (SW-101): a signed-in /account page also starts GET /api/account from <head>; wait for both so the first paint has the sign-in methods.
+ if(req&&window.__ACP&&typeof window.__ACP.then==="function"){const ap=window.__ACP;window.__ACP=null;req=Promise.all([req,ap.then(function(a){window.__ACI=a;return a},function(){return null})]).then(function(x){return x[0]})}
  return __when(req||{},fromRes)}

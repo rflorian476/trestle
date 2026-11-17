@@ -668,8 +668,10 @@ const server=http.createServer(async(req,res)=>{
     if(v==="job"&&jid){const html=withMeta(req,{title:"Not found · Sawyer",desc:"That job isn't available.",path:p.replace(/\/$/,""),noindex:true});return sendHtml(res,req,404,html)}}
    // v27: a signed-in pro opening /join goes to the dashboard setup flow, not a second (blank) signup wizard
    if(v==="join"){const su=sessionUid(req);const su_=su&&(DB().users||[]).find(x=>x.id===su);if(su_&&su_.role==="contractor"){res.writeHead(302,{Location:"/dash?setup=1","Cache-Control":"no-store"});return res.end()}}
-   if(v){const mm=VIEW_META[v];const html=withMeta(req,{title:TITLE(v,(/^\/[a-z0-9]{2,20}\/([^/?]{1,120})/.exec(p)||[])[1]||null),desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});
+   if(v){const mm=VIEW_META[v];let html=withMeta(req,{title:TITLE(v,(/^\/[a-z0-9]{2,20}\/([^/?]{1,120})/.exec(p)||[])[1]||null),desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)});
     const dash=v==="dash"&&!!sessionUid(req)&&/^\/dash\/?$/.test(p)&&!url.search;
+    // v42 (SW-101): signed-in /account fetches its sign-in methods from <head> next to /api/state (the client used to block on a synchronous XHR for them).
+    if(v==="account"&&sessionUid(req)&&/^\/account\/?$/.test(p)){const hk='<script>window.__STP=fetch(';const k=html.indexOf(hk);if(k>=0)html=html.slice(0,k)+'<script>window.__ACP=fetch("/api/account",{credentials:"same-origin"}).then(function(r){return r.json()}).catch(function(){return null})</script>'+html.slice(k)}
     return sendHtml(res,req,200,dash?preDash(req,html):v==="prices"?prePrices(req,html):v==="find"&&/^\/find\/?$/.test(p)?preFind(req,html,url.search):PRE_VIEWS.has(v)&&/^\/[a-z]+\/?$/.test(p)&&!url.search?preView(req,html,v):html,dash?{"Cache-Control":"no-store"}:undefined)}
    return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/\">Go to the home page</a></p>")}
   return send(res,404,{error:"Not found"})}

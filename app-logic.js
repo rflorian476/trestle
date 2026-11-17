@@ -1303,7 +1303,40 @@ function authBox(q){const M=authMethods();q=q||{};const role=ROLE_OPTS.some(r=>r
  $("verF").onsubmit=async e=>{e.preventDefault();const r=await jpost("/api/auth/verify",{channel:ch,to,code:$("au-code").value,role:role(),name:$("au-name").value});if(r.error){toast(r.error,"err");return}if(r.needRole){toast("Pick how you'll use Sawyer above","err");return}done(r)};
  $("au-back").onclick=()=>{$("codeF").hidden=false;$("verF").hidden=true};
  $("au-passkey").onclick=async()=>{try{await passkeyLogin();done({})}catch(e){toast(pkFriendly(e,false),"err")}}}}
-VIEWS.account=(p,q)=>{const m=me();if(!m)return VIEWS.signup(null,{next:"/account"});q=q||{};let info={};try{const x=new XMLHttpRequest();x.open("GET","/api/account",false);x.send();info=JSON.parse(x.responseText)}catch(e){}
+/* v42 (SW-101): Account no longer blocks on a synchronous XMLHttpRequest for GET /api/account. The sign-in methods come
+   from a small per-account cache filled by the async __xhr (fetch), the same pattern as every other caller (__when).
+   A signed-in /account page starts that fetch from <head> (window.__ACP) and boot waits for it with /api/state, so the
+   first paint already has the real sign-in methods; in-app visits use the copy fetched in the background after load
+   (or when the account menu is opened). Every visit refreshes it and swaps in only the sign-in methods card if
+   something changed (a new passkey, a password set elsewhere). With nothing cached yet the card keeps its shape with
+   neutral placeholders (never a wrong "not added" / "not set") until the answer arrives. */
+let V42AC=null,V42ACP=null;
+function v42AcctGet(uid){if(!V42AC&&typeof window!=="undefined"&&window.__ACI&&typeof window.__ACI==="object"&&!window.__ACI.error){V42AC={uid,info:window.__ACI};window.__ACI=null}return V42AC&&V42AC.uid===uid?V42AC.info:null}
+function v42AcctLoad(){const m=typeof me==="function"?me():null;if(!m||typeof __xhr!=="function")return null;const uid=m.id;if(V42ACP&&V42ACP.uid===uid)return V42ACP.p;
+ let src=null;if(typeof window!=="undefined"&&window.__ACP&&typeof window.__ACP.then==="function"){src=window.__ACP;window.__ACP=null}
+ const rec={uid,p:null};rec.p=(src||__xhr("GET","/api/account")).then(r=>{if(V42ACP===rec)V42ACP=null;if(r&&typeof r==="object"&&!r.error&&me()&&me().id===uid)V42AC={uid,info:r};return r},()=>{if(V42ACP===rec)V42ACP=null;return null});V42ACP=rec;return rec.p}
+function v42AcctCard(info){if(!info)return`<div class="card" id="signinMethods" aria-busy="true"><h2 class="h-sub">Sign-in methods</h2><ul class="v3list v42ac-ld">
+ <li>${I("chat",14)} Email <span class="v42sk" aria-hidden="true"></span></li><li>${I("phone",14)} Phone <span class="v42sk" aria-hidden="true"></span></li>
+ <li>${I("lock",14)} Password <span class="v42sk" aria-hidden="true"></span></li></ul><p class="sr-only" role="status">Loading your sign-in methods</p>
+ <div class="v3oauth sm"><button class="btn" id="addPasskey" type="button">${I("key",16)} Add a passkey</button></div></div>`;
+ return`<div class="card" id="signinMethods"><h2 class="h-sub">Sign-in methods</h2><ul class="v3list">
+ <li>${I("chat",14)} Email ${info.email?`<b>${esc(info.email)}</b> · codes & magic links`:"not added"}</li><li>${I("phone",14)} Phone ${info.phone?`<b>${esc(info.phone)}</b> · SMS codes`:"not added"}</li>
+ <li>${I("lock",14)} Password ${info.password?"set":"not set"} <button class="linkbtn" id="setPw">${info.password?"Change":"Add one"}</button></li>
+ ${(info.passkeys||[]).map(k=>`<li class="pk">${I("key",14)} Passkey · ${esc(k.label)} <small>added ${fmtD(k.created)}${k.last_used?" · used "+fmtD(k.last_used):""}</small> <button class="linkbtn" data-delpk="${esc(k.cred_id)}">Remove</button></li>`).join("")}
+ ${(info.linked||[]).map(l=>`<li>${I("check",14)} ${esc(l.provider.replace("-demo"," (demo)"))} linked</li>`).join("")}</ul>
+ <div class="v3oauth sm"><button class="btn" id="addPasskey" type="button">${I("key",16)} Add a passkey</button>${OAUTH_P.filter(([k])=>oauthOn(info.methods||authMethods(),k)&&!(info.linked||[]).some(l=>l.provider.startsWith(k))).map(([k,t])=>`<a class="btn v3o" href="/auth/oauth/${k}/start">${OAUTH_ICON[k]}<span>Link ${t}</span></a>`).join("")}</div></div>`}
+function v42AcctBind(){const $=s=>document.getElementById(s);if($("addPasskey"))$("addPasskey").onclick=async()=>{try{await addPasskey();toast("Passkey added. Next time, sign in with one tap.");render()}catch(e){toast(pkFriendly(e,true),"err")}};
+ if($("setPw"))$("setPw").onclick=()=>{const chg=/Change/.test($("setPw").textContent);openModal(`<h2>${chg?"Change your password":"Add a password"}</h2>${chg?`<div class="fld"><label for="cpw">Current password</label><input id="cpw" type="password" autocomplete="current-password"></div>`:""}<div class="fld"><label for="npw">New password (8+ characters)</label><input id="npw" type="password" autocomplete="new-password" minlength="8"></div>${chg?`<p class="muted small">Other devices signed in to this account are signed out.</p>`:""}<button class="btn primary block" id="npwGo">Save password</button>`,()=>{$("npwGo").onclick=async()=>{const r=await jpost("/api/account/password",{password:$("npw").value,current:$("cpw")?$("cpw").value:""});if(r.error)toast(r.error,"err");else{if(V42AC&&V42AC.info)V42AC.info.password=true;closeModal();toast("Password saved");render()}}})};
+ document.querySelectorAll("[data-delpk]").forEach(b=>b.onclick=async()=>{if(!confirm("Remove this passkey?"))return;await jpost("/api/passkey/delete",{id:b.dataset.delpk});if(V42AC&&V42AC.info)V42AC.info.passkeys=(V42AC.info.passkeys||[]).filter(k=>k.cred_id!==b.dataset.delpk);render()})}
+function v42AcctRefresh(shown){const p=v42AcctLoad();if(!p)return;p.then(r=>{if(!r||r.error||typeof r!=="object")return;const m=me(),el=document.getElementById("signinMethods");if(!m||!el||ROUTE.v!=="account")return;
+ if(shown&&JSON.stringify(r)===shown)return;
+ /* the card goes through every VIEWS.account layer (v39 wording etc.), then the AFTER.account chain rebinds it (v18's password dialog); the profile form being typed in is left alone */
+ const t=document.createElement("div");t.innerHTML=VIEWS.account(ROUTE.p,ROUTE.q);const nc=t.querySelector("#signinMethods");if(!nc)return;el.replaceWith(nc);
+ const ph=document.getElementById("ac-p");if(ph&&!ph.value&&r.phone&&document.activeElement!==ph)ph.value=r.phone;AFTER.account(ROUTE.p,ROUTE.q)})}
+function v42AcctWarm(){setTimeout(()=>{try{if(typeof me==="function"&&me()&&!V42AC&&!(typeof ROUTE!=="undefined"&&ROUTE.v==="account"))v42AcctLoad()}catch(e){}},2500);
+ document.addEventListener("pointerdown",e=>{try{const a=e.target&&e.target.closest&&e.target.closest('#acctBtn,a[href="/account"],a[href="#/account"]');if(a&&me()&&!V42AC)v42AcctLoad()}catch(x){}},{passive:true,capture:true})}
+if(typeof window!=="undefined"&&window.addEventListener&&typeof document!=="undefined"){if(document.readyState==="complete")v42AcctWarm();else window.addEventListener("load",v42AcctWarm,{once:true})}
+VIEWS.account=(p,q)=>{const m=me();if(!m)return VIEWS.signup(null,{next:"/account"});q=q||{};const info=v42AcctGet(m.id)||{},have=!!v42AcctGet(m.id);
  const pro=m.role==="contractor",biz=m.acct==="business"||m.role==="pm";const ph=n=>/^New (member|pro)$/.test(n||"")?"":n;
  const ds=t=>t?new Date(t).toISOString().slice(0,10):"";
  return`<section class="page narrow v3acct"><div class="pagehead"><h1>${q.welcome?"Welcome! Finish your profile":"Account"}</h1><p class="muted">${q.welcome?"Just the basics. You can add the rest any time.":"Profile, sign-in methods and privacy."}</p></div>
@@ -1312,18 +1345,11 @@ VIEWS.account=(p,q)=>{const m=me();if(!m)return VIEWS.signup(null,{next:"/accoun
  ${pro?`<div class="fld"><label for="ac-t">Main trade</label><select id="ac-t" name="trade">${Object.keys(CATS).map(c=>`<option ${c===m.trade?"selected":""}>${esc(c)}</option>`).join("")}</select></div><div class="row2"><div class="fld"><label for="ac-le">License expires</label><input id="ac-le" name="licExp" type="date" value="${ds(m.licExp)}"></div><div class="fld"><label for="ac-ie">Insurance expires</label><input id="ac-ie" name="insExp" type="date" value="${ds(m.insExp)}"></div></div>`:""}
  <div class="fld"><label for="ac-z">ZIP / area</label><select id="ac-z" name="zip">${zipOpts(m.zip)}</select></div>
  <div class="fld"><label for="ac-p">Phone ${pro?"(shown on your profile)":"(private; only shared with pros you pick)"}</label><input id="ac-p" name="phone" type="tel" value="${esc(m.phone||info.phone||"")}" autocomplete="tel"></div><button class="btn primary">Save profile</button></form>
- <div class="card" id="signinMethods"><h2 class="h-sub">Sign-in methods</h2><ul class="v3list">
- <li>${I("chat",14)} Email ${info.email?`<b>${esc(info.email)}</b> · codes & magic links`:"not added"}</li><li>${I("phone",14)} Phone ${info.phone?`<b>${esc(info.phone)}</b> · SMS codes`:"not added"}</li>
- <li>${I("lock",14)} Password ${info.password?"set":"not set"} <button class="linkbtn" id="setPw">${info.password?"Change":"Add one"}</button></li>
- ${(info.passkeys||[]).map(k=>`<li class="pk">${I("key",14)} Passkey · ${esc(k.label)} <small>added ${fmtD(k.created)}${k.last_used?" · used "+fmtD(k.last_used):""}</small> <button class="linkbtn" data-delpk="${esc(k.cred_id)}">Remove</button></li>`).join("")}
- ${(info.linked||[]).map(l=>`<li>${I("check",14)} ${esc(l.provider.replace("-demo"," (demo)"))} linked</li>`).join("")}</ul>
- <div class="v3oauth sm"><button class="btn" id="addPasskey" type="button">${I("key",16)} Add a passkey</button>${OAUTH_P.filter(([k])=>oauthOn(info.methods||authMethods(),k)&&!(info.linked||[]).some(l=>l.provider.startsWith(k))).map(([k,t])=>`<a class="btn v3o" href="/auth/oauth/${k}/start">${OAUTH_ICON[k]}<span>Link ${t}</span></a>`).join("")}</div></div>
+ ${v42AcctCard(have?info:null)}
  <div class="card v3privacy"><h2 class="h-sub">${I("shield",16)} Privacy</h2><p>We never sell or share your contact info. Pros reach you through ${"Sawyer"} messages, and your number stays hidden unless you share it with a specific pro.</p></div></section>`};
 AFTER.account=()=>{const $=s=>document.getElementById(s);if(!$("acctForm"))return;
  $("acctForm").onsubmit=e=>{e.preventDefault();act(A.updateMe(readForm($("acctForm"))),()=>{if(routeStr().includes("welcome"))go("dash");else render()})};
- $("addPasskey").onclick=async()=>{try{await addPasskey();toast("Passkey added. Next time, sign in with one tap.");render()}catch(e){toast(pkFriendly(e,true),"err")}};
- $("setPw").onclick=()=>openModal(`<h2>${/Change/.test($("setPw").textContent)?"Change your password":"Add a password"}</h2>${/Change/.test($("setPw").textContent)?`<div class="fld"><label for="cpw">Current password</label><input id="cpw" type="password" autocomplete="current-password"></div>`:""}<div class="fld"><label for="npw">New password (8+ characters)</label><input id="npw" type="password" autocomplete="new-password" minlength="8"></div>${/Change/.test($("setPw").textContent)?`<p class="muted small">Other devices signed in to this account are signed out.</p>`:""}<button class="btn primary block" id="npwGo">Save password</button>`,()=>{$("npwGo").onclick=async()=>{const r=await jpost("/api/account/password",{password:$("npw").value,current:$("cpw")?$("cpw").value:""});if(r.error)toast(r.error,"err");else{closeModal();toast("Password saved");render()}}});
- document.querySelectorAll("[data-delpk]").forEach(b=>b.onclick=async()=>{if(!confirm("Remove this passkey?"))return;await jpost("/api/passkey/delete",{id:b.dataset.delpk});render()})};
+ v42AcctBind();{const m=me();v42AcctRefresh(m&&v42AcctGet(m.id)?JSON.stringify(v42AcctGet(m.id)):"")}};
 
 /* v4 redesign: photo hero, one search, clean sections */
 const V4IMG={Plumbing:"t-plumbing",Electrical:"t-electrical",HVAC:"t-hvac",Roofing:"t-roofing",Remodeling:"t-remodel",Painting:"t-painting"};
