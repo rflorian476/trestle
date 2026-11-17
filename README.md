@@ -27,6 +27,7 @@ Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, M
 
 - **Unique invoice numbers (SW-106).** The next invoice, estimate or change-order number is one past the highest existing number of that type for that business (`v7Next`). Voids and drafts count, so a number is never reused. The server will not save a second bill with the same business, type and number — it mints the next free one (or refuses if it cannot). On boot, any existing collision is repaired by giving the newer bill a new number. The demo seed numbers estimates, invoices and change orders on separate counters (EST-1001…, INV-1001…, CO-1001…), so a fresh seed's next INV, EST and CO never collide with a leftover like CO-1010.
 - **Don't duplicate a void invoice (SW-104).** `v42CanDup` (and so the Duplicate button, the "Duplicate instead" offer, and `dupBill42`) refuses a void source. The API says the bill is void; the button is hidden on its page.
+- **One draft from a parallel Bill again (SW-105).** Two `dupBill42` calls for the same source at once (or a double-click that got past the UI busy-guard) return the same draft. A short per-source lock (15 seconds) and an optional idempotency key (`dupBill42(id, key)`) make the second call reuse the first draft instead of minting another.
 
 ## v42: duplicate an invoice ("Bill again"), traveler calls in all 50 states, a faster Account page
 

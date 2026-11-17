@@ -3,6 +3,7 @@
 // SW-106: invoice numbers are max(existing of that type for that business)+1; (business, type, no) is unique; a fresh
 //   seed's next INV / EST / CO do not collide; on boot the newer of a colliding pair is renumbered.
 // SW-104: void invoices cannot be duplicated (API and the Duplicate button is hidden).
+// SW-105: two parallel dupBill42 calls for the same source return one draft.
 // Usage: node test/v43-e2e.js [shots dir]
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib");
@@ -164,6 +165,29 @@ const SERVERS=[];let br=null;
   const ui2=await p.evaluate(()=>({btn:!!document.getElementById("bDup42")}));
   ok(ui2.btn,"SW-104: Duplicate still shows on an open invoice");
   await c.close()}
+
+
+ // --- SW-105: parallel dupBill42 yields one draft
+ {const P=await signup(L,"pro","idems","78704");const C=await signup(L,"customer","idemcu","78704");
+  const cust=await act(L,P.ck,"saveCust",[{name:"Idem Clinic",email:C.email}]);
+  const inv=await act(L,P.ck,"saveBill",[{type:"inv",cust:cust.res.id,title:"Monthly backflow",lines:[{d:"Test",q:1,r:250}]}]);
+  await act(L,P.ck,"sendBill",[inv.res.id]);
+  const srcNo=((await stateFor(L,P.ck)).bills||[]).find(b=>b.id===inv.res.id).no;
+  const pair=await Promise.all([act(L,P.ck,"dupBill42",[inv.res.id]),act(L,P.ck,"dupBill42",[inv.res.id])]);
+  ok(pair[0].res.ok&&pair[1].res.ok,"SW-105: both parallel calls succeed",J(pair.map(x=>x.res)));
+  ok(pair[0].res.id&&pair[0].res.id===pair[1].res.id,"SW-105: both calls return the same draft id",J(pair.map(x=>x.res)));
+  const st=await stateFor(L,P.ck);
+  const copies=(st.bills||[]).filter(b=>b.by===P.id&&b.status==="draft"&&b.dup42&&(b.dup42.from===inv.res.id||b.dup42.no===srcNo));
+  ok(copies.length===1,"SW-105: only one draft was created from the source",J(copies.map(b=>({id:b.id,no:b.no}))));
+  // optional idempotency key: the same key always returns that draft
+  const invB=await act(L,P.ck,"saveBill",[{type:"inv",cust:cust.res.id,title:"Keyed source",lines:[{d:"Visit",q:1,r:80}]}]);
+  await act(L,P.ck,"sendBill",[invB.res.id]);
+  const k="v43-key-"+run;
+  const a=await act(L,P.ck,"dupBill42",[invB.res.id,k]);
+  const b=await act(L,P.ck,"dupBill42",[invB.res.id,k]);
+  ok(a.res.ok&&b.res.ok&&a.res.id===b.res.id,"SW-105: the same idempotency key returns the same draft",J({a:a.res,b:b.res}));
+  const other=await act(L,P.ck,"dupBill42",[inv.res.id,k+"-other"]);
+  ok(other.res.ok&&other.res.id!==a.res.id,"SW-105: a different key (or a different source) can still mint its own draft",J(other.res))}
 
  if(failed)throw new Error(failed+" check(s) failed");
  console.log("OK v43-e2e");
