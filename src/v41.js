@@ -13,7 +13,10 @@ function v41Norm(s){return String(s||"").trim().toLowerCase()}
 /* full names, case-insensitive. Codes (any case) only count in a list of 2+ states or a reciprocity-phrase sentence. */
 const V41_NAME={alabama:"AL",alaska:"AK",arizona:"AZ",arkansas:"AR",california:"CA",colorado:"CO",connecticut:"CT",delaware:"DE","district of columbia":"DC",florida:"FL",georgia:"GA",hawaii:"HI",idaho:"ID",illinois:"IL",indiana:"IN",iowa:"IA",kansas:"KS",kentucky:"KY",louisiana:"LA",maine:"ME",maryland:"MD",massachusetts:"MA",michigan:"MI",minnesota:"MN",mississippi:"MS",missouri:"MO",montana:"MT",nebraska:"NE",nevada:"NV","new hampshire":"NH","new jersey":"NJ","new mexico":"NM","new york":"NY","north carolina":"NC","north dakota":"ND",ohio:"OH",oklahoma:"OK",oregon:"OR",pennsylvania:"PA","puerto rico":"PR","rhode island":"RI","south carolina":"SC","south dakota":"SD",tennessee:"TN",texas:"TX",utah:"UT",vermont:"VT",virginia:"VA",washington:"WA","west virginia":"WV",wisconsin:"WI",wyoming:"WY"};
 function v41IsSt(c){return V41_ST.includes(String(c||"").toUpperCase())}
-function v41ParseRecip(txt){const raw=String(txt||"");if(!raw.trim())return[];if(/\bno reciprocity\b|\breciprocity not accepted\b/i.test(raw))return[];
+/* v42 (SW-102): "Washington DC", "Washington, D.C." and a bare "D.C." mean the District, not Washington state. They are
+   rewritten to "District of Columbia" before parsing; "Washington state" and plain "Washington" still mean WA. */
+function v42DcNorm(t){return String(t||"").replace(/\bwashington\s*,?\s*d\.?\s?c\b\.?/gi,"District of Columbia").replace(/(^|[^a-z.])d\.c\.(?![a-z])/gi,(m,a)=>a+"District of Columbia")}
+function v41ParseRecip(txt){const raw=v42DcNorm(txt);if(!raw.trim())return[];if(/\bno reciprocity\b|\breciprocity not accepted\b/i.test(raw))return[];
  const names=Object.keys(V41_NAME).sort((a,b)=>b.length-a.length),nameRe=new RegExp("\\b("+names.join("|")+")\\b","gi"),out=[];
  const add=c=>{c=String(c||"").toUpperCase();if(v41IsSt(c)&&!out.includes(c))out.push(c)};
  let m;while((m=nameRe.exec(raw)))add(V41_NAME[m[1].toLowerCase()]);
