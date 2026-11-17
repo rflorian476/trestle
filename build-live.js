@@ -38,6 +38,10 @@ c=rep(c,'id="acctBtn" aria-haspopup="true"','id="acctBtn" aria-label="${esc((ini
 c=c.split('class="mapsvg" role="img"').join('class="mapsvg" role="group"').split('class="mapsvg usmap" role="img"').join('class="mapsvg usmap" role="group"');
 c=rep(c,'class="stars" aria-label=','class="stars" role="img" aria-label=');
 c=rep(c,'Demo prototype. Every business, person, city listing, license and review here is fictional sample data.','Beta test. Every pro, customer, job and review in this beta is fictional sample data. Payments are in test mode.');
+// v44 perf: the browser copy drops server-only code (A.<action> bodies the client proxies to /api/act, demo seed builders).
+// app-logic.js (written above from js) keeps all of it. See lib/strip-server.js.
+{const live=(fs.readFileSync(path.join(__dirname,"client-post.js"),"utf8").match(/const LIVE=(\[[^\]]*\])/)||[])[1];if(!live)throw new Error("client-post LIVE list missing");
+ const r=require("./lib/strip-server.js")(c,JSON.parse(live));c=r.code;console.log("strip-server",JSON.stringify(r.stats))}
 // v9 perf: run the live-mode patches before boot so the page renders once instead of twice
 {const post=fs.readFileSync(path.join(__dirname,"client-post.js"),"utf8");const tail="try{render()}catch(e){}\n})();";if(!post.trimEnd().endsWith(tail.trim()))throw new Error("client-post tail changed");
  const pre=post.trimEnd().slice(0,-tail.trim().length)+"})();";if(!c.includes("\nboot();"))throw new Error("boot anchor missing (client)");c=c.replace("\nboot();",()=>"\n"+pre+"\nboot();")}
