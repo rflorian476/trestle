@@ -102,9 +102,9 @@ const SERVERS=[];let br=null;const errs=[];
   await p.evaluate(()=>{V42AC.info=Object.assign({},V42AC.info,{password:false});go("dash")});await p.waitForTimeout(200);await p.evaluate(()=>go("account"));
   await p.waitForFunction(()=>/Password set/.test((document.getElementById("signinMethods")||{}).innerText||""),null,{timeout:15000}).catch(()=>{});
   ok(/Password set/.test(await p.evaluate(()=>document.getElementById("signinMethods").innerText)),w+": SW-101: a changed answer swaps in the corrected card");
+  if(w===390){await p.locator("#signinMethods").scrollIntoViewIfNeeded();await p.waitForTimeout(400);await shot(p,"v42-account-390.png")}
   await p.click("#setPw");await p.waitForSelector("#modal .mbox",{timeout:8000}).catch(()=>{});
   const mt=await p.evaluate(()=>{const m=document.querySelector("#modal .mbox");return m?m.innerText.slice(0,160):""});ok(/password/i.test(mt),w+": SW-101: Change opens the password dialog after the swap",mt);
-  if(w===390)await shot(p,"v42-account-390.png");
   ok((await p.evaluate(()=>window.__syncX.length))===0,w+": SW-101: still no synchronous XHR after in-app visits");
   await c.close()}
 
