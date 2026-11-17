@@ -6207,11 +6207,12 @@ function v42AddDays(ymd,n){const a=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||
 function v42Terms(b,key,def){const d=/^\d{4}-\d{2}-\d{2}$/.test(String(b&&b[key]||""))?b[key]:"";if(!d||!b.date)return def;
  const t0=new Date(b.sent||b.date);const s=new Date(Date.UTC(t0.getUTCFullYear(),t0.getUTCMonth(),t0.getUTCDate()));const n=Math.round((Date.parse(d+"T00:00:00Z")-s.getTime())/864e5);
  return Number.isFinite(n)&&n>=1&&n<=120?n:def}
-function v42CanDup(b,m){return!!(b&&m&&b.by===m.id&&(b.type==="inv"||b.type==="est"))}
+function v42CanDup(b,m){return!!(b&&m&&b.by===m.id&&(b.type==="inv"||b.type==="est")&&b.status!=="void")}
 /* the newest invoice the pro actually sent (not a draft, not void) whose customer is still in their list */
 function v42LastInv(m){if(!m)return null;return(DB.bills||[]).filter(b=>b&&b.by===m.id&&b.type==="inv"&&b.status!=="draft"&&b.status!=="void"&&(DB.bcust||[]).some(c=>c&&c.id===b.cust&&c.by===m.id)).sort((a,b)=>(b.sent||b.date||0)-(a.sent||a.date||0))[0]||null}
 A.dupBill42=function(id){const m=me();if(!m)return{ok:false,need:"login",msg:"Sign in first"};if(!v7Pro(m))return{ok:false,msg:"Invoices are part of The Office for pro accounts."};
  const src=v7Bill(String(id||""));if(!src||src.by!==m.id)return{ok:false,msg:"That invoice wasn't found."};
+ if(src.status==="void")return{ok:false,msg:src.no+" is void, so it can't be duplicated."};
  if(src.type==="co")return{ok:false,msg:"A change order belongs to one estimate. Start a new change order from that estimate instead."};if(!v42CanDup(src,m))return{ok:false,msg:"That invoice wasn't found."};
  const c=v7Cust(src.cust);if(!c||c.by!==m.id)return{ok:false,msg:(src.cname||"That customer")+" is no longer in your customers, so "+src.no+" can't be copied. Start a new "+(src.type==="inv"?"invoice":"estimate")+" instead."};
  const all=(src.lines||[]),keep=all.filter(l=>l&&!l.l36),skipped=all.length-keep.length;

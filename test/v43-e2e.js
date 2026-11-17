@@ -2,6 +2,7 @@
 // mode). Covers health 2.26.0-sawyer / SW cache sawyer-v43 (or later), and:
 // SW-106: invoice numbers are max(existing of that type for that business)+1; (business, type, no) is unique; a fresh
 //   seed's next INV / EST / CO do not collide; on boot the newer of a colliding pair is renumbered.
+// SW-104: void invoices cannot be duplicated (API and the Duplicate button is hidden).
 // Usage: node test/v43-e2e.js [shots dir]
 "use strict";
 const {spawn}=require("child_process"),http=require("http"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib");
@@ -138,6 +139,31 @@ const SERVERS=[];let br=null;
   ok(newer&&newer.no!==src.no&&/^INV-/.test(newer.no),"SW-106: the newer colliding bill is renumbered",newer&&newer.no);
   ok(uniquePairs(mine).length===0,"SW-106: after boot repair, demo-pro numbers are unique",J(uniquePairs(mine)));
   await stopApp(R2,true)}
+
+
+ // --- SW-104: refuse to duplicate a void invoice (API + hidden button)
+ {const P=await signup(L,"pro","voidsrc","78704");const C=await signup(L,"customer","voidcu","78704");
+  const cust=await act(L,P.ck,"saveCust",[{name:"Void Clinic",email:C.email}]);
+  const inv=await act(L,P.ck,"saveBill",[{type:"inv",cust:cust.res.id,title:"To be voided",lines:[{d:"Labor",q:1,r:120}]}]);
+  const sent=await act(L,P.ck,"sendBill",[inv.res.id]);ok(sent.res.ok,"SW-104 fixture invoice is sent");
+  const vo=await act(L,P.ck,"voidBill",[inv.res.id]);ok(vo.res.ok,"SW-104 fixture invoice is voided");
+  const dup=await act(L,P.ck,"dupBill42",[inv.res.id]);
+  ok(!dup.res.ok&&/void/i.test(dup.res.msg||""),"SW-104: dupBill42 refuses a void invoice",J(dup.res));
+  const bills=(dup.st.bills||[]).filter(b=>b.by===P.id&&b.id!==inv.res.id);
+  ok(!bills.some(b=>b.dup42),"SW-104: no draft was created from the void invoice",J(bills.map(b=>({id:b.id,no:b.no,st:b.status}))));
+  // a still-open invoice from the same pro can be duplicated (the helper isn't stuck off)
+  const inv2=await act(L,P.ck,"saveBill",[{type:"inv",cust:cust.res.id,title:"Still open",lines:[{d:"Labor",q:1,r:90}]}]);
+  await act(L,P.ck,"sendBill",[inv2.res.id]);
+  const dup2=await act(L,P.ck,"dupBill42",[inv2.res.id]);
+  ok(dup2.res.ok&&dup2.res.id,"SW-104: a non-void invoice can still be duplicated",J(dup2.res));
+  const {c,p}=await page(L,1100,P.ck);
+  await go(L,p,"/invoice/"+inv.res.id);
+  const ui=await p.evaluate(()=>({btn:!!document.getElementById("bDup42"),can:typeof v42CanDup==="function"&&v42CanDup(v7Bill(location.pathname.split("/").pop()),me()),voided:/void/i.test(document.body.innerText)}));
+  ok(!ui.btn&&!ui.can&&ui.voided,"SW-104: Duplicate is hidden on a void invoice and v42CanDup is false",J(ui));
+  await go(L,p,"/invoice/"+inv2.res.id);
+  const ui2=await p.evaluate(()=>({btn:!!document.getElementById("bDup42")}));
+  ok(ui2.btn,"SW-104: Duplicate still shows on an open invoice");
+  await c.close()}
 
  if(failed)throw new Error(failed+" check(s) failed");
  console.log("OK v43-e2e");
