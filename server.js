@@ -399,7 +399,7 @@ function preHire(req,h,sub){if(sessionUid(req)||!PRE_TOP)return h;const body=vie
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 // v45: launch SEO. Structured data only ever reaches a page when withMeta allows it (SAWYER_INDEXABLE=1 and not noindex).
-const SEO45=(()=>{const V=n=>{try{return vm.runInContext(n,ctx)}catch(e){return null}};const ORG=o=>({"@type":"Organization","@id":o+"/#org",name:BRAND.name,url:o+"/",logo:o+"/icons/icon-512.png"});
+const SEO45=(()=>{const V=n=>{try{return vm.runInContext(n,ctx)}catch(e){return null}};const ORG=o=>({"@type":"Organization","@id":o+"/#org",name:BRAND.name,url:o,logo:o+"/icons/icon-512.png"});
  const strip=s=>String(s||"").replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g," ").trim();
  const crumbs=(o,list)=>({"@type":"BreadcrumbList",itemListElement:list.map(([n,u],i)=>({"@type":"ListItem",position:i+1,name:n,item:o+u}))});
  const realPros=(t,c)=>{const f=V("h45Pros");try{return (f?f(t,c):[]).filter(x=>x&&x.u&&!isDemo(x.u))}catch(e){return[]}};
