@@ -95,7 +95,9 @@ function locs(xml){return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m=>m[1])
   const liveCalls=(liveState.tcalls||[]).filter(c=>c.status!=="closed"&&(c.demo||/\(demo\)/i.test(c.title||"")));
   assert(liveDemo.length>10&&liveCalls.length>0,"live server still has the demo catalog");
   const liveMap=locs((await get(livePort,"/sitemap.xml")).body.toString("utf8"));
-  assert(liveMap.length===1&&liveMap[0]==="https://sawyer.example/","indexable sitemap still omits every demo record");
+  // v45: the indexable sitemap also lists the public marketing pages and /hire, but still no record built only from demo data
+  // (no /p/, /t/ or city-level /hire/<trade>/<city> page while every pro is a demo pro).
+  assert(liveMap[0]==="https://sawyer.example/"&&liveMap.includes("https://sawyer.example/hire")&&liveMap.includes("https://sawyer.example/prices")&&!liveMap.some(u=>/\/(p|t)\/|\/hire\/[^/]+\/[^/]+$/.test(u)),"indexable sitemap still omits every demo record",liveMap.join(" "));
   for(const u of liveDemo)assert(!liveMap.some(l=>l.endsWith("/p/"+u.id)),"demo pro "+u.id+" not in sitemap");
   for(const c of liveCalls)assert(!liveMap.some(l=>l.endsWith("/t/"+c.id)),"demo call "+c.id+" not in sitemap");
   const livePro=await get(livePort,"/p/"+liveDemo[0].id);

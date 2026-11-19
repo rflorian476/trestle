@@ -14,3 +14,38 @@
 #v45lfAdd,#v45lfWaive{min-height:44px}
 @media (max-width:700px){.v45lf-g{grid-template-columns:1fr}}
 @media print{.v45lf-terms{background:none;padding:0}}
+/* Hire pages (/hire, /hire/<trade>, /hire/<trade>/<city>) */
+.v45h{padding-top:18px;padding-bottom:48px}
+.v45crumb{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13.5px;color:#5B6576;margin:0 0 14px}
+.v45crumb a{color:#33405A;text-decoration:underline;text-underline-offset:2px;min-height:24px;display:inline-flex;align-items:center}
+.v45sep{color:#8A93A3}
+.v45h h1{margin:0 0 8px;line-height:1.15}
+.v45lead{max-width:720px;margin:0 0 16px;color:#33405A}
+.v45cta{gap:10px;margin:0 0 18px}
+.v45stats{list-style:none;padding:0;margin:0 0 24px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.v45stats li{background:#FFFFFF;border:1px solid #E4DCCB;border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.v45stats b{font-size:20px;color:#0F2A44;line-height:1.2}
+.v45stats small{color:#5B6576;line-height:1.35}
+.v45h2{font-size:19px;margin:26px 0 12px;line-height:1.25}
+.v45grid2{margin-bottom:6px}
+.v45two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:10px}
+.v45two .card .v45h2{margin-top:0}
+.v45links{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px}
+.v45links a{display:flex;align-items:center;gap:8px;min-height:40px;padding:4px 0;color:#0F2A44;text-decoration:underline;text-decoration-color:#C9D4E5;text-underline-offset:3px}
+.v45links a:hover{text-decoration-color:#AE4718}
+.v45links small{margin-left:4px;text-decoration:none}
+.v45grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 16px}
+.v45grid a{text-decoration:none;background:#FFFFFF;border:1px solid #E4DCCB;border-radius:12px;padding:8px 12px;min-height:48px}
+.v45grid a:hover{border-color:#0F2A44}
+.v45cols{display:block;columns:3 220px;column-gap:20px}
+.v45cols li{break-inside:avoid}
+.v45why{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+.v45why li{display:flex;gap:10px;align-items:flex-start;line-height:1.45}
+.v45why svg{flex:none;margin-top:3px;color:#AE4718}
+.v45empty{margin:0 0 8px}
+.v45empty h2{margin:0 0 6px;font-size:19px}
+.v45faq{max-width:820px}
+.v45more{margin:10px 0 0}
+.v45more a{text-decoration:underline;text-underline-offset:2px}
+@media (max-width:800px){.v45stats{grid-template-columns:repeat(2,minmax(0,1fr))}.v45two{grid-template-columns:1fr}}
+@media (max-width:600px){.v45cta .btn{width:100%;justify-content:center}}

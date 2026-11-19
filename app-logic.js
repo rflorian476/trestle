@@ -6358,6 +6358,67 @@ function lf45Card(m){const o=m.lf45||{},on=!!o.on,kind=o.kind==="pct"?"pct":"fla
 if(typeof oRecurring==="function"){const orr=oRecurring;oRecurring=function(m){const h=orr.apply(this,arguments);try{const a='<div class="card"><div class="o7-sh"><h2>Repeating invoices</h2>';const k=h.indexOf(a);const c=lf45Card(m);return k<0?h+c:h.slice(0,k)+c+h.slice(k)}catch(e){return h}}}
 {const oa=AFTER.office;AFTER.office=(tab,q)=>{oa&&oa(tab,q);const f=document.getElementById("v45lfF");if(!f)return;f.onsubmit=e=>{e.preventDefault();const o=readForm(f);o.on=!!f.querySelector("[name=on]").checked;o.auto=!!f.querySelector("[name=auto]").checked;act(A.lateSet45(o),()=>{const y=scrollY;render();scrollTo(0,y)})}}}
 
+/* ---------- hire pages: /hire, /hire/<trade>, /hire/<trade>/<city> ---------- */
+const H45_MILES=40;
+const H45_NOUN={"Plumbing":"Plumbers","Electrical":"Electricians","HVAC":"HVAC contractors","Roofing":"Roofers","Carpentry":"Carpenters","Remodeling":"Remodeling contractors","Concrete & Masonry":"Concrete & masonry contractors","Painting":"Painters","Flooring":"Flooring installers","Landscaping":"Landscapers","Snow Removal":"Snow removal services","Excavation":"Excavation contractors","Decks & Docks":"Deck & dock builders","Fencing":"Fence installers","Siding & Exterior":"Siding contractors","Insulation":"Insulation contractors","Cleaning":"House cleaners","Handyman":"Handymen","Appliance Repair":"Appliance repair pros","Pest Control":"Pest control pros","Moving & Hauling":"Movers & haulers","Auto & Marine":"Mobile mechanics & marine techs","Welding & Metal":"Welders","Pools & Hot Tubs":"Pool & hot tub pros","Security & Smart Home":"Security & smart home installers","Well & Water":"Well & water pros","Countertops":"Countertop installers","Windows & Glass":"Window & glass pros","Inspection":"Home inspectors","Property Management":"Property caretakers","Drywall & Plaster":"Drywall contractors","Solar & Energy":"Solar installers"};
+function h45Slug(s){return String(s||"").toLowerCase().replace(/&/g," ").replace(/[.']/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")}
+function h45Noun(t){return H45_NOUN[t]||(t+" pros")}
+function h45Trades(){return Object.keys(CATS)}
+function h45Cities(){const seen={},out=[];for(const z of Object.keys(ZIPS)){const t=ZIPS[z][0],s=h45Slug(t);if(seen[s])continue;seen[s]=1;out.push({z,t,s,st:t.slice(-2),name:t.replace(/,\s*[A-Z]{2}$/,"")})}return out.sort((a,b)=>a.t.localeCompare(b.t))}
+function h45Parse(p){const a=String(p||"").split("/").filter(Boolean);if(a.length>2)return null;const trade=a[0]?h45Trades().find(t=>h45Slug(t)===a[0]):null;
+ /* /hire/<city>: every trade in one city */if(a.length===1&&!trade){const c1=h45Cities().find(c=>c.s===a[0]);return c1?{trade:null,city:c1}:null}if(a[0]&&!trade)return null;
+ const city=a[1]?h45Cities().find(c=>c.s===a[1]):null;if(a[1]&&!city)return null;return{trade:trade||null,city:city||null}}
+function h45Href(t,c){return"/hire"+(t?"/"+h45Slug(t):"")+(c?"/"+c.s:"")}
+function h45CityHub(r){const c=r.city,rows=h45Trades().map(t=>({t,n:h45Pros(t,c).length,g:h45Range(t,c)})).sort((a,b)=>b.n-a.n||a.t.localeCompare(b.t));
+ return`<section class="page v45h"><div class="wrap">${h45Crumb(r)}<h1>Local pros in ${esc(c.t)}</h1><p class="lead v45lead">Pick a trade to compare pros near ${esc(c.name)}, see the typical price and post your job free.</p>
+ <ul class="v45links v45grid">${rows.map(o=>`<li><a href="${h45Href(o.t,c)}">${catIcon(o.t)}<span>${esc(h45Noun(o.t))}${o.n?` <small class="muted">${o.n} nearby</small>`:""}</span></a></li>`).join("")}</ul>
+ <h2 class="v45h2">Nearby cities</h2><ul class="v45links">${h45Near(c,6).map(x=>`<li><a href="${h45Href(null,x)}">Local pros in ${esc(x.t)}</a></li>`).join("")}</ul></div></section>`}
+function h45Pros(t,c){try{return searchPros({cat:t,zip:c.z,miles:H45_MILES,sort:"best"})}catch(e){return[]}}
+function h45Range(t,c){try{return estimateRange({cat:t,size:"medium",urg:"soon",zip:c.z})}catch(e){return null}}
+function h45Near(c,n){return h45Cities().filter(x=>x.s!==c.s).map(x=>({x,d:dist(c.z,x.z)})).filter(o=>o.d<999).sort((a,b)=>a.d-b.d).slice(0,n||6).map(o=>o.x)}
+function h45Faq(t,c){const r=h45Range(t,c),tl=t.toLowerCase(),n=h45Noun(t).toLowerCase();
+ return[[`How much does a ${tl} job cost in ${c.t}?`,r?`A typical mid-size ${tl} job in ${c.t} runs about $${r.low.toLocaleString("en-US")} to $${r.high.toLocaleString("en-US")}. That's Sawyer's price guide for ${c.st} (regional cost index ${(+r.mult).toFixed(2)}); your quotes depend on size, materials and how soon you need it.`:`Prices depend on size, materials and timing. Post your job free and compare quotes side by side.`],
+  [`How do I know a ${tl} pro is licensed and insured?`,`Look for the Verified badge. A person on Sawyer's Trust team checks the pro's license number, issuing state and expiry, and a current certificate of insurance, and the badge comes off on the day either one expires.`],
+  [`Do I pay anything to get quotes?`,`No. Posting a job and getting quotes is free for homeowners and businesses. Pros pay a flat $20 a month, never per lead, so they aren't racing to recover lead fees on your job.`],
+  [`Can I trust the reviews?`,`Only a customer who hired the pro through Sawyer and finished the job can leave a review, and every review is tied to that job.`]]}
+function h45Title(p){const r=h45Parse(p);if(!r)return null;if(r.trade&&r.city)return h45Noun(r.trade)+" in "+r.city.t;if(r.city)return"Local pros in "+r.city.t;if(r.trade)return h45Noun(r.trade)+" by city";return"Hire a pro by trade and city"}
+function h45Desc(p){const r=h45Parse(p);if(!r)return"";if(r.trade&&r.city){const n=h45Pros(r.trade,r.city).length,g=h45Range(r.trade,r.city),tl=r.trade.toLowerCase();
+  const pr=g?` Typical job $${g.low.toLocaleString("en-US")}–$${g.high.toLocaleString("en-US")}.`:"";
+  return n?`Compare ${n} ${tl} pro${n===1?"":"s"} near ${r.city.t}.${pr} Free quotes, no lead fees, and reviews only from finished jobs.`:`Get free ${tl} quotes in ${r.city.t}.${pr} Post once and nearby pros quote. No lead fees, reviews only from finished jobs.`}
+ if(r.city){const n=h45Trades().filter(t=>h45Pros(t,r.city).length).length;return`Hire local pros in ${r.city.t}: ${n?n+" trades with pros nearby, ":""}local price ranges for ${h45Trades().length} trades, and reviews only from finished jobs. Free for customers.`}
+ if(r.trade)return`Find ${h45Noun(r.trade).toLowerCase()} in ${h45Cities().length} US cities. Local price ranges, verified licenses, and reviews only from finished jobs. Free for customers.`;
+ return`Browse local pros by trade and city: ${h45Trades().length} trades in ${h45Cities().length} US cities, with local price ranges and reviews only from finished jobs.`}
+if(typeof TITLES!=="undefined")TITLES.hire="Hire a pro";
+if(typeof sawyerTitle==="function"){const st=sawyerTitle;sawyerTitle=function(v,p){if(v==="hire"){const t=h45Title(p);return(t||"Page not found")+" · Sawyer"}return st.apply(this,arguments)}}
+function h45Crumb(r){const parts=[`<a href="/">Home</a>`,`<a href="/hire">Hire a pro</a>`];if(!r.trade&&r.city)parts.push(`<span aria-current="page">${esc(r.city.t)}</span>`);if(r.trade)parts.push(r.city?`<a href="${h45Href(r.trade)}">${esc(r.trade)}</a>`:`<span aria-current="page">${esc(r.trade)}</span>`);if(r.city)parts.push(`<span aria-current="page">${esc(r.city.t)}</span>`);
+ return`<nav class="v45crumb" aria-label="Breadcrumb">${parts.join(`<span class="v45sep" aria-hidden="true">›</span>`)}</nav>`}
+VIEWS.hire=(p,q)=>{const r=h45Parse(p);if(!r)return VIEWS.notfound();const cities=h45Cities();if(!r.trade&&r.city)return h45CityHub(r);
+ if(!r.trade)return`<section class="page v45h"><div class="wrap">${h45Crumb(r)}<h1>Hire a pro by trade and city</h1><p class="lead v45lead">Pick a trade to see local pros, typical prices and what to ask. Free for customers, no lead fees for pros, and reviews only from finished jobs.</p>
+  <h2 class="v45h2">Trades</h2><ul class="v45links v45grid">${h45Trades().map(t=>`<li><a href="${h45Href(t)}">${catIcon(t)}<span>${esc(h45Noun(t))}</span></a></li>`).join("")}</ul>
+  <h2 class="v45h2">Cities</h2><ul class="v45links v45cols">${cities.map(c=>`<li><a href="${h45Href(null,c)}">${esc(c.t)}</a></li>`).join("")}</ul></div></section>`;
+ const t=r.trade,tl=t.toLowerCase(),N=h45Noun(t);
+ if(!r.city){const rows=cities.map(c=>({c,n:h45Pros(t,c).length})).sort((a,b)=>b.n-a.n||a.c.t.localeCompare(b.c.t));
+  return`<section class="page v45h"><div class="wrap">${h45Crumb(r)}<h1>${esc(N)} by city</h1><p class="lead v45lead">Choose a city to compare ${esc(tl)} pros, see the local price range and post your job free.</p>
+  <ul class="v45links v45cols">${rows.map(o=>`<li><a href="${h45Href(t,o.c)}">${esc(o.c.t)}${o.n?` <small class="muted">${o.n} pro${o.n===1?"":"s"}</small>`:""}</a></li>`).join("")}</ul>
+  <p class="v45more"><a href="/hire">All trades</a></p></div></section>`}
+ const c=r.city,res=h45Pros(t,c),rg=h45Range(t,c),rated=res.filter(x=>x.r&&x.r.n),avg=rated.length?rated.reduce((a,x)=>a+x.r.avg,0)/rated.length:0,ver=res.filter(x=>x.u.verified).length;
+ const subs=(CATS[t]||[]).slice(0,8),near=h45Near(c,6),others=h45Trades().filter(x=>x!==t).map(x=>({x,n:h45Pros(x,c).length})).sort((a,b)=>b.n-a.n||a.x.localeCompare(b.x)).slice(0,8);
+ const post=href("post",null,{cat:t,zip:c.z}),find=href("find",null,{cat:t,zip:c.z,miles:String(H45_MILES)});
+ return`<section class="page v45h"><div class="wrap">${h45Crumb(r)}
+ <header class="v45top"><h1>${esc(N)} in ${esc(c.t)}</h1><p class="lead v45lead">${res.length?`Compare ${res.length} ${esc(tl)} pro${res.length===1?"":"s"} within ${H45_MILES} miles of ${esc(c.name)}.`:`Get free ${esc(tl)} quotes from pros near ${esc(c.name)}.`} Free quotes, no lead fees, and every review comes from a finished job.</p>
+ <div class="row wrapr v45cta"><a class="btn primary lg" href="${post}">Post your ${esc(tl)} job free</a>${res.length?`<a class="btn lg" href="${find}">See them on the map</a>`:""}</div></header>
+ <ul class="v45stats" aria-label="At a glance"><li><b>${rg?`$${rg.low.toLocaleString("en-US")}–$${rg.high.toLocaleString("en-US")}`:"Free quotes"}</b><small>Typical ${esc(tl)} job in ${esc(c.st)}</small></li><li><b>${res.length}</b><small>Pro${res.length===1?"":"s"} within ${H45_MILES} mi</small></li><li><b>${avg?avg.toFixed(1)+" ★":"–"}</b><small>${rated.length?"Average from finished jobs":"No reviews yet"}</small></li><li><b>${ver}</b><small>Verified license & insurance</small></li></ul>
+ ${res.length?`<h2 class="v45h2">${esc(t)} pros near ${esc(c.name)}</h2><div class="progrid v45grid2">${res.slice(0,12).map(PROCARD).join("")}</div>${res.length>12?`<p class="v45more"><a href="${find}">See all ${res.length}</a></p>`:""}`
+  :`<div class="card v45empty"><h2>No ${esc(tl)} pros listed near ${esc(c.name)} yet</h2><p class="muted">Post your job anyway. Pros who serve ${esc(c.name)} get a notice and can quote free.</p><div class="row wrapr"><a class="btn primary" href="${post}">Post a job</a><a class="btn" href="${href("pros")}">Are you a ${esc(tl)} pro? Join for $20/mo</a></div></div>`}
+ <div class="v45two"><div class="card"><h2 class="v45h2">Common ${esc(tl)} jobs</h2><ul class="v45links">${subs.map(s=>`<li><a href="${href("find",null,{cat:t,sub:s,zip:c.z})}">${esc(s)}</a></li>`).join("")}</ul><p class="small muted">Prices for your ZIP: <a href="${href("prices",null,{cat:t,zip:c.z})}">${esc(t)} price guide</a></p></div>
+ <div class="card"><h2 class="v45h2">Why hire on Sawyer</h2><ul class="v45why"><li>${I("shield",16)}<span><b>Licenses checked by a person.</b> The Verified badge means our Trust team reviewed the license and insurance.</span></li><li>${I("star",16)}<span><b>Reviews from finished jobs only.</b> No anonymous or paid reviews.</span></li><li>${I("dollar",16)}<span><b>No lead fees.</b> Pros pay a flat $20/mo, so your job isn't sold to five strangers.</span></li></ul></div></div>
+ <h2 class="v45h2">Questions about hiring ${esc(N.toLowerCase())} in ${esc(c.t)}</h2><div class="faq v45faq">${h45Faq(t,c).map(([qq,a])=>`<details><summary>${esc(qq)}${I("chev",16)}</summary><p>${esc(a)}</p></details>`).join("")}</div>
+ <div class="v45two"><div><h2 class="v45h2">${esc(N)} nearby</h2><ul class="v45links">${near.map(x=>`<li><a href="${h45Href(t,x)}">${esc(N)} in ${esc(x.t)}</a></li>`).join("")}</ul></div>
+ <div><h2 class="v45h2">Other pros in ${esc(c.t)}</h2><ul class="v45links">${others.map(o=>`<li><a href="${h45Href(o.x,c)}">${esc(h45Noun(o.x))}</a></li>`).join("")}</ul></div></div>
+ </div></section>`};
+/* footer: one link into the directory */
+if(typeof SHELL==="function"){const os=SHELL;SHELL=function(){os.apply(this,arguments);if(typeof document==="undefined"||!document.getElementById)return;const ft=document.getElementById("foot");
+ if(ft&&!ft.querySelector("[data-v45]")){const a=ft.querySelector('.footin a[href="'+href("post")+'"]');a&&a.insertAdjacentHTML("afterend",'<a data-v45 href="/hire">Pros by city</a>')}}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
