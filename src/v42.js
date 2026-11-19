@@ -24,7 +24,7 @@ A.dupBill42=function(id,key){const m=me();if(!m)return{ok:false,need:"login",msg
  if(src.status==="void")return{ok:false,msg:src.no+" is void, so it can't be duplicated."};
  if(src.type==="co")return{ok:false,msg:"A change order belongs to one estimate. Start a new change order from that estimate instead."};if(!v42CanDup(src,m))return{ok:false,msg:"That invoice wasn't found."};
  const c=v7Cust(src.cust);if(!c||c.by!==m.id)return{ok:false,msg:(src.cname||"That customer")+" is no longer in your customers, so "+src.no+" can't be copied. Start a new "+(src.type==="inv"?"invoice":"estimate")+" instead."};
- const all=(src.lines||[]),keep=all.filter(l=>l&&!l.l36),skipped=all.length-keep.length;
+ const all=(src.lines||[]),keep=all.filter(l=>l&&!l.l36&&!l.lf45),skipped=all.filter(l=>l&&l.l36).length;/* v45: a late fee is never copied */
  if(!keep.length)return{ok:false,msg:"Every line on "+src.no+" is a job cost (a receipt or trip), and those can only be billed once. Use Bill job costs for new ones."};
  const doneMsg=(b)=> (b?b.no:"A draft")+" drafted from "+src.no+". Check the dates, then send."+(skipped?" "+skipped+" job-cost line"+(skipped===1?" was":"s were")+" left off.":"");
  const reuse=b=>({ok:true,id:b.id,no:b.no||"",msg:doneMsg(b)});

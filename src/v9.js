@@ -15,7 +15,7 @@ const v9CB=s=>{const x=V9CS[s]||[s,"b7-mute"];return`<span class="b7 ${x[1]}">${
 function v9Sweep(m){if(!m)return 0;let n=0;const today=v7Today();
  if(v7Pro(m)){
   (DB.bills||[]).filter(b=>b.by===m.id&&b.type==="inv"&&b.rec9&&b.rec9.on&&b.status!=="void").forEach(b=>{let guard=0;while(b.rec9.next<=today&&guard++<12){
-   const nb=JSON.parse(JSON.stringify(b));const no9=v7Next(m,"inv");if(!no9||v7Taken(m,"inv",no9))return;
+   const nb=JSON.parse(JSON.stringify(b));/* v45: a late fee stays on its own invoice */nb.lines=(nb.lines||[]).filter(l=>!l.lf45);delete nb.lf45;delete nb.lf45log;delete nb.lf45waived;const no9=v7Next(m,"inv");if(!no9||v7Taken(m,"inv",no9))return;
    Object.assign(nb,{id:"b"+uid(),no:no9,status:"draft",payments:[],reminders:[],autoRem9:[],date:Date.now(),viewed:null,sent:null,demo:false,rec9:null,recFrom9:b.id,due:v7Day(14)});
    delete nb.approved;(DB.bills).push(nb);b.rec9.count=(b.rec9.count||0)+1;b.rec9.last=nb.id;b.rec9.next=v9AddEvery(b.rec9.next,b.rec9.every);
    if(b.rec9.auto){nb.status="sent";nb.sent=Date.now();if(nb.cuid)notify(nb.cuid,`${nb.bizName} sent you invoice ${nb.no} for ${v7$(billCalc(nb).total)} (${V9EVERY[b.rec9.every][0].toLowerCase()} billing)`,"bill:"+nb.id)}

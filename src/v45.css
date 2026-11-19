@@ -1,0 +1,16 @@
+/* ===== v45 ===== */
+/* Late fees: settings card (Office -> Recurring), terms line on the invoice paper, the reason line on the pro's invoice */
+.v45lf .o9-auto-h{display:flex;gap:12px;align-items:flex-start}
+.v45lf .o9-auto-h h2{margin:0 0 2px}
+.v45lf-f{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.v45lf-on{display:flex;gap:8px;align-items:center;min-height:44px;line-height:1.4}
+.v45lf-on input{width:20px;height:20px;flex:none;accent-color:#0F2A44}
+.v45lf-g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.v45lf-g .fld{margin:0}
+.v45lf-g small{display:block;margin-top:4px}
+.v45lf-terms{display:flex;gap:8px;align-items:flex-start;margin:14px 0 0;padding:10px 12px;border-radius:10px;background:#EEF2F7;color:#1B2A3B;font-size:13.5px;line-height:1.5}
+.v45lf-terms svg{flex:none;margin-top:3px;color:#1F3A68}
+.v45lf-why{margin:0 0 6px;line-height:1.45}
+#v45lfAdd,#v45lfWaive{min-height:44px}
+@media (max-width:700px){.v45lf-g{grid-template-columns:1fr}}
+@media print{.v45lf-terms{background:none;padding:0}}

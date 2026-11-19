@@ -29,7 +29,7 @@ const v7Col=k=>{if(!Array.isArray(DB[k]))DB[k]=[];return DB[k]};
 const v7Pro=m=>m&&(m.role==="contractor"||m.role==="pm");
 const v7Mine=(k,m)=>(DB[k]||[]).filter(x=>m&&x.by===m.id);
 const v7Lines=a=>(Array.isArray(a)?a:[]).slice(0,40).map(l=>({d:v7S(l&&l.d,160),q:v7N(l&&l.q,0,1e5,1),r:v7N(l&&l.r,-1e7,1e7,0),opt:!!(l&&l.opt),on:l&&l.opt?!!l.on:true})).filter(l=>l.d||l.r);
-function billCalc(b){const lines=b.lines||[];const sub=lines.filter(l=>!l.opt||l.on).reduce((a,l)=>a+l.q*l.r,0);const tax=Math.round(sub*(b.tax||0))/100;const total=Math.round((sub+tax)*100)/100;
+function billCalc(b){const lines=b.lines||[];const sub=lines.filter(l=>!l.opt||l.on).reduce((a,l)=>a+l.q*l.r,0);/* v45: a late fee line is not taxed */const txb=lines.filter(l=>(!l.opt||l.on)&&!l.lf45).reduce((a,l)=>a+l.q*l.r,0);const tax=Math.round(txb*(b.tax||0))/100;const total=Math.round((sub+tax)*100)/100;
  const paid=(b.payments||[]).reduce((a,p)=>a+p.amt,0);const bal=Math.max(0,Math.round((total-paid)*100)/100);
  const depAmt=b.deposit?Math.round(total*b.deposit)/100:0;
  let st=b.status||"draft";if(b.type==="inv"&&st!=="void"&&st!=="draft"){if(bal<=0.004&&total>0)st="paid";else if(paid>0)st="partial";else if(b.due&&v7DaysTo(b.due)<0)st="overdue";else st=b.viewed?"viewed":"sent"}
