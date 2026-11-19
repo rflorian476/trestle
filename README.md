@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.26.0
+# Sawyer (beta) — v2.28.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.26.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.28.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -22,6 +22,13 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v45: late fees on overdue invoices, pages for every trade and city, launch-ready SEO
+
+- **Late fees** (Office → Recurring, under Auto payment reminders). A pro turns on one late fee: a flat amount ($1–$500) or a percent of the unpaid balance (0.5–10%), after a grace period of 0–60 days past the due date. While it's on, every invoice the pro sends carries the terms on the paper ("Late fee: $25.00, added once if the invoice is still unpaid 5 days after the due date."). A fee can only go on an invoice that showed those terms when it was sent, so an invoice sent before the setting existed (or while it was off) never gets one. One fee per invoice, no stacking. On an overdue invoice past the grace period the pro taps **Add $25.00 late fee**, or turns on **Add it automatically** and the hourly server sweep adds it (the pro gets a notice). The fee is its own line ("Late fee (9 days past due)"), is **not taxed**, and the customer is notified with the new balance. **Waive late fee** removes it any time before it's paid; a waived fee stays off. Duplicate / Bill again and repeating invoices never copy it. Server-allowlisted actions `lateSet45`, `lateAdd45`, `lateWaive45` (owner-only; customers and other pros are refused); the setting (`lf45`) is private to the pro. The card reminds pros to check their state's limits on late fees. Payments stay in test mode.
+- **Hire pages** (`/hire`, `/hire/<trade>`, `/hire/<city>`, `/hire/<trade>/<city>`, for example `/hire/plumbing/austin-tx` "Plumbers in Austin, TX"). 32 trades × 46 cities from the price guide's city list. Each city page shows the pros within 40 miles (the same search and cards as Find), the typical price for that trade in that state, verified and review counts, common jobs (linked into Find), why Sawyer is different (licenses checked by a person, reviews only from finished jobs, no lead fees), a four-question FAQ with the local price, and links to the same trade in nearby cities and other trades in the city. A trade with no pros nearby still answers with a post-a-job prompt and a join link for pros. Unknown trades or cities are 404s. Signed-out visits are prerendered (header + page in the first HTML, same `VIEWS.hire` as the app). The footer has a **Pros by city** link.
+- **Launch SEO** (still `noindex` and the betabar while in test mode). Every public page has its own meta description (none fall back to the home page's), plus `twitter:title`, `twitter:description`, `twitter:image`, `og:image:alt` and `og:locale` next to the existing OG tags and canonical. Signed-in and per-person views (`/dash`, `/account`, `/office`, `/myhome`, `/bills`, `/inbox`, invoices, pay pages and so on) are always `noindex` (meta and header), even with `SAWYER_INDEXABLE=1`. Structured data, only when indexing is on: the home page has Organization + WebSite with a site-search action (`/find?q=`); `/faq` has FAQPage; `/pros` and `/pricing` have a Service with the $20/month offer; `/hire` pages have breadcrumbs, and a city page has Service (area served, price range as an AggregateOffer), an ItemList of real pros as HomeAndConstructionBusiness (LocalBusiness) with ratings, and its FAQPage. **Thin-page guard:** a city page whose pros are all demo pros stays `noindex` with no schema, and only city pages (and hubs) with at least one real pro go in the sitemap. With indexing on, the sitemap also lists `/find`, `/prices`, `/pros`, `/pricing`, `/faq`, `/about`, `/travel`, `/jobs`, `/projects` and `/hire`; `test/seo.js` was updated for that (still no demo record).
+- Tests: `node test/v45-e2e.js [shots dir]` (self-contained, local test mode) is in `test/run-all.sh` (now 43 suites). It covers late-fee validation and permissions, terms stamping, grace period, one fee only, untaxed totals, customer notice, waive (final), percent fees, the automatic sweep, Duplicate and repeating invoices, the settings card and invoice buttons at 390 and 1300, the customer view, every hire page shape (titles, unique descriptions, prerender, 404s, in-app navigation, footer link), private-view noindex, and the structured data and sitemap with the index switch on, before and after a real pro signs up.
 
 ## v44: idempotency keys stay with their invoice, a steadier Account card, a lighter signed-in dashboard
 
@@ -537,7 +544,7 @@ Also set the canonical origin (no path). Open Graph and canonical tags use it, t
 SAWYER_BASE_URL=https://your-domain
 ```
 
-Leave `SAWYER_INDEXABLE` unset or `0` until then. With it on, the sitemap lists `/` plus non-demo pro and traveler-call URLs only.
+Leave `SAWYER_INDEXABLE` unset or `0` until then. With it on, the sitemap lists `/`, the public marketing pages (`/find`, `/prices`, `/pros`, `/pricing`, `/faq`, `/about`, `/travel`, `/jobs`, `/projects`, `/hire`), `/hire` trade and city pages that list at least one real pro, and non-demo pro and traveler-call URLs (v45). Signed-in views are never indexed.
 
 ### v11 performance notes
 - App JS ships as hashed, immutable `public/js/a*.js` files (built by `build-live.js`), preloaded in `<head>` and run in order by a tiny loader.
