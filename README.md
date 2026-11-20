@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.28.0
+# Sawyer (beta) — v2.29.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.28.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.29.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -22,6 +22,13 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v46: bills to pay, hire links in any letter case, a void invoice says when
+
+- **Bills to pay** (top of Office → Expenses & mileage). The other half of "who owes you": supplier invoices, sub bills, shop rent and truck notes. Each bill has who it's from, the amount, the due date, a category (the same list as receipts), an optional job and the vendor's invoice number, and can **repeat monthly**. The card shows **Late**, **Due in 7 days** and **All open** totals and lists open bills by due date ("2 days late", "Due today", "Due in 3 days"). **Mark paid** asks for the date paid (today or earlier) and logs an ordinary expense with the same amount, category, vendor and job on that date, so the P&L, the tax file, job costing, **Bill job costs** and the 1099 sub totals (a Subcontractor bill) all include it without typing it twice. A monthly bill then opens next month's copy (Jan 31 → Feb 28). **Undo paid** takes that expense back off (refused while the receipt is billed on a live invoice; void the invoice or take the line off first), and deleting the expense in the log reopens the bill. A paid bill can't be edited or deleted until it's undone. Reminders come from the hourly server sweep, once each: 3 days before, on the day, and once it's late. The Office overview lists bills that are late or due within 3 days next to the other alerts. **Bills to pay (CSV)** downloads them, and **Back up everything** adds `bills-to-pay.csv`. The demo pro (Bluebonnet) has three sample bills, which never send reminders. Private to the pro (user field `ap46`, in `PRO_PRIVATE`); server-allowlisted `apSave46`, `apPay46`, `apUndo46`, `apDel46`, refused for customers, other pros and signed-out callers. Up to 300 open bills; payments stay in test mode (Sawyer doesn't send the money, it keeps the record).
+- **SW-107: hire links in any letter case.** `/hire/Plumbing/Austin-TX`, `/hire/plumbing/Austin-TX`, `/HIRE/Plumbing` and the like now 301 to the canonical lowercase page (`/hire/plumbing/austin-tx`), keeping the query string (`?utm_source=…`). Slugs that still don't exist (spaces, underscores, unknown trades or cities, extra segments) stay real 404 pages with `X-Robots-Tag: noindex`, in beta and indexable mode.
+- **A void invoice says when.** Voiding stamps the time (`voided46`) and the invoice timeline ends with "Voided 2h ago" (QA v42 idea 9; invoices voided before v46 show "Voided").
+- Tests: `node test/v46-e2e.js [shots dir]` (self-contained, local test mode) is in `test/run-all.sh` (now 44 suites). It covers the SW-107 redirects and 404s in both modes, bills-to-pay validation and permissions, privacy in other accounts' state, paid → expense, undo, the billed-on-an-invoice guard, deleting the expense, monthly repeats, sweep reminders (once each), demo samples, CSV and backup, the Office overview alert, the void timeline, and the UI at 390 and 1300.
 
 ## v45: late fees on overdue invoices, pages for every trade and city, launch-ready SEO
 
