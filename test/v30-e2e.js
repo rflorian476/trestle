@@ -38,7 +38,10 @@ const dayISO=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
  const page=async(w,cookie)=>{const c=await br.newContext({viewport:{width:w||1440,height:w&&w<500?844:900}});
   if(cookie){const [k,v]=cookie.split("=");await c.addCookies([{name:k,value:v,url:LOCAL.B}])}
   const p=await c.newPage();p.on("pageerror",e=>errs.push(String(e).slice(0,200)));return p};
- const dash=async(w,ck)=>{const p=await page(w,ck);await p.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await p.waitForTimeout(400);return p};
+ // The dashboard runs sweep9 ~1.2s after load (v9Tick) and re-renders if it changed anything (on a fresh server it usually does),
+ // which rebuilds the compare card and resets its sliders. Wait for that sweep to answer before touching the card.
+ const dash=async(w,ck)=>{const p=await page(w,ck);const sw=p.waitForResponse(r=>r.url().endsWith("/api/act")&&/"sweep9"/.test(r.request().postData()||""),{timeout:5000}).catch(()=>null);
+  await p.goto(LOCAL.B+"/dash",{waitUntil:"networkidle"});await sw;await p.waitForTimeout(400);return p};
  const hz=(await req(LOCAL.port,"GET","/healthz")).json||{};ok(/^2\.\d+\.\d+-sawyer$/.test(hz.v),"healthz reports a Sawyer version",J(hz));
  const sw=await req(LOCAL.port,"GET","/sw.js");ok(sw.status===200&&/const C="sawyer-v\d+"/.test(sw.body),"service worker cache is versioned");
  const pro=await login(LOCAL.port,"demo-pro@sawyer.test"),ho=await login(LOCAL.port,"demo-homeowner@sawyer.test"),pm=await login(LOCAL.port,"demo-pm@sawyer.test"),tv=await login(LOCAL.port,"demo-traveler@sawyer.test");
