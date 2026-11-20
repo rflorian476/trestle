@@ -394,7 +394,9 @@ function preView(req,h,v){if(sessionUid(req)||!PRE_TOP)return h;const body=viewH
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 // v45: /hire pages are prerendered for signed-out visitors the same way (header + the page from the public snapshot).
-function preHire(req,h,sub){if(sessionUid(req)||!PRE_TOP)return h;const body=viewHtml("hire",sub||"");if(!body)return h;
+function preHire(req,h,sub){if(sessionUid(req)||!PRE_TOP)return h;let body=viewHtml("hire",sub||"");if(!body)return h;
+ // the first pro photo is the largest paint on a phone (like /find): fetch it now instead of lazily
+ body=body.replace(/<img\b[^>]*>/,x=>/\sloading="lazy"/.test(x)?x.replace(/\sloading="lazy"/,' fetchpriority="high"'):x);
  const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
