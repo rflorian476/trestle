@@ -373,9 +373,10 @@ function prePrices(req,h){if(sessionUid(req)||!PRE_TOP)return h;const body=price
 // the browser runs, from the public signed-out snapshot only) plus the site header inside <main>, so the heading paints
 // before the app JS. Without it the mobile Lighthouse LCP (the hero subtitle) waits on the app bundle and lands near 3.6 s.
 // v38 perf: signed-out /myhome (the sign-in card) is prerendered the same way, with the same sign-in methods the page carries.
-let PRE_VIEW={v:-1,m:new Map()};const PRE_VIEWS=new Set(["pros","jobs","myhome","signup"]);
+let PRE_VIEW={v:-1,m:new Map()};const PRE_VIEWS=new Set(["pros","jobs","myhome","signup","dash"]);
 // v40: signed-out /signup is prerendered too, so its first HTML carries the same honest sign-in card the app renders.
-const PRE_AUTHV=new Set(["myhome","signup"]);
+const PRE_AUTHV=new Set(["myhome","signup","dash"]);
+// v47 perf: signed-out /dash is the same sign-in card, so it is prerendered too (mobile Lighthouse was 88-89, LCP ~3.8 s, waiting on app JS).
 // The live "Log in" card (client-post.js LOGINF) is added to /signup by the app after it mounts; the prerender carries the same static
 // markup in the same place, so the first paint already has the password log-in and the app's takeover doesn't move anything.
 const PRE_LOGINF=(()=>{try{const m=/const LOGINF=`([^`$]*)`;/.exec(fs.readFileSync(path.join(__dirname,"client-post.js"),"utf8"));return m?m[1]:""}catch(e){return""}})();
