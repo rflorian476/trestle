@@ -2480,7 +2480,7 @@ function v8Demo(rec){return !!(rec&&(rec.demo||/\(demo\)/i.test([rec.name,rec.bi
 function v8Meta(){if(typeof document==="undefined")return;const v=ROUTE.v,p=ROUTE.p;let t=null,d=null;
  if(v==="pro"){const u=U(p);if(u&&u.role==="contractor"){t=`${u.biz||nameOf(u)}: ${u.trade} in ${townOf(u.zip)}`;d=`${u.biz} is a ${String(u.trade||"").toLowerCase()} pro in ${townOf(u.zip)}. ${u.rating?(+u.rating).toFixed(1)+" stars from "+(u.reviews||0)+" verified reviews. ":""}Get a free quote on Sawyer.`}}
  else if(v==="tcall"){const c=(DB.tcalls||[]).find(x=>x.id===p);if(c){t=`${c.title}: ${c.loc||""}${c.state?", "+c.state:""}`;d=`$${c.rate}/hr${c.perDiem?" + $"+c.perDiem+"/day per diem":""}, ${c.weeks} weeks. Rate, per diem, length and layoff risk shown up front.`}}
- if(t)document.title=typeof sawyerTitle==="function"?sawyerTitle(v,p,DB):t+" · Sawyer";/* v24: one title format everywhere (this also runs on a timer and on hashchange) */const md=document.querySelector('meta[name="description"]');if(md){md.dataset.orig=md.dataset.orig||md.content;md.content=d||md.dataset.orig}
+ if(t)document.title=typeof sawyerTitle==="function"?sawyerTitle(v,p,DB):t+" · Sawyer";/* v24: one title format everywhere (this also runs on a timer and on hashchange) */const md=document.querySelector('meta[name="description"]');if(md){md.dataset.orig=md.dataset.orig||md.content;md.content=(typeof sawyerDesc==="function"&&sawyerDesc(v,p,DB))||d||md.dataset.orig}
  const cur=v==="pro"||v==="traveler"?U(p):v==="job"?(DB.jobs||[]).find(x=>x.id===p):v==="project"?(DB.projects||[]).find(x=>x.id===p):v==="tcall"?(DB.tcalls||[]).find(x=>x.id===p):null;
  const demo=!!(cur&&v8Demo(cur));const rm=document.querySelector('meta[name="robots"]');
  if(!(rm&&rm.getAttribute("data-sawyer-robots")==="beta")){if(demo){const tag=rm||document.head.appendChild(document.createElement("meta"));tag.setAttribute("name","robots");tag.setAttribute("content","noindex, nofollow");tag.setAttribute("data-sawyer-robots","demo")}else if(rm&&rm.getAttribute("data-sawyer-robots")==="demo"){rm.setAttribute("content","index, follow");rm.setAttribute("data-sawyer-robots","live")}}
@@ -6523,6 +6523,91 @@ if(typeof v31Backup==="function"){const ob=v31Backup;v31Backup=function(m){const
 /* QA v42 idea 9: a void invoice's timeline ends with "Voided" (the badge already said so). The time is kept from v46 on. */
 {const ovb=A.voidBill;A.voidBill=function(id){const r=ovb.apply(this,arguments);try{if(r&&r.ok){const b=v7Bill(id);if(b&&b.status==="void"&&!b.voided46){b.voided46=Date.now();save()}}}catch(e){}return r}}
 {const ov=VIEWS.invoice;VIEWS.invoice=(id,q)=>{let h=ov(id,q);try{const b=v7Bill(id);if(b&&b.status==="void"){const t=h.indexOf('<ul class="o7-tl">');if(t>=0){const z=h.indexOf("</ul>",t);if(z>=0)h=h.slice(0,z)+`<li class="v46void">Voided${b.voided46?" "+ago(b.voided46):""}</li>`+h.slice(z)}}}catch(e){}return h}}
+
+/* ===================== v47 ===================== */
+/* (1) SEO: one description per page. server.js calls sawyerDesc() from the app sandbox for the first HTML, and v8Meta
+   calls the same function after every in-app render, so the description never flips and never falls back to the home
+   page's text. Record pages (pro, job, project, traveler call, traveler profile, hire pages) are built from public
+   facts only: no customer names, no job or project descriptions, no contact details. Search indexing is unchanged
+   (noindex until launch). */
+const V47_DESC={
+ home:"Hire licensed local pros with reviews only from finished jobs. Free for customers. Pros pay a flat $20/mo with no lead fees, business tools included.",
+ find:"Search licensed, reviewed local pros by trade and distance. Compare reply times, typical prices and verified licenses. Free for customers.",
+ prices:"Typical prices for common home projects, adjusted for your ZIP code: water heaters, roofs, panels, HVAC and more, so you know a fair quote when you see one.",
+ pricing:"Sawyer is free for customers. Pros pay a flat $20 a month with no lead fees, no per-seat charges and no contract. Invoices, estimates and records are included.",
+ pros:"A flat $20/month gets you a profile, job-board leads and the business tools: invoices, estimates, expenses, timesheets and license tracking. No lead fees.",
+ faq:"Answers about getting quotes, how reviews stay honest, paying a pro, verified licenses, the $20 pro plan and what happens to your data on Sawyer.",
+ about:"Why Sawyer exists: reviews only from finished jobs, licenses checked by a person, no pay-to-rank and no lead fees. Built for homeowners and the trades.",
+ jobs:"Open jobs from homeowners and businesses near you, with budgets and timing up front. Pros quote free: no lead fees and no bidding for contact details.",
+ post:"Describe your project in four steps and get quotes from licensed local pros. See the typical price for your ZIP before you hire. Free for customers.",
+ travel:"Traveler calls for electricians with the rate, per diem, hours, length and layoff risk up front. Apply direct to the contractor, with no agency markup.",
+ signup:"Sign in or join Sawyer free with a one-time code, a password, a passkey or Google, Apple, Microsoft or Facebook. Customers are free; pros pay $20/mo.",
+ credits:"Credits for the real Pexels photos used on Sawyer, with links to each photographer. No AI-generated images of tradespeople or homes.",
+ projects:"Multi-trade projects that need crews: the trades, the dates and how many of each are still needed. Pros apply free.",
+ newproject:"Post a multi-trade project, list how many of each trade you need, and book the whole crew in one place.",
+ join:"List your business for a flat $20/mo with no lead fees. Invoices, estimates, expenses and license tracking are included.",
+ cmp:"Compare up to three pros side by side: rating, typical price, distance, reply time and license.",
+ estimate:"Get a typical price range for your project from a few details and a photo, before you ask for quotes.",
+ newtravel:"Post a call for traveling electricians with the rate, per diem, hours and dates up front.",
+ perdiem:"Per diem guide for traveling electricians: what a day rate covers, 7-day vs. days-worked per diem, and what a call really pays after lodging and travel.",
+ lodging:"Lodging notes for traveling electricians: RV pads, extended-stay rates and rooms near job sites, shared by travelers who worked there.",
+ travme:"Your traveling electrician profile: license cards, references, availability and saved calls.",
+ tdash:"Applicants and hires for your traveler calls: who fits the license and start date, who you hired, and who is still waiting on an answer.",
+ wallet:"Your document wallet: license cards, OSHA and safety tickets, with expiry reminders 60, 30 and 7 days ahead.",
+ welcome:"Welcome to Sawyer. Set up your account in a minute: your ZIP, what you need done or the trade you work, and how you want to hear from us.",
+ track:"Track a visit from your pro: the arrival window on your own clock, on-the-way notices, and a way to confirm or ask for a new time.",
+ "case":"A resolution case on Sawyer: what happened, what each side asked for, and the Trust team's answer, in one place.",
+ ref:"A reference request on Sawyer: a contractor or foreman answers for a traveling electrician they worked with, from their own sign-in.",
+ verify:"Get the Verified badge on Sawyer: send your license number and a current certificate of insurance, and a person on our Trust team reviews it.",
+ myhome:"Your home's maintenance schedule, warranties, past jobs and the pros you've hired, in one place.",
+ dash:"Your Sawyer dashboard: new jobs and quotes, messages, appointments, invoices to pay and what needs your attention next.",
+ account:"Your Sawyer account: sign-in methods, password, contact details, alerts and a copy of your data.",
+ office:"Invoices, estimates, customers, expenses, timesheets, payroll and licenses for your business.",
+ bills:"Invoices from the pros you hired, with one place to pay.",
+ inbox:"Your notices from Sawyer: jobs and quotes, money, messages, crew and travel, and records, with per-category alert settings.",
+ msgs:"Your messages on Sawyer with pros, customers and crews.",
+ saved:"Pros you saved on Sawyer, ready to compare or ask for a quote.",
+ schedule:"Your appointments and visits, with arrival windows on each customer's own clock.",
+ homelog:"Maintenance, warranties and receipts for your home.",
+ statement:"A statement of open invoices from one business, with what is due, what is late and a link to pay each one.",
+ consults:"Your booked consults with pros on Sawyer.",
+ board:"Every project's crew slots on one timeline: crew counts, open slots and double-booking warnings.",
+ mod:"Sawyer Trust team queue."
+};
+V47_DESC.traveling=V47_DESC.travel;
+function v47Clip(s,n){n=n||160;s=String(s||"").replace(/\s+/g," ").trim();if(s.length<=n)return s;const c=s.slice(0,n-1);const k=c.lastIndexOf(" ");return (k>n-40?c.slice(0,k):c).replace(/[,.;:\-–\s]+$/,"")+"…"}
+/* builds a description from whole sentences: the first always, the rest only while the text stays within n characters */
+function v47Fit(parts,n){n=n||160;let out="";for(const x of parts.filter(Boolean)){const y=String(x).replace(/\s+/g," ").trim();if(!out){out=y;continue}if((out+" "+y).length<=n)out+=" "+y}return v47Clip(out,n)}
+function v47An(w){w=String(w||"");return /^[A-Z]{2,}/.test(w)?(/^[AEFHILMNORSX]/.test(w)?"an":"a"):/^[aeiou]/i.test(w)?"an":"a"}
+function v47Trade(t){t=String(t||"home services");return /^[A-Z]{2,}/.test(t)?t:t.toLowerCase()}
+function v47Town(z){try{return z?String(townOf(z)||""):""}catch(e){return ""}}
+function v47Clean(t){return String(t||"").replace(/\s*\(demo\)/gi,"").replace(/^demo:\s*/i,"").trim()}
+const v47Month=iso=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||""));if(!m)return "";return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m[2]-1]+" "+(+m[3])+", "+m[1]};
+function sawyerDesc(v,p,db){const d=db||(typeof DB!=="undefined"?DB:null)||{};try{
+ if(v==="pro"&&p){const u=(d.users||[]).find(x=>x.id===p&&x.role==="contractor");if(u){const name=v47Clean(u.biz||u.name||"This pro"),t=v47Town(u.zip),tr=v47Trade(u.trade);
+  const rv=(d.reviews||[]).filter(r=>r.cid===u.id&&!r.removed),n=rv.length,avg=n?rv.reduce((a,r)=>a+(+r.stars||0),0)/n:0;
+  return v47Fit([`${name} is ${v47An(tr)} ${tr} pro${t?" in "+t:""}.`,n?`${avg.toFixed(1)} stars from ${n} review${n>1?"s":""} of finished jobs.`:"",u.verified?"License checked by Sawyer.":"",+u.years>1?`${+u.years} years in business.`:"","Free quotes, no lead fees."])}}
+ if((v==="job"||v==="compare")&&p){const j=(d.jobs||[]).find(x=>x.id===p);if(j){const t=v47Town(j.zip),ti=v47Clean(j.title).slice(0,80),cat=j.cat?String(j.cat).charAt(0).toUpperCase()+String(j.cat).slice(1):"Home";
+  return v47Clip(v==="compare"?`Compare the bids on "${ti}"${t?" in "+t:""} side by side: price, timing, reviews from finished jobs and license, on Sawyer.`:`${cat} job${t?" in "+t:""}: ${ti}. Local pros quote free, and the customer compares bids side by side on Sawyer.`)}}
+ if(v==="project"&&p){const pj=(d.projects||[]).find(x=>x.id===p);if(pj){const t=v47Town(pj.zip),ti=v47Clean(pj.title).slice(0,70)||"Multi-trade project",rs=pj.roles||[];
+  const need=rs.reduce((a,r)=>a+(+r.need||0),0),open=rs.reduce((a,r)=>a+Math.max(0,(+r.need||0)-(r.filled||[]).length),0),trades=[...new Set(rs.filter(r=>(+r.need||0)>(r.filled||[]).length).map(r=>r.trade).filter(Boolean))];
+  if(pj.status==="closed"||pj.ownerGone34)return v47Clip(`${ti}${t?" in "+t:""}: this crew project is closed. Browse other projects that need crews on Sawyer.`);
+  const when=pj.start?` Starts ${v47Month(pj.start)}.`:"";
+  return v47Fit([`${ti}${t&&!ti.includes(t.replace(/, [A-Z]{2}$/,""))?" in "+t:""}: ${open?open+" of "+need+" crew spots open":"crew full"}${trades.length?" for "+trades.slice(0,4).join(", ")+(trades.length>4?" and more":""):""}.`,when.trim(),"Pros apply free on Sawyer."])}}
+ if(v==="tcall"&&p){const c=(d.tcalls||[]).find(x=>x.id===p);if(c){const ti=v47Clean(c.title).slice(0,70)||"Traveler call",w=[c.loc,c.state].filter(Boolean).join(", ");
+  return v47Fit([`${ti}${w?" in "+w:""}: $${c.rate}/hr${c.perDiem?" + $"+c.perDiem+"/day per diem":""}, about ${c.weeks} weeks.`,c.hours?`Hours: ${c.hours}.`:"",c.lic?`${c.lic} license${c.lstate?" ("+c.lstate+")":""}.`:"","Rate, per diem and layoff risk up front."])}}
+ if(v==="traveler"&&p){const u=(d.users||[]).find(x=>x.id===p&&x.trav);if(u){const t=u.trav,lic=(t.lic||[]).filter(l=>l&&l.state);const lt=lic.length?` ${lic[0].type||"License"} card${lic.length>1?"s":""} in ${[...new Set(lic.map(l=>l.state))].slice(0,5).join(", ")}.`:"";
+  const tr=String(t.trade||"Electrical")==="Electrical"?"electrician":String(t.trade).toLowerCase()+" hand";
+  return v47Fit([`Traveling ${tr}${t.home?" from "+t.home:""}${t.headline?": "+v47Clean(t.headline).replace(/^./,x=>x.toLowerCase()):""}.`,lt.trim(),+t.yrs?(+t.yrs)+" years in the trade.":"","References from foremen on Sawyer."])}}
+ if(v==="hire"&&typeof h45Desc==="function"){const x=String(h45Desc(p||"")||"");if(x)return x}
+ }catch(e){}
+ return V47_DESC[v]||null}
+
+/* page titles for crew projects and traveler profiles (were "Project" / "Traveler"); same function on the server and in the app */
+if(typeof sawyerTitle==="function"){const st0=sawyerTitle;sawyerTitle=function(v,p,db){const d=db||(typeof DB!=="undefined"?DB:null)||{},S=" · Sawyer";try{
+ if(v==="project"&&p){const pj=(d.projects||[]).find(x=>x.id===p);if(pj&&pj.title)return v47Clean(pj.title).slice(0,90)+": crew openings"+S}
+ if(v==="traveler"&&p){const u=(d.users||[]).find(x=>x.id===p&&x.trav);if(u){const t=u.trav,tr=String(t.trade||"Electrical")==="Electrical"?"electrician":v47Trade(t.trade)+" hand";return "Traveling "+tr+(t.home?" from "+String(t.home).slice(0,40):"")+S}}}catch(e){}
+ return st0.apply(this,arguments)}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
