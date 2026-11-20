@@ -1,1 +1,28 @@
 /* ===================== v47 ===================== */
+/* Your traveler calls: "Show N more calls" */
+.v47callsmore{margin:10px 0 0;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.v47callsmore .linkbtn{min-height:40px;font-weight:600}
+/* Payroll (Office -> Time & payroll) */
+.pr47{margin-bottom:18px}
+.pr47 .o7-sh{flex-wrap:wrap;gap:8px 16px}
+.pr47-wk{margin:0;min-width:0}
+.pr47-wk label{display:block;margin-bottom:2px}
+.pr47-wk select{min-height:44px;max-width:100%}
+.pr47-lead{margin:-4px 0 12px;line-height:1.5}
+.pr47-tbl td small{display:block}
+.pr47-rate{width:84px;min-height:40px;text-align:right}
+.pr47-warn{display:flex;gap:6px;align-items:flex-start;background:#FFF6E0;border:1px solid #EBD59B;color:#5C4300;border-radius:10px;padding:8px 10px;margin:10px 0}
+.pr47 .o7-inl{margin-top:12px}
+.pr47-none{margin:4px 0 0}
+.pr47-stub{border-top:1px solid var(--line);padding:12px 0}
+.pr47-sh{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
+.pr47-sh>div{display:flex;flex-direction:column;min-width:0}
+.pr47-sh b{font-size:16px}
+.pr47-t{font-size:14px}
+.pr47-sm{display:none}
+.pr47-own{display:flex;gap:6px;align-items:flex-start;margin:10px 0}
+@media (max-width:700px){.pr47-wk{flex:1 1 100%}.pr47-wk select{width:100%}
+ .pr47-tbl th,.pr47-tbl td{padding:9px 4px;font-size:13px}.pr47-tbl th{font-size:11px;letter-spacing:.02em}.pr47-tbl td:first-child,.pr47-tbl th:first-child{padding-left:6px}
+ .pr47-lg{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.pr47-sm{display:inline}.pr47-rate{width:64px}}
+@media print{.pr47 .o7-inl,.pr47 .ap46-b,.pr47 .ap46-x{display:none!important}
+ body.print47 *{visibility:hidden!important}body.print47 .pr47-print,body.print47 .pr47-print *{visibility:visible!important}body.print47 .pr47-print{position:absolute;left:0;top:0;width:100%}}
