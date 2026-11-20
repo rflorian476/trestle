@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.30.0
+# Sawyer (beta) — v2.31.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.30.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.31.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -22,6 +22,13 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v48: customer links for invoices and estimates, clean traveler-call addresses
+
+- **Customer links.** Before v48, an invoice for a customer who isn't on Sawyer said "copy the link and text it", but that link only opened for a linked account, so the customer hit a sign-in wall and a "this invoice isn't in your account" page. Now every sent invoice, estimate or change order for a customer without an account gets a **private link**, `/i/<token>` (24 random characters from the server's CSPRNG; the browser never chooses it). It opens without signing in: the same invoice paper the app prints, the balance and due date, the business, **Print / PDF**, and on phones a short "due + Pay" strip above the paper. **Pay** (or **Review and approve** on an estimate) asks for a free account; after any sign-in path (code, password, passkey, Google/Apple…) the bill is added to that account and the customer lands on Pay (or on the estimate's Sign and approve). The pro is told when the customer first opens the link and when they add it to their account, and the customer record is linked so the next invoice goes straight to their account. On the pro's invoice page the **Customer link** card has the link with **Copy**, **Text it** (opens the phone's messages with the customer's number and a short note), **Email it** (opens the mail app with a subject and the note; nothing is sent by Sawyer), **Preview**, "Opened by Dana 2h ago", and **Turn off this link and make a new one**. Rules: the owner, shared demo accounts and anyone after the bill is already in someone's account can't claim it; a void bill opens marked void with no Pay and can't be claimed; a claimed bill stays with its customer when the pro edits it; Duplicate and recurring copies never inherit a link (`tk48b` must be the bill's own id). Links are `noindex`, `no-store` and `Referrer-Policy: no-referrer`; unknown, turned-off, draft and malformed tokens are the same 404; the guest copy leaves out customer ids, reminders, recurring setup and private line costs; link-preview bots don't count as the customer opening it; `/i/` is throttled per IP. Server-allowlisted `link48` and `claim48`; the server replaces any token the browser sends. Payments stay in test mode.
+- **Traveler-call addresses (QA v47 ideas 1-2).** `/tcall/<id>` is one **301** to `/t/<id>` and `/traveling` is one 301 to the traveling guide, which now lives at `/travel?tab=how` (canonical `/travel`); the query string is kept and the `Location` is always a same-origin path built from the validated id. Unknown or malformed ids (`/tcall/%2F%2Fevil.com`, `/t/nope`) are a real **404** with a noindex "Traveler call not found" page and its own description, and every 4xx/5xx error page is now noindex (meta and `X-Robots-Tag`), also with indexing on. In-app links and push notifications use the canonical addresses.
+- **QA v47 idea 3.** v47-e2e accepts the singular "Show 1 more call".
+- Tests: `node test/v48-e2e.js [shots dir]` (self-contained, local test mode) is in `test/run-all.sh` (now 46 suites). It covers the version and SW cache, the redirects and 404s (indexing off and on), the guide, and the customer-link flows above at 390 and 1300 with CSP on.
 
 ## v47: payroll, a faster signed-out dashboard, a real description on every page
 

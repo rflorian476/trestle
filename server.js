@@ -569,7 +569,7 @@ const VIEW_META={find:["Find pros","Search licensed, reviewed local pros by trad
 const PRIV_V45=new Set(["dash","account","office","invedit","invoice","pay","bills","msgs","inbox","saved","welcome","schedule","track","case","consults","homelog","board","mod","verify","statement","myhome","lodging","wallet","perdiem","tdash","travme","newtravel","newproject","estimate","cmp","ref"]);
 // v21 SW-016: in-app links are pretty now, so any /<view>[/<id or sub-path>] serves the app (ids may be URL-encoded)
 function viewRoute(p){const m=/^\/([a-z0-9]{2,20})(?:\/([\w.%~@+-]{1,120}(?:\/[\w.%~@+-]{1,120}){0,2}))?\/?$/.exec(p);if(!m||m[1]==="notfound"||m[1]==="api"||m[1]==="auth")return null;const V=api.VIEWS||{};return Object.prototype.hasOwnProperty.call(V,m[1])?m[1]:null}
-const SW_JS=`const C="sawyer-v47";const SHELL=["/","/icons/icon-192.png","/img/hero.webp","/fonts/plus-jakarta-sans-400.woff2","/fonts/plus-jakarta-sans-800.woff2"];
+const SW_JS=`const C="sawyer-v48";const SHELL=["/","/icons/icon-192.png","/img/hero.webp","/fonts/plus-jakarta-sans-400.woff2","/fonts/plus-jakarta-sans-800.woff2"];
 self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL)).catch(()=>{}))});
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("push",e=>{let d={};try{d=e.data?e.data.json():{}}catch(x){d={body:e.data?e.data.text():""}}
