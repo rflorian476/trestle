@@ -16,6 +16,7 @@
 .ap46-r:first-child{border-top:0}
 .ap46-m{display:flex;flex-direction:column;min-width:0}
 .ap46-m b{overflow-wrap:anywhere}
+.ap46-m .tag7{align-self:flex-start;margin:2px 0}
 .ap46-m small{font-size:12.5px;overflow-wrap:anywhere}
 .ap46-w{font-size:13px;font-weight:600;color:#33405A;white-space:nowrap}
 .ap46-w.ap46-warn{color:#8A5A00}
