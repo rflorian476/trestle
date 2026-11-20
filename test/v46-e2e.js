@@ -143,6 +143,11 @@ const SERVERS=[];let br=null;
   await go(L,p,"/office/money?ap="+A1,"#ap46F");const ed=await p.evaluate(()=>({v:(document.getElementById("ap-v")||{}).value,a:(document.getElementById("ap-a")||{}).value,btn:(document.querySelector("#ap46F button.primary")||{}).textContent}));
   ok(ed.v==="Ferguson Supply"&&ed.a==="415.25"&&ed.btn==="Save bill","390: Edit opens the bill in the form",J(ed));await c.close()}
  {const {c,p}=await page(L,390,C.ck);await go(L,p,"/office/money","#app");ok(!(await p.$("#ap46"))&&/The Office is for pros/.test(await p.evaluate(()=>document.getElementById("app").innerText)),"390 customer: no Bills to pay card (The Office is for pros)");await c.close()}
+ // --- QA v42 idea 9: a void invoice's timeline says Voided
+ {const cu=await act(L,P.ck,"saveCust",[{name:"Void Test",email:"void-"+run+"@example.com"}]);const inv=await act(L,P.ck,"saveBill",[{type:"inv",cust:cu.res.id,title:"Void me",lines:[{d:"Work",q:1,r:100}],tax:0,due:ymd(14)}]);
+  await act(L,P.ck,"sendBill",[inv.res.id]);const v=await act(L,P.ck,"voidBill",[inv.res.id]);const b=((await stateFor(L,P.ck)).bills||[]).find(x=>x.id===inv.res.id)||{};ok(v.res.ok&&b.status==="void"&&b.voided46>0,"voiding an invoice keeps when it was voided",J([v.res,b.voided46]));
+  const {c,p}=await page(L,390,P.ck);await go(L,p,"/invoice/"+inv.res.id,".o7-tl");const tl=await p.evaluate(()=>[...document.querySelectorAll(".o7-tl li")].map(l=>l.textContent));
+  ok(/^Created/.test(tl[0]||"")&&tl.some(x=>/^Sent/.test(x))&&/^Voided/.test(tl[tl.length-1]||""),"390: the void invoice's timeline ends with Voided",J(tl));await c.close()}
 
  if(failed)throw new Error(failed+" check(s) failed");
  console.log("OK v46-e2e");

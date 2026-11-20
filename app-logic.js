@@ -6520,6 +6520,9 @@ if(typeof oAlerts==="function"){const oal=oAlerts;oAlerts=function(m){const a=oa
  a.push([d<0?"bad":"warn",`Bill from ${esc(ap46Name(x))} (${v7$(x.amt)}) is ${d<0?(-d)+" day"+(d===-1?"":"s")+" late":d===0?"due today":"due in "+d+" day"+(d===1?"":"s")}.`,`<a class="btn sm" href="${href("office","money")}#ap46">Bills to pay</a>`])}}catch(e){}return a}}
 /* Back up everything (v31 ZIP) includes the bills to pay */
 if(typeof v31Backup==="function"){const ob=v31Backup;v31Backup=function(m){const r=ob.apply(this,arguments);try{if(ap46All(m).length&&r&&Array.isArray(r.files))r.files.push(["bills-to-pay.csv","\ufeff"+ap46Csv(m)])}catch(e){}return r}}
+/* QA v42 idea 9: a void invoice's timeline ends with "Voided" (the badge already said so). The time is kept from v46 on. */
+{const ovb=A.voidBill;A.voidBill=function(id){const r=ovb.apply(this,arguments);try{if(r&&r.ok){const b=v7Bill(id);if(b&&b.status==="void"&&!b.voided46){b.voided46=Date.now();save()}}}catch(e){}return r}}
+{const ov=VIEWS.invoice;VIEWS.invoice=(id,q)=>{let h=ov(id,q);try{const b=v7Bill(id);if(b&&b.status==="void"){const t=h.indexOf('<ul class="o7-tl">');if(t>=0){const z=h.indexOf("</ul>",t);if(z>=0)h=h.slice(0,z)+`<li class="v46void">Voided${b.voided46?" "+ago(b.voided46):""}</li>`+h.slice(z)}}}catch(e){}return h}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
