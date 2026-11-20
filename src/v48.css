@@ -1,0 +1,15 @@
+/* v48: customer links */
+.i48-own{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#EEF3F9;border:1px solid #C9D6E6;color:#0E1B2B;border-radius:12px;padding:10px 14px;margin:0 0 14px;font-size:14px}
+.i48-own a{font-weight:700}
+.i48-trust{display:flex;gap:6px;align-items:flex-start;margin:4px 2px 0;line-height:1.45}
+.i48-trust svg{flex:none;margin-top:2px}
+.i48 .o7-pro+.row{margin-top:10px;gap:8px}
+.i48-how{margin-top:8px}
+.i48-link{display:flex;gap:8px;margin:10px 0 8px}
+.i48-link input{flex:1;min-width:0;font:13px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;padding:8px 10px;border:1px solid #C9CFD4;border-radius:10px;background:#F7F6F3;color:#0E1B2B}
+.i48-send{gap:8px}
+.i48-seen{margin-top:10px}
+.i48-seen .linkbtn{font-size:13px;margin-left:4px}
+/* phones: a short "due + Pay" strip above the paper (the full box stays beside / under it) */
+.i48-top{display:none}
+@media (max-width:900px){.i48-top{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid #E4E0D6;border-radius:14px;padding:12px 14px;margin:0 0 12px;box-shadow:0 6px 24px -18px rgba(14,27,43,.35)}.i48-top small{display:block;color:#5B6573;font-size:12px}.i48-top b{font-size:20px;color:#0E1B2B}.i48-top .btn{flex:none}}
