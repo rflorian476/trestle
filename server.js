@@ -705,7 +705,7 @@ const server=http.createServer(async(req,res)=>{
  // and the token never leaves in a Referer. Unknown, turned-off, draft and malformed tokens are the same 404.
  {const im=/^\/i\/([^/]{1,80})\/?$/.exec(p);if(req.method==="GET"&&im){const NOI={"X-Robots-Tag":"noindex, nofollow","Referrer-Policy":"no-referrer","Cache-Control":"no-store"};for(const[k,v]of Object.entries(NOI))res.setHeader(k,v);
   if(limited("i48:"+ip(req),120,60e3))return htmlPage(res,429,"Slow down","<p>Too many requests. Try again in a minute.</p>");
-  const ua=String(req.headers["user-agent"]||""),bot=/bot|crawl|spider|slurp|lighthouse|preview|facebookexternalhit|whatsapp|slack|discord|telegram|skype/i.test(ua);
+  const ua=String(req.headers["user-agent"]||""),bot=!ua||/bot|crawl|spider|slurp|lighthouse|preview|facebookexternalhit|whatsapp|slack|discord|telegram|skype/i.test(ua);
   let g=null;const pb=pushBefore();try{g=vm.runInContext("v48View",ctx)(im[1],sessionUid(req),bot)}catch(e){g=null}finally{DB().me=null}if(dirty)persist();pushAfter(pb);
   if(!g)return htmlPage(res,404,"This link isn't active","<p>The pro may have turned this link off or sent a newer one. Ask them to send it again.</p><p><a href=\"/\">Go to Sawyer</a></p>",{desc:"This Sawyer link isn't active. Ask the pro who sent it for a new one."});
   const js=JSON.stringify(g).replace(/</g,"\\u003c").replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");
