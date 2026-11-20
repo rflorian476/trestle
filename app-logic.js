@@ -6609,5 +6609,30 @@ if(typeof sawyerTitle==="function"){const st0=sawyerTitle;sawyerTitle=function(v
  if(v==="traveler"&&p){const u=(d.users||[]).find(x=>x.id===p&&x.trav);if(u){const t=u.trav,tr=String(t.trade||"Electrical")==="Electrical"?"electrician":v47Trade(t.trade)+" hand";return "Traveling "+tr+(t.home?" from "+String(t.home).slice(0,40):"")+S}}}catch(e){}
  return st0.apply(this,arguments)}}
 
+/* (2) QA v42 idea 3: a reciprocity line that is only one two-letter state code ("DC", "VA", "va.") means that state.
+   Lists, full names and "licensed in / accepts" phrases already worked; a lone code used to be ignored. */
+if(typeof v41ParseRecip==="function"){const rp0=v41ParseRecip;v41ParseRecip=function(txt){const r=rp0.apply(this,arguments);if(r&&r.length)return r;
+ const s=String(txt||"").trim().replace(/[.!]+$/,"").trim();if(/^[A-Za-z]{2}$/.test(s)&&typeof v41IsSt==="function"&&v41IsSt(s))return[s.toUpperCase()];return r||[]}}
+
+/* (3) QA v42 idea 5: "Your traveler calls" on the dashboard listed only the first 4 calls, so with several live calls one
+   (say, a Hawaii call) fell off the card. Open calls now come first by days to start on each call's own calendar, the
+   first 4 show, and "Show N more calls" opens the rest in place (aria-expanded). Rows use inline display so the
+   dashboard's stylesheet subset needs no new rule. */
+let V47_CALLS_OPEN=false;
+function v47CallRow(c,more,hide){const hired=tHiredN(c),s=v41FitCount(c),days=v41TDays(c);
+ const when=!Number.isFinite(days)?"":days>1?`starts in ${days} days`:days===1?"starts tomorrow":days===0?"starts today":"started";
+ return`<li class="v41row${more?" v47more":""}" data-call="${esc(c.id)}"${hide?' style="display:none"':""}><a class="v41row-m" href="${href("tcall",c.id)}"><b>${esc(c.title)}</b><small>${esc(c.loc||"")}${c.state?", "+esc(c.state):""} · ${tMoney(c.rate)}/hr + ${tMoney(c.perDiem)}/day${when?" · "+when:""}${c.status!=="open"?" · "+(c.status==="filled"?"filled":"closed"):""}</small></a>
+ <span class="v41meter" role="img" aria-label="${hired} of ${c.need} hired"><i style="--f:${Math.min(100,Math.round(hired/Math.max(1,c.need)*100))}%"></i><span><b>${hired}</b>/${c.need} hired</span></span>
+ <span class="v41apps">${s.of?`<b>${s.of}</b> active · <b class="${s.n?"v41g":""}">${s.n}</b> fit`:`<span class="muted">No active applicants</span>`}</span>
+ <a class="btn sm" href="${href("tdash",null,{call:c.id})}">${I("users",14)}Pipeline</a></li>`}
+if(typeof v41DashBlock==="function"){const db0=v41DashBlock;v41DashBlock=function(m){try{const calls=v41MyCalls(m);if(calls.length<=4)return db0.apply(this,arguments);
+  const dd=c=>{const d=v41TDays(c);return Number.isFinite(d)?d:1e6};
+  const sorted=calls.slice().sort((a,b)=>(a.status==="open"?0:1)-(b.status==="open"?0:1)||dd(a)-dd(b)||String(a.start||"").localeCompare(String(b.start||"")));
+  const open=sorted.filter(c=>c.status==="open"),act=open.reduce((a,c)=>a+v41FitCount(c).of,0),n=sorted.length-4;
+  return`<section class="v41calls" id="v41calls"><div class="ud-h"><h2>Your traveler calls</h2><a href="${href("newtravel")}">${I("plus",14)}Post a call</a></div><div class="card v41list"><p class="small muted v41lead">${open.length} open call${open.length===1?"":"s"} · ${act} active applicant${act===1?"":"s"} to review. Fit = license (or reciprocity) for the call's state and free by the start date.</p><ul id="v47callul">${sorted.map((c,i)=>v47CallRow(c,i>=4,i>=4&&!V47_CALLS_OPEN)).join("")}</ul><p class="small v47callsmore"><button type="button" class="linkbtn small" data-v47calls="1" aria-expanded="${V47_CALLS_OPEN}" aria-controls="v47callul">${V47_CALLS_OPEN?"Show fewer calls":`Show ${n} more call${n===1?"":"s"}`}</button> · <a class="small" href="${href("tdash")}">All ${sorted.length} calls in the pipeline</a></p></div></section>`}catch(e){return db0.apply(this,arguments)}}}
+if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("click",e=>{const b=e.target&&e.target.closest&&e.target.closest("[data-v47calls]");if(!b)return;e.preventDefault();
+ const open=b.getAttribute("aria-expanded")!=="true",sec=b.closest(".v41calls");if(!sec)return;const rows=sec.querySelectorAll(".v47more");rows.forEach(r=>r.style.display=open?"":"none");
+ V47_CALLS_OPEN=open;b.setAttribute("aria-expanded",open?"true":"false");b.textContent=open?"Show fewer calls":`Show ${rows.length} more call${rows.length===1?"":"s"}`;if(open&&rows[0]){const a=rows[0].querySelector("a");a&&a.focus({preventScroll:false})}});
+
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};
