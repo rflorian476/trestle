@@ -1,0 +1,36 @@
+/* ===== v46 ===== */
+/* Bills to pay (Office -> Expenses & mileage) */
+.ap46{margin-bottom:18px}
+.ap46-lead{margin:-4px 0 12px;line-height:1.5}
+.ap46-k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 14px}
+.ap46-k>div{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ap46-k span{font-size:12.5px;color:var(--muted);font-weight:600}
+.ap46-k b{font-size:18px;color:var(--ink);letter-spacing:-.01em}
+.ap46-k small{font-size:12px;color:var(--muted)}
+.ap46-k .ap46-kbad{background:#FBEDEA;border-color:#EBC3BA}
+.ap46-k .ap46-kbad b{color:#9A2A17}
+.ap46-rep{display:flex;gap:8px;align-items:center;min-height:44px;font-size:14px;flex:0 0 auto}
+.ap46-rep input{width:20px;height:20px;accent-color:#0F2A44}
+.ap46-l{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ap46-r{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:6px 14px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.ap46-r:first-child{border-top:0}
+.ap46-m{display:flex;flex-direction:column;min-width:0}
+.ap46-m b{overflow-wrap:anywhere}
+.ap46-m small{font-size:12.5px;overflow-wrap:anywhere}
+.ap46-w{font-size:13px;font-weight:600;color:#33405A;white-space:nowrap}
+.ap46-w.ap46-warn{color:#8A5A00}
+.ap46-w.ap46-bad{color:#9A2A17}
+.ap46-a{font-size:15px;white-space:nowrap}
+.ap46-b{display:flex;gap:6px;align-items:center}
+.ap46-b .btn{min-height:40px}
+.ap46-b .linkbtn{min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center}
+.ap46-done .ap46-a{color:var(--muted)}
+.ap46-done{grid-template-columns:minmax(0,1fr) auto auto}
+.ap46-none{margin:4px 0 0}
+.ap46-p{margin-top:12px}
+.ap46-p summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center;color:#1F3A68}
+.ap46-x{margin-top:12px}
+@media (max-width:700px){.ap46-k{grid-template-columns:1fr 1fr}.ap46-k>div:last-child{grid-column:1/-1}
+ .ap46-r{grid-template-columns:minmax(0,1fr) auto}.ap46-w{grid-column:1}.ap46-a{grid-column:2;grid-row:1}.ap46-b{grid-column:1/-1}
+ .ap46-done .ap46-b{grid-column:1/-1}}
+@media print{.ap46 .o7-inl,.ap46-b,.ap46-x{display:none!important}}
