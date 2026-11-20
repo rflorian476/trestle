@@ -700,6 +700,10 @@ const server=http.createServer(async(req,res)=>{
   if(m[2]==="callback"){if(req.method==="POST"){if(!/x-www-form-urlencoded/.test(req.headers["content-type"]||""))return htmlPage(res,415,"Bad request","");const o=req.headers.origin;if(o&&o!=="null"&&new URL(o).host!==req.headers.host&&m[1]!=="apple")return htmlPage(res,403,"Blocked","<p>Cross-site form post refused.</p>");return AUTH.oauthCallback(req,res,m[1],url,await formBody(req))}return AUTH.oauthCallback(req,res,m[1],url,null)}
   return htmlPage(res,405,"Method not allowed","")}}
  if(!p.startsWith("/api/")){
+  // v46 (SW-107): hire slugs are lowercase. /hire/Plumbing/Austin-TX (or /HIRE/...) 301s to the canonical lowercase page
+  // when that page exists, keeping the query string. Anything that still doesn't parse falls through to the real 404.
+  if((req.method==="GET"||req.method==="HEAD")&&/^\/hire(\/|$)/i.test(p)&&/[A-Z]/.test(p)){const hp=p.toLowerCase().replace(/^\/hire\/?/,"").split("/").filter(Boolean).join("/");let parse=null;try{parse=vm.runInContext("h45Parse",ctx)}catch(e){}
+   let okp=false;try{okp=!!(parse&&parse(hp))}catch(e){}if(okp&&/^[a-z0-9/-]*$/.test(hp)){res.writeHead(301,{Location:"/hire"+(hp?"/"+hp:"")+(url.search||""),"Cache-Control":"public, max-age=3600"});return res.end()}}
   if(req.method==="GET"){const v=viewRoute(p);
    // v22: /pro/<id> is the same profile as /p/<id> (title, description, cover prerender, slim state); canonical stays /p/<id>
    if(v==="pro"){const pm=/^\/pro\/([A-Za-z0-9_-]{1,40})\/?$/.exec(p);if(pm){const html=SEO_PAGE(req,"p",pm[1]);if(html)return sendHtml(res,req,200,html)}}
@@ -709,7 +713,7 @@ const server=http.createServer(async(req,res)=>{
    // v27: a signed-in pro opening /join goes to the dashboard setup flow, not a second (blank) signup wizard
    if(v==="join"){const su=sessionUid(req);const su_=su&&(DB().users||[]).find(x=>x.id===su);if(su_&&su_.role==="contractor"){res.writeHead(302,{Location:"/dash?setup=1","Cache-Control":"no-store"});return res.end()}}
    // v45: trade + city pages (/hire/<trade>/<city>), prerendered, with structured data once indexing is on
-   if(v==="hire"){const hp=p.replace(/^\/hire\/?/,"").replace(/\/$/,"");const H=SEO45.hire(req,hp);if(!H)return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/hire\">Browse pros by trade and city</a></p>");
+   if(v==="hire"){const hp=p.replace(/^\/hire\/?/,"").replace(/\/$/,"");const H=SEO45.hire(req,hp);if(!H){res.setHeader("X-Robots-Tag","noindex, nofollow");return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\"/hire\">Browse pros by trade and city</a></p>");}
     if(H.noindex)res.setHeader("X-Robots-Tag","noindex, nofollow");const html=withMeta(req,{title:H.title,desc:H.desc,path:"/hire"+(hp?"/"+hp:""),noindex:H.noindex,ld:H.ld,img:H.img});return sendHtml(res,req,200,preHire(req,html,hp))}
    if(v&&PRIV_V45.has(v))res.setHeader("X-Robots-Tag","noindex, nofollow");
    if(v){const mm=VIEW_META[v];let html=withMeta(req,{title:TITLE(v,(/^\/[a-z0-9]{2,20}\/([^/?]{1,120})/.exec(p)||[])[1]||null),desc:mm?mm[1]:"Find trusted local contractors. Free for customers. Pros pay a flat $20/mo with no lead fees.",path:p.replace(/\/$/,""),noindex:pathDemo(p)||PRIV_V45.has(v),ld:SEO45.view(req,v,p)});
