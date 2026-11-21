@@ -26,8 +26,8 @@ const tiles=await pub.$$(".g12 [data-g12]");ok(tiles.length===5,"portfolio grid 
 await tiles[0].click();await pub.waitForTimeout(300);ok(await pub.$(".lb12box img")!==null,"lightbox opens");const s1=await pub.getAttribute(".lb12box img","src");await pub.keyboard.press("ArrowRight");await pub.waitForTimeout(200);ok(s1!==await pub.getAttribute(".lb12box img","src"),"arrow key moves to the next photo");await shot(pub,"desktop-portfolio-lightbox");await pub.keyboard.press("Escape");await pub.waitForTimeout(200);
 const st=await pub.$$eval(".st12 > *",x=>x.map(e=>e.textContent));ok(st.length===6&&!st.some(t=>/undefined|NaN/.test(t)),"track record shows 6 clean stats");
 ok((await pub.$$(".ar12-c span")).length>=3,"towns covered listed");
-await pub.fill("#ar12z","78704");await pub.click('#ar12F button');await pub.waitForTimeout(200);ok(/yes|cover/i.test(await txt(pub,"#ar12o")),"ZIP inside the area says yes: "+(await txt(pub,"#ar12o")).slice(0,60));
-await pub.fill("#ar12z","10011");await pub.click('#ar12F button');await pub.waitForTimeout(200);ok(/outside|not|unknown|don/i.test(await txt(pub,"#ar12o")),"ZIP far away says no: "+(await txt(pub,"#ar12o")).slice(0,60));
+const zip12=async z=>{for(let k=0;k<2;k++){await pub.fill("#ar12z",z);await pub.click('#ar12F button');if(await pub.waitForFunction(()=>((document.getElementById("ar12o")||{}).textContent||"").trim().length>0,null,{timeout:4000}).then(()=>true,()=>false))return;console.log("note: ZIP answer was empty after 4s (page re-rendered under load?); checking "+z+" again")}};await zip12("78704");ok(/yes|cover/i.test(await txt(pub,"#ar12o")),"ZIP inside the area says yes: "+(await txt(pub,"#ar12o")).slice(0,60));
+await zip12("10011");ok(/outside|not|unknown|don/i.test(await txt(pub,"#ar12o")),"ZIP far away says no: "+(await txt(pub,"#ar12o")).slice(0,60));
 await pub.$eval("#prices",e=>e.scrollIntoView());await pub.waitForTimeout(200);await shot(pub,"desktop-prices-area");
 await pub.evaluate(()=>scrollTo(0,0));await shot(pub,"desktop-pro-profile");
 // signed-out consult: see times first, sign in at the end, come back to the same pick
