@@ -90,7 +90,8 @@ if(typeof document!=="undefined"){
  function v48Url(b){return location.origin+"/i/"+b.tk48}
  function v48Card(b){const kind=v48Kind(b),first=String(b.cname||"").split(/\s+/)[0]||"there";
   if(b.status==="draft")return`<b>${I("share",15)} Customer link</b><p class="muted small">${esc(b.cname)} has no __BRAND__ account yet. Send the ${kind} first, then text or email them a private link that opens without signing in.</p>`;
-  if(b.status==="void")return`<b>${I("share",15)} Customer link off</b><p class="muted small">A void ${kind} doesn't open from its link.</p>`;
+  /* v49 (QA v48 idea 3): a void bill's link still opens it, marked void with no Pay/Approve, so the card says so and can turn it off */
+  if(b.status==="void")return v48Ok(b)?`<b>${I("share",15)} Customer link still on</b><p class="muted small i49-void">This ${kind} is void, but anyone who has the link can still open it, marked void with no ${b.type==="inv"?"Pay":"Approve"} button. Turn off this link to hide it.</p><div class="row wrapr"><a class="btn sm ghost" href="/i/${esc(b.tk48)}" target="_blank" rel="noopener noreferrer">${I("out",14)}Preview</a><button class="btn sm" id="i49Off">Turn off this link</button></div>`:`<b>${I("share",15)} Customer link off</b><p class="muted small">Nobody can open this void ${kind} from a link.</p>`;
   if(!v48Ok(b))return`<b>${I("share",15)} Customer link</b><p class="muted small">${esc(b.cname)} has no __BRAND__ account yet. Get a private link that opens this ${kind} without signing in.</p><button class="btn sm primary" id="i48Make">${I("share",14)}Get customer link</button>`;
   const u=v48Url(b),c=billCalc(b),amt=b.type==="inv"?v7$(c.bal>0?c.bal:c.total):v7$(c.total);
   const msg=`Hi ${first}, here's ${kind} ${b.no} from ${b.bizName} for ${amt}${b.type==="inv"&&b.due&&c.bal>0?", due "+fmtD(b.due):""}: ${u}`;
@@ -98,12 +99,14 @@ if(typeof document!=="undefined"){
   return`<b>${I("share",15)} Customer link</b><p class="muted small">Opens this ${kind} without signing in. ${esc(b.cname)} pays or approves with a free account, and it moves into their account.</p>
   <div class="i48-link"><label class="sr-only" for="i48Url">Customer link</label><input id="i48Url" readonly value="${esc(u)}"><button class="btn sm" id="i48Copy">${I("copy",14)}Copy</button></div>
   <div class="row wrapr i48-send"><a class="btn sm" id="i48Sms" href="sms:${esc(ph)}?&body=${encodeURIComponent(msg)}">${I("chat",14)}Text it</a><a class="btn sm" id="i48Mail" href="mailto:${esc(encodeURIComponent(em).replace(/%40/g,"@"))}?subject=${encodeURIComponent(v48Name(b)+" "+b.no+" from "+b.bizName)}&body=${encodeURIComponent(msg)}">${I("mail",14)}Email it</a><a class="btn sm ghost" href="/i/${esc(b.tk48)}" target="_blank" rel="noopener noreferrer">${I("out",14)}Preview</a></div>
-  <p class="muted small i48-seen">${b.viewed?I("check",13)+" Opened by "+esc(first)+" "+ago(b.viewed):"Not opened yet."} <button class="linkbtn" id="i48Reset">Turn off this link and make a new one</button></p>`}
+  <p class="muted small i48-seen">${b.viewed?I("check",13)+" Opened by "+esc(first)+" "+ago(b.viewed):"Not opened yet."} <button class="linkbtn" id="i48Reset">Turn off this link and make a new one</button></p>
+  <p class="muted small i49-vnote">If you void this ${kind}, anyone who has the link can still open it, marked void with no ${b.type==="inv"?"Pay":"Approve"} button. Turn off this link to hide it.</p>`}
  {const oa=AFTER.invoice;AFTER.invoice=function(id){const r=oa&&oa.apply(this,arguments);try{const m=me(),b=v7Bill(id);if(!m||!b||b.by!==m.id||b.cuid)return r;
   const old=document.getElementById("bCopy");const card=old&&old.closest(".o7-tip");if(!card)return r;card.classList.add("i48-card");card.innerHTML=v48Card(b);
   const $=s=>document.getElementById(s),R=()=>{const y=scrollY;render();scrollTo(0,y)};
   if($("i48Make"))$("i48Make").onclick=()=>act(A.link48(id,false),R);
   if($("i48Reset"))$("i48Reset").onclick=()=>{if(confirm("Turn off the current link? Anyone who has it, including "+b.cname+", won't be able to open this "+v48Kind(b)+" until you send the new one."))act(A.link48(id,true),R)};
   if($("i48Copy"))$("i48Copy").onclick=()=>{const u=$("i48Url").value;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast("Link copied"),()=>{$("i48Url").select();toast("Press and hold to copy the link")})};
-  if($("i48Url"))$("i48Url").onfocus=e=>e.target.select()}catch(e){}return r}}
+  if($("i48Url"))$("i48Url").onfocus=e=>e.target.select();
+  if($("i49Off"))$("i49Off").onclick=()=>{if(confirm("Turn off this link? Nobody, including "+b.cname+", will be able to open this void "+v48Kind(b)+" from it."))act(A.off49(id),R)}}catch(e){}return r}}
 }
