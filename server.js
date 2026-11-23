@@ -715,6 +715,11 @@ const server=http.createServer(async(req,res)=>{
   return callGone48(res)}}
  // /traveling is the old address of the traveling-electricians guide, which now lives at /travel?tab=how (canonical /travel).
  if(req.method==="GET"&&/^\/traveling\/?$/.test(p)){const q=new URLSearchParams(url.search);if(!q.has("tab"))q.set("tab","how");res.writeHead(301,{Location:"/travel?"+q.toString(),"Cache-Control":"public, max-age=3600"});return res.end()}
+ // v49 (QA v48 idea 2): extra path segments on the traveling guide and the other one-page views (/traveling/<x>,
+ // e.g. an encoded //evil.com, /travel/<x>, /faq/<x>, /pricing/<x>, /about/<x>, /pros/<x>, /prices/<x>) are a real noindex
+ // 404 like /tcall/<id>/extra, never a 200 copy of the page and never a redirect. None of these pages takes a sub-path.
+ {const xm=/^\/(traveling|travel|faq|pricing|about|pros|prices)\/./.exec(p);if(req.method==="GET"&&xm){const home=xm[1]==="traveling"?"/travel?tab=how":"/"+xm[1];
+  return htmlPage(res,404,"Page not found","<p>That page doesn't exist. <a href=\""+home+"\">Go to "+(xm[1]==="traveling"?"the traveling electricians guide":"the "+xm[1]+" page")+"</a></p>",{desc:"That Sawyer page doesn't exist. The address may have a typo or extra characters at the end."})}}
  // v48: customer links. /i/<token> opens one invoice / estimate / change order without signing in (the guest copy from
  // v48View in the app sandbox: no customer ids, reminders, recurring setup or private line costs). Never indexed or cached,
  // and the token never leaves in a Referer. Unknown, turned-off, draft and malformed tokens are the same 404.
