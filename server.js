@@ -873,7 +873,8 @@ const server=http.createServer(async(req,res)=>{
   if(name==="modVerify19"){const me_=DB().users.find(u=>u.id===uid);if(!me_||!me_.staff)return send(res,403,{error:"Trust team only",res:{ok:false,msg:"Trust team only"},state:snapshot(uid)})}
   // v48: customer-link tokens come from the server's CSPRNG only; whatever the browser sent in that slot is replaced.
   if(name==="link48"){args.length=2;args[1]=args[1]===true;args[2]=crypto.randomBytes(18).toString("base64url")}
-  if(name==="off49")args.length=1;  if(name==="sendBill"){args.length=1;args[1]=crypto.randomBytes(18).toString("base64url")}
+  if(name==="off49")args.length=1;if(name==="remindBill"){args.length=2;if(args[1]!=="sms"&&args[1]!=="email")args[1]=null}
+  if(name==="sendBill"){args.length=1;args[1]=crypto.randomBytes(18).toString("base64url")}
   if(name==="claim48"){args.length=1;args[0]=String(args[0]||"").slice(0,40);if(limited("claim48:"+uid,20,3600e3))return send(res,429,{error:"Too many tries. Try again later.",res:{ok:false,msg:"Too many tries. Try again later."},state:snapshot(uid)})}
   stripPriv(args);
   {const lim=LIMITS.check(name,args);if(lim)return send(res,400,{error:lim.msg,field:lim.field,max:lim.max,res:{ok:false,msg:lim.msg},state:snapshot(uid)})}

@@ -1,3 +1,7 @@
-/* v49: customer link card notes */
+/* v49: customer link card notes, reminders for customers without an account */
 .i49-vnote{margin-top:8px;line-height:1.45}
 .i49-void{margin:6px 0 10px;line-height:1.45}
+.i49-rem{margin-top:12px;padding-top:12px;border-top:1px solid #E4E0D6}
+.i49-rem>b{display:flex;gap:6px;align-items:center}
+.i49-rem p{margin:4px 0 8px;line-height:1.45}
+.i49-rem .row{gap:8px}

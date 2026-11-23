@@ -2520,8 +2520,10 @@ function v9Sweep(m){if(!m)return 0;let n=0;const today=v7Today();
    if(b.rec9.auto){nb.status="sent";nb.sent=Date.now();if(nb.cuid)notify(nb.cuid,`${nb.bizName} sent you invoice ${nb.no} for ${v7$(billCalc(nb).total)} (${V9EVERY[b.rec9.every][0].toLowerCase()} billing)`,"bill:"+nb.id)}
    notify(m.id,`Recurring invoice ${nb.no} for ${nb.cname} ${b.rec9.auto?"was sent":"is ready to review"}`,"bill:"+nb.id);n++}});
   if(m.autoRem9)(DB.bills||[]).filter(b=>b.by===m.id&&b.type==="inv"&&b.status!=="draft"&&b.status!=="void"&&b.due).forEach(b=>{const c=billCalc(b);if(c.bal<=0.004)return;const late=-v7DaysTo(b.due);
-   const step=[14,7,1].find(d=>late>=d);if(!step)return;b.autoRem9=b.autoRem9||[];if(b.autoRem9.includes(step))return;b.autoRem9.push(step);b.reminders=(b.reminders||[]).concat(Date.now());
-   if(b.cuid)notify(b.cuid,`Friendly reminder from ${b.bizName}: invoice ${b.no} has ${v7$(c.bal)} due (was due ${fmtD(b.due)})`,"bill:"+b.id);n++})}
+   const step=[14,7,1].find(d=>late>=d);if(!step)return;b.autoRem9=b.autoRem9||[];if(b.autoRem9.includes(step))return;b.autoRem9.push(step);
+   /* v49: a customer without an account can't get the nudge, so it isn't logged as sent; the pro is told instead (with the customer link card on the invoice) */
+   if(b.cuid){b.reminders=(b.reminders||[]).concat(Date.now());notify(b.cuid,`Friendly reminder from ${b.bizName}: invoice ${b.no} has ${v7$(c.bal)} due (was due ${fmtD(b.due)})`,"bill:"+b.id)}
+   else if(!b.demo)notify(m.id,`${b.no} for ${b.cname} is ${late} day${late===1?"":"s"} overdue. They have no Sawyer account, so text or email them a reminder from the invoice.`,"bill:"+b.id);n++})}
  (DB.bdocs||[]).filter(d=>d.by===m.id&&d.exp).forEach(d=>{const left=v7DaysTo(d.exp);const step=[0,7,30,60].find(x=>left<=x);if(step==null)return;d.rem9=d.rem9||[];if(d.rem9.includes(step))return;d.rem9.push(step);
   const nm=d.name||((d.scope==="biz"?BIZ_KINDS:WALLET_KINDS).find(k=>k[0]===d.kind)||[,"Document"])[1];
   const badge=d.scope==="biz"&&["license","gl"].includes(d.kind),permit=/permit/.test(String(d.kind))||/permit/i.test(nm);/* v16: only a license or liability policy affects the badge */
@@ -2575,7 +2577,7 @@ if(typeof OTABS!=="undefined"&&!OTABS.some(t=>t[0]==="recurring"))OTABS.splice(2
 {const os=oStart;oStart=function(m){const h=os(m);return /You're set up/.test(h)?"":h}}
 function oRecurring(m){const rs=v7Mine("bills",m).filter(b=>b.type==="inv"&&b.rec9&&b.rec9.on);const mo=rs.reduce((a,b)=>a+billCalc(b).total*(b.rec9.every==="week"?52/12:b.rec9.every==="quarter"?1/3:1),0);
  const cand=v7Mine("bills",m).filter(b=>b.type==="inv"&&!(b.rec9&&b.rec9.on)&&b.status!=="void").sort((a,b)=>b.date-a.date).slice(0,4);
- return`<div class="o9-g"><div class="card o9-auto"><div class="o9-auto-h"><span class="o9-ic">${I("bell",20)}</span><div><h2>Auto payment reminders</h2><p class="muted small">A polite, branded nudge goes to the customer 1, 7 and 14 days after the due date. It stops the moment they pay. No awkward calls.</p></div><label class="t5switch"><input type="checkbox" id="o9Auto" role="switch" aria-label="Auto payment reminders" ${m.autoRem9?"checked":""}><span></span></label></div>
+ return`<div class="o9-g"><div class="card o9-auto"><div class="o9-auto-h"><span class="o9-ic">${I("bell",20)}</span><div><h2>Auto payment reminders</h2><p class="muted small">A polite, branded nudge goes to the customer 1, 7 and 14 days after the due date. It stops the moment they pay. No awkward calls. Customers without a Sawyer account can't get it, so we tell you and you text or email theirs from the invoice.</p></div><label class="t5switch"><input type="checkbox" id="o9Auto" role="switch" aria-label="Auto payment reminders" ${m.autoRem9?"checked":""}><span></span></label></div>
   <ol class="o9-steps" aria-label="Reminder schedule"><li><b>Day 1</b><small>"Just a heads-up, ${esc(m.biz||nameOf(m))} invoice is due."</small></li><li><b>Day 7</b><small>Reminder with a one-tap pay link</small></li><li><b>Day 14</b><small>Final friendly reminder, then it's your call</small></li></ol></div>
   <div class="card o9-kpi"><span class="o9-ic">${I("repeat",20)}</span><b>${v7$0(mo)}</b><small>Recurring revenue per month</small><em>${rs.length} repeating invoice${rs.length===1?"":"s"}</em></div></div>
   <div class="card"><div class="o7-sh"><h2>Repeating invoices</h2><span class="muted small">Maintenance plans, retainers, monthly service</span></div>${rs.length?`<div class="o7-tw"><table class="o7t"><thead><tr><th>Customer</th><th>How often</th><th class="hide-s">Next one</th><th class="num">Amount</th><th>Sends</th><th></th></tr></thead><tbody>${rs.map(b=>`<tr><td><a href="${href("invoice",b.id)}"><b>${esc(b.cname)}</b></a><small class="muted">${esc(b.title)} · from ${esc(b.no)}</small></td><td>${V9EVERY[b.rec9.every][0]}<small class="muted">${b.rec9.count||0} sent so far</small></td><td class="hide-s">${fmtD(b.rec9.next)}</td><td class="num">${v7$(billCalc(b).total)}</td><td>${b.rec9.auto?'<span class="b7 b7-good">Automatically</span>':'<span class="b7 b7-blue">Draft first</span>'}</td><td><button class="btn sm ghost" data-recoff="${b.id}">Stop</button></td></tr>`).join("")}</tbody></table></div>`:empty("repeat","No repeating invoices yet","Open any invoice and choose Repeat. Great for maintenance plans and monthly service.")}
@@ -6840,7 +6842,7 @@ if(typeof document!=="undefined"){
   <div class="i48-link"><label class="sr-only" for="i48Url">Customer link</label><input id="i48Url" readonly value="${esc(u)}"><button class="btn sm" id="i48Copy">${I("copy",14)}Copy</button></div>
   <div class="row wrapr i48-send"><a class="btn sm" id="i48Sms" href="sms:${esc(ph)}?&body=${encodeURIComponent(msg)}">${I("chat",14)}Text it</a><a class="btn sm" id="i48Mail" href="mailto:${esc(encodeURIComponent(em).replace(/%40/g,"@"))}?subject=${encodeURIComponent(v48Name(b)+" "+b.no+" from "+b.bizName)}&body=${encodeURIComponent(msg)}">${I("mail",14)}Email it</a><a class="btn sm ghost" href="/i/${esc(b.tk48)}" target="_blank" rel="noopener noreferrer">${I("out",14)}Preview</a></div>
   <p class="muted small i48-seen">${b.viewed?I("check",13)+" Opened by "+esc(first)+" "+ago(b.viewed):"Not opened yet."} <button class="linkbtn" id="i48Reset">Turn off this link and make a new one</button></p>
-  <p class="muted small i49-vnote">If you void this ${kind}, anyone who has the link can still open it, marked void with no ${b.type==="inv"?"Pay":"Approve"} button. Turn off this link to hide it.</p>`}
+  <p class="muted small i49-vnote">If you void this ${kind}, anyone who has the link can still open it, marked void with no ${b.type==="inv"?"Pay":"Approve"} button. Turn off this link to hide it.</p>${typeof v49Rem==="function"?v49Rem(b,u,first):""}`}
  {const oa=AFTER.invoice;AFTER.invoice=function(id){const r=oa&&oa.apply(this,arguments);try{const m=me(),b=v7Bill(id);if(!m||!b||b.by!==m.id||b.cuid)return r;
   const old=document.getElementById("bCopy");const card=old&&old.closest(".o7-tip");if(!card)return r;card.classList.add("i48-card");card.innerHTML=v48Card(b);
   const $=s=>document.getElementById(s),R=()=>{const y=scrollY;render();scrollTo(0,y)};
@@ -6848,7 +6850,8 @@ if(typeof document!=="undefined"){
   if($("i48Reset"))$("i48Reset").onclick=()=>{if(confirm("Turn off the current link? Anyone who has it, including "+b.cname+", won't be able to open this "+v48Kind(b)+" until you send the new one."))act(A.link48(id,true),R)};
   if($("i48Copy"))$("i48Copy").onclick=()=>{const u=$("i48Url").value;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast("Link copied"),()=>{$("i48Url").select();toast("Press and hold to copy the link")})};
   if($("i48Url"))$("i48Url").onfocus=e=>e.target.select();
-  if($("i49Off"))$("i49Off").onclick=()=>{if(confirm("Turn off this link? Nobody, including "+b.cname+", will be able to open this void "+v48Kind(b)+" from it."))act(A.off49(id),R)}}catch(e){}return r}}
+  if($("i49Off"))$("i49Off").onclick=()=>{if(confirm("Turn off this link? Nobody, including "+b.cname+", will be able to open this void "+v48Kind(b)+" from it."))act(A.off49(id),R)};
+  if(typeof v49RemWire==="function")v49RemWire(b,R,arguments[1])}catch(e){}return r}}
 }
 
 /* ===================== v49 ===================== */
@@ -6861,6 +6864,32 @@ A.off49=function(id){const m=me();if(!m)return{ok:false,need:"login",msg:"Sign i
  if(!v48Ok(b))return{ok:true,msg:"This link is already off"};
  delete b.tk48;delete b.tk48b;delete b.tk48at;save();return{ok:true,msg:"Link turned off. It doesn't open this "+v48Kind(b)+" anymore."}};
 
+/* (2) Reminders that reach customers without an account. Before v49, Send reminder on an invoice for a customer with no
+   Sawyer account said "Reminder sent", but the in-app nudge had nobody to go to. Now that every such invoice has a
+   customer link (v48), the Customer link card has a Payment reminder with Text reminder / Email reminder: the pro's own
+   messages or mail app opens with a short, friendly note, the balance, the due date and the link (nothing is sent by
+   Sawyer). Tapping one logs the reminder on the invoice's timeline. remindBill without a channel is refused for these
+   customers with an honest message, and the auto-reminder sweep tells the pro instead of logging a nudge nobody got. */
+{const or=A.remindBill;A.remindBill=function(id,via){const m=me(),b=v7Bill(id);
+ if(m&&b&&b.by===m.id&&b.type==="inv"&&!b.cuid&&b.status!=="draft"&&b.status!=="void"&&billCalc(b).bal>0){
+  if(via!=="sms"&&via!=="email")return{ok:false,msg:b.cname+" has no Sawyer account, so Sawyer can't deliver a reminder. Open "+b.no+" and text or email one from the Customer link card."};
+  if(!v48Ok(b))return{ok:false,msg:"Get the customer link on "+b.no+" first, then text or email the reminder."};
+  const app=via==="sms"?"messages":"email",last=(b.reminders||[]).slice(-1)[0];
+  if(last&&Date.now()-last<20*36e5)return{ok:true,msg:"Reminder ready in your "+app+" app. One is already logged today."};
+  const r=or.call(this,id);if(r&&r.ok)r.msg="Reminder logged. Send it from your "+app+" app.";return r}
+ return or.apply(this,arguments)}}
+function v49Rem(b,u,first){if(b.type!=="inv"||b.status==="draft"||b.status==="void")return"";const c=billCalc(b);if(c.bal<=0)return"";
+ const late=!!b.due&&v7DaysTo(b.due)<0,last=(b.reminders||[]).slice(-1)[0],cu=v7Cust(b.cust)||{},ph=String(cu.phone||"").replace(/[^\d+]/g,""),em=cu.email||"";
+ const msg=`Hi ${first}, a friendly reminder from ${b.bizName}: invoice ${b.no} has ${v7$(c.bal)} due${b.due?(late?" (it was due "+fmtD(b.due)+")":" by "+fmtD(b.due)):""}. You can see it and pay here: ${u}`;
+ return`<div class="i49-rem" id="i49Rem"><b>${I("bell",14)} ${late?"Overdue: send a reminder":"Payment reminder"}</b><p class="muted small">${esc(first)} has no Sawyer account, so Sawyer can't deliver a reminder. Text or email this one from your phone. It has the link.${last?" Last reminder "+ago(last)+".":""}</p>
+  <div class="row wrapr"><a class="btn sm${late?" primary":""}" id="i49Sms" data-via="sms" href="sms:${esc(ph)}?&body=${encodeURIComponent(msg)}">${I("chat",14)}Text reminder</a><a class="btn sm" id="i49Mail" data-via="email" href="mailto:${esc(encodeURIComponent(em).replace(/%40/g,"@"))}?subject=${encodeURIComponent("Reminder: invoice "+b.no+" from "+b.bizName)}&body=${encodeURIComponent(msg)}">${I("mail",14)}Email reminder</a></div></div>`}
+function v49RemWire(b,R,q){const $=s=>document.getElementById(s),card=document.querySelector(".i48-card");
+ document.querySelectorAll("#i49Rem [data-via]").forEach(a=>a.addEventListener("click",()=>act(A.remindBill(b.id,a.dataset.via),R)));
+ const show=()=>{if(!card)return;card.scrollIntoView({block:"center"});const f=$("i49Sms")||$("i48Make");if(f)f.focus()};
+ if($("bRemind")&&!b.cuid)$("bRemind").onclick=show;
+ if(q&&q.rem==="1")setTimeout(show,0)}
+/* the Office overview's "Send reminder" on an overdue invoice for a customer without an account opens that card */
+{const oo=AFTER.office;AFTER.office=function(){const r=oo&&oo.apply(this,arguments);try{document.querySelectorAll("[data-remind]").forEach(x=>{const b=v7Bill(x.dataset.remind);if(b&&!b.cuid)x.onclick=()=>go("invoice",b.id,{rem:"1"})})}catch(e){}return r}}
 
 boot();
 ;globalThis.__api={get DB(){return DB},set DB(v){DB=v},A,seed,KEY,VIEWS};

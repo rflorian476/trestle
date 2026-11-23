@@ -100,7 +100,7 @@ if(typeof document!=="undefined"){
   <div class="i48-link"><label class="sr-only" for="i48Url">Customer link</label><input id="i48Url" readonly value="${esc(u)}"><button class="btn sm" id="i48Copy">${I("copy",14)}Copy</button></div>
   <div class="row wrapr i48-send"><a class="btn sm" id="i48Sms" href="sms:${esc(ph)}?&body=${encodeURIComponent(msg)}">${I("chat",14)}Text it</a><a class="btn sm" id="i48Mail" href="mailto:${esc(encodeURIComponent(em).replace(/%40/g,"@"))}?subject=${encodeURIComponent(v48Name(b)+" "+b.no+" from "+b.bizName)}&body=${encodeURIComponent(msg)}">${I("mail",14)}Email it</a><a class="btn sm ghost" href="/i/${esc(b.tk48)}" target="_blank" rel="noopener noreferrer">${I("out",14)}Preview</a></div>
   <p class="muted small i48-seen">${b.viewed?I("check",13)+" Opened by "+esc(first)+" "+ago(b.viewed):"Not opened yet."} <button class="linkbtn" id="i48Reset">Turn off this link and make a new one</button></p>
-  <p class="muted small i49-vnote">If you void this ${kind}, anyone who has the link can still open it, marked void with no ${b.type==="inv"?"Pay":"Approve"} button. Turn off this link to hide it.</p>`}
+  <p class="muted small i49-vnote">If you void this ${kind}, anyone who has the link can still open it, marked void with no ${b.type==="inv"?"Pay":"Approve"} button. Turn off this link to hide it.</p>${typeof v49Rem==="function"?v49Rem(b,u,first):""}`}
  {const oa=AFTER.invoice;AFTER.invoice=function(id){const r=oa&&oa.apply(this,arguments);try{const m=me(),b=v7Bill(id);if(!m||!b||b.by!==m.id||b.cuid)return r;
   const old=document.getElementById("bCopy");const card=old&&old.closest(".o7-tip");if(!card)return r;card.classList.add("i48-card");card.innerHTML=v48Card(b);
   const $=s=>document.getElementById(s),R=()=>{const y=scrollY;render();scrollTo(0,y)};
@@ -108,5 +108,6 @@ if(typeof document!=="undefined"){
   if($("i48Reset"))$("i48Reset").onclick=()=>{if(confirm("Turn off the current link? Anyone who has it, including "+b.cname+", won't be able to open this "+v48Kind(b)+" until you send the new one."))act(A.link48(id,true),R)};
   if($("i48Copy"))$("i48Copy").onclick=()=>{const u=$("i48Url").value;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast("Link copied"),()=>{$("i48Url").select();toast("Press and hold to copy the link")})};
   if($("i48Url"))$("i48Url").onfocus=e=>e.target.select();
-  if($("i49Off"))$("i49Off").onclick=()=>{if(confirm("Turn off this link? Nobody, including "+b.cname+", will be able to open this void "+v48Kind(b)+" from it."))act(A.off49(id),R)}}catch(e){}return r}}
+  if($("i49Off"))$("i49Off").onclick=()=>{if(confirm("Turn off this link? Nobody, including "+b.cname+", will be able to open this void "+v48Kind(b)+" from it."))act(A.off49(id),R)};
+  if(typeof v49RemWire==="function")v49RemWire(b,R,arguments[1])}catch(e){}return r}}
 }
