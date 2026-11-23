@@ -1,8 +1,8 @@
-# Sawyer (beta) — v2.31.0
+# Sawyer (beta) — v2.32.0
 
 **Sawyer** is a nationwide contractor marketplace: homeowners hire licensed pros, project managers assemble whole crews, and every review and photo is tied to a finished job.
 
-Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.31.0-sawyer","persistent":false,…}`
+Live: https://trestle-twjo.onrender.com · version check: `GET /healthz` → `{"v":"2.32.0-sawyer","persistent":false,…}`
 
 > **Renaming:** the product name, wordmark, tagline, demo-login domain and DB file name all come from `brand.json` (one line). Old DB files (`toolbelt.db`, `spanwise.db`, `trestle.db`) are migrated automatically on boot.
 
@@ -22,6 +22,15 @@ All demo accounts share the password **`sawyer-demo-2026`**. Every person and bu
 
 Seed data covers Austin, Phoenix/Scottsdale, Tampa, Atlanta, Seattle, Detroit, Minneapolis, Brooklyn, Denver and Chicago.
 
+
+## v49: invoice links that open fast, reminders for customers without an account, tidy 404s
+
+- **Customer links open fast (QA v48 idea 1).** A signed-out `/i/<token>` is now prerendered like `/dash` and `/t/<id>`: the site header and the bill itself (the same `VIEWS.i` the browser runs, from the guest copy `v48View` already inlines plus the public snapshot) are in the first HTML, so the invoice paper, the balance and **Pay** paint before the app JavaScript; app JS is no longer preloaded ahead of it, and the app takes over without moving anything. Mobile Lighthouse on a local production-like run went from 84 (LCP 4.4 s; 95 / 3.0 s on live) to 100 (LCP about 1.1 s). Still `noindex`, `no-store`, `Referrer-Policy: no-referrer` and the hash-based CSP; the prerender has no scripts and leaves out customer ids, emails, reminders, recurring setup and private line costs. Signed-in visitors (including the pro's own Preview) get the normal app page.
+- **Extra path segments are a real 404 (QA v48 idea 2).** `/traveling/<anything>` (e.g. `/traveling/%2F%2Fevil.com`) and the other one-page views (`/travel/…`, `/faq/…`, `/pricing/…`, `/about/…`, `/pros/…`, `/prices/…`) are a noindex 404 like `/tcall/<id>/extra`, never a 200 copy of the page and never a redirect. `/traveling` and `/traveling/` still 301 once to `/travel?tab=how`.
+- **What a voided bill's link shows (QA v48 idea 3).** The **Customer link** card now says that if the pro voids the bill, anyone who has the link can still open it, marked void with no Pay (or Approve) button, and that **Turn off this link** hides it. On a void bill with a live link the card reads **Customer link still on** with **Preview** and **Turn off this link** (new server-allowlisted `off49`: owner only, removes the token, so the old link is the same 404 as an unknown one; a void bill still can't get a new link).
+- **Reminders that reach customers without an account.** Before v49, **Send reminder** on an invoice for a customer with no Sawyer account said "Reminder sent", but the in-app nudge had nobody to go to. Now the Customer link card has a **Payment reminder** ("Overdue: send a reminder" once it's late) with **Text reminder** and **Email reminder**: the pro's own messages or mail app opens with a short, friendly note, the balance, the due date and the customer link (Sawyer sends nothing). Tapping one logs it on the invoice timeline and the card shows "Last reminder 2h ago" (a second channel the same day isn't logged twice). **Send reminder** at the top of the invoice and the Office overview's overdue alert take the pro straight there. `remindBill` without a channel is refused for these customers with an honest message (the server keeps only `sms`/`email`). **Auto payment reminders** no longer log a nudge nobody got: for a customer without an account the pro gets a notice instead ("INV-1005 for Jordan Hale is 9 days overdue. They have no Sawyer account, so text or email them a reminder from the invoice."), once per step, and the card says so. Customers with an account are unchanged.
+- **Size.** `lib/strip-server.js` also drops the server-only reminder sweeps (`v9Sweep`, `lf45Sweep`, `ap46Sweep`) from the browser copy, so app JS is 1,115,895 bytes (v48: 1,116,164) under the 1.12 MB budget; `app-logic.js` keeps them.
+- Tests: `node test/v49-e2e.js [shots dir]` (self-contained, local test mode) is in `test/run-all.sh` (now 47 suites). It covers the version and SW cache, the prerendered guest page (first HTML, JS-off paint, no shift at 390/1300, privacy, headers, CSP, Pay hand-off, estimates, void bills), the 404s in beta and indexing-on mode, the void-link card and `off49` permissions, and the reminders (links, logging, refusals, Office alert, accounts unchanged, the auto-reminder sweep). Version 2.32.0, SW cache `sawyer-v49`.
 
 ## v48: customer links for invoices and estimates, clean traveler-call addresses
 

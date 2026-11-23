@@ -1,6 +1,6 @@
 #!/bin/bash
 # Runs every e2e suite, each against its own fresh server (empty data dir, so suites don't affect each other).
-# Official count is 46: 14 shared-port suites in SUITES, then 32 self-contained suites in the second loop.
+# Official count is 47: 14 shared-port suites in SUITES, then 33 self-contained suites in the second loop.
 # test/shots.js is a screenshot helper, not a suite, and is not in this runner.
 # usage: NODE_PATH=/path/to/node_modules(with playwright) bash test/run-all.sh [port]   -> prints PASS/FAIL per suite
 cd "$(dirname "$0")/.."
@@ -22,7 +22,7 @@ for s in $SUITES; do
 done
 
 # Self-contained suites start their own servers (seo, exposure). bundle-sync (v31) rebuilds from source in a temp dir and diffs the committed bundles. They must not use the shared e2e port.
-for s in bundle-sync seo exposure v20-e2e v21-e2e v22-e2e v23-e2e v24-e2e v25-e2e v26-e2e v27-e2e v28-e2e v29-e2e v30-e2e v31-e2e v32-e2e v33-e2e v34-e2e v35-e2e v36-e2e v37-e2e v38-e2e v39-e2e v40-e2e v41-e2e v42-e2e v43-e2e v44-e2e v45-e2e v46-e2e v47-e2e v48-e2e; do
+for s in bundle-sync seo exposure v20-e2e v21-e2e v22-e2e v23-e2e v24-e2e v25-e2e v26-e2e v27-e2e v28-e2e v29-e2e v30-e2e v31-e2e v32-e2e v33-e2e v34-e2e v35-e2e v36-e2e v37-e2e v38-e2e v39-e2e v40-e2e v41-e2e v42-e2e v43-e2e v44-e2e v45-e2e v46-e2e v47-e2e v48-e2e v49-e2e; do
   [ -f "test/$s.js" ] || continue
   if timeout 180 node "test/$s.js" >"$LOG/$s.log" 2>&1 && ! grep -q "^FAIL" "$LOG/$s.log"; then st=PASS; else st=FAIL; rc=1; fi
   echo "$st $s ($(grep -c -E '^ok |^PASS' "$LOG/$s.log") pass lines, $(grep -c '^FAIL' "$LOG/$s.log") FAIL lines)"
