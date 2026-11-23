@@ -501,6 +501,21 @@ function preCall(req,h,id){if(sessionUid(req)||!PRE_TOP)return h;const body=call
  h=h.replace(/(<link rel="preload" href="\/fonts\/plus-jakarta-sans-800\.woff2"[^>]*>)/,x=>x+FIND_FONTS);
  h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
  return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
+// v49 perf (QA v48 idea 1): a signed-out /i/<token> (customer link) gets the bill itself inside <main> plus the site
+// header, rendered by the same VIEWS.i the browser runs, from the guest copy (v48View: no customer ids, reminders,
+// recurring setup or private line costs) and the public snapshot only. The invoice paper paints before the app JS
+// (mobile Lighthouse was 95 on live, LCP 3.0 s). Never cached: the page is built per request and sent no-store.
+function invHtml(g){if(!g||!api.VIEWS||!api.VIEWS.i)return null;const save=api.DB,had=Object.prototype.hasOwnProperty.call(ctx,"__INV48"),prev=ctx.__INV48;let h=null;
+ try{try{vm.runInContext("V4N={};V4Q=0",ctx)}catch(e){}const s=JSON.parse(JSON.stringify(snapshot(null)));s.me=null;s.theme="light";s.recent=[];api.DB=s;ctx.__INV48=g;
+  const out=String(api.VIEWS.i(g.tok,{})||"");
+  if(out&&!/<script/i.test(out)&&/id="paper"/.test(out))h=prettyHrefs(typeof ctx.IMGSET==="function"?String(ctx.IMGSET(out)):out)}
+ catch(e){h=null}finally{api.DB=save;if(had)ctx.__INV48=prev;else delete ctx.__INV48}return h}
+function preInv(req,h,g){if(sessionUid(req)||!PRE_TOP)return h;const body=invHtml(g);if(!body)return h;
+ const re=/<div class="sk11 wrap" aria-hidden="true">[\s\S]*?<\/div>/;if(!re.test(h))return h;h=noJsPreload(h);
+ // the bill's numbers and headings use the 500-700 weights: load them up front (as on /t/<id>) so a late font swap doesn't re-wrap the paper
+ h=h.replace(/(<link rel="preload" href="\/fonts\/plus-jakarta-sans-800\.woff2"[^>]*>)/,x=>x+FIND_FONTS);
+ h=h.replace('<header class="top" id="top"></header>',()=>PRE_TOP.replace(" on-home",""));
+ return h.replace(re,()=>'<div id="pre11">'+body+'</div>')}
 function pubST(){const n=Date.now();if(n-PUB_ST.t>3000||!PUB_ST.s||PUB_ST.v!==VER)PUB_ST={t:n,s:sj(snapshot(null)),v:VER};return PUB_ST.s}
 // v16 (QA SW-018): a signed-out /p/<id> page inlines only the data that profile needs (the pro, their reviews, quotes,
 // consults, the jobs and crew projects they're part of), about 10 KB instead of the whole
@@ -710,7 +725,7 @@ const server=http.createServer(async(req,res)=>{
   if(!g)return htmlPage(res,404,"This link isn't active","<p>The pro may have turned this link off or sent a newer one. Ask them to send it again.</p><p><a href=\"/\">Go to Sawyer</a></p>",{desc:"This Sawyer link isn't active. Ask the pro who sent it for a new one."});
   const js=JSON.stringify(g).replace(/</g,"\\u003c").replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");
   let html=withMeta(req,{title:g.title+" · "+BRAND.name,desc:g.desc,path:"/i/"+g.tok,noindex:true});html=html.replace(/<meta name="viewport"[^>]*>/,x=>x+"<script>window.__INV48="+js+"</script>");
-  return sendHtml(res,req,200,html,NOI)}}
+  return sendHtml(res,req,200,preInv(req,html,g),NOI)}}
  {const em=/^\/embed\/([A-Za-z0-9_-]{1,40})$/.exec(p);if(req.method==="GET"&&em)return embedPage(req,res,em[1],url)}
  if(req.method==="GET"&&p==="/favicon.ico"){res.writeHead(200,{"Content-Type":"image/png","Cache-Control":"public, max-age=86400"});return res.end(fs.readFileSync(path.join(__dirname,"public/icons/favicon-32.png")))}
  if(req.method==="GET"&&p==="/healthz")return send(res,200,{ok:true,v:APP_VERSION,app:BRAND.name,data:VER,persistent:STORE.persistent,freshDb:FRESH_DB,dbSince:new Date(BOOT34.since).toISOString(),boots:BOOT34.boots});// v34: storage flags (no paths)
