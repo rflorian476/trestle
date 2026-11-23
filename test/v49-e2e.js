@@ -191,6 +191,14 @@ const SERVERS=[];let br=null;
   await act(L,P.ck,"sweep9",[]);const ns2=((await stateFor(L,P.ck)).notifs||[]).filter(x=>/for Jordan Hale is 9 days overdue/.test(x.text));ok(ns2.length===1,"…once per step",ns2.length);
   const {c,p}=await pageCSP(L,1300,P.ck);await go(L,p,"/office/recurring","#o9Auto");const t=await p.evaluate(()=>(document.querySelector(".o9-auto")||{}).textContent||"");ok(/Customers without a Sawyer account can't get it, so we tell you and you text or email theirs from the invoice\./.test(t),"the auto-reminder card says who it can't reach",t.slice(0,200));await c.close()}
 
+ // --- payroll opens on the newest week with someone to pay (v47-e2e's demo check failed on Mondays: that day's only
+ //     approved hours were the owner's, with no rate, so the card opened on an empty week). Any weekday reproduces it here.
+ {const Q=await signup(L,"pro","pay","78704",{name:"Quinn Avery"});const log=async(who,role,date,hrs,rate)=>(await act(L,Q.ck,"logTime",[{who,role,job:"Kitchen repipe",date,hrs:String(hrs),rate:rate==null?"":String(rate)}])).res;
+  const r1=await log("Quinn Avery","Owner",today,3,null),r2=await log("Luis Ortega","Journeyman",addD(lastMon,2),8,30);ok(r1.ok&&r2.ok,"logged the owner's hours this week and a worker's last week",J([r1,r2]));
+  for(const t of ((await stateFor(L,Q.ck)).tsheets||[]))await act(L,Q.ck,"approveTime",[t.id]);
+  const {c,p,errs}=await pageCSP(L,1300,Q.ck);await go(L,p,"/office/time","#pr47");const d=await p.evaluate(()=>({rows:document.querySelectorAll(".pr47-tbl tbody tr").length,wk:(document.getElementById("pr47wk")||{}).value,t:(document.querySelector(".pr47-tbl")||{}).textContent||""}));
+  ok(d.rows===1&&d.wk===lastMon&&/Luis Ortega/.test(d.t)&&!errs.length,"the payroll card opens on last week's ready payroll, not on a week with only the owner's no-rate hours",J([d,errs]));await c.close()}
+
  // --- budget: server-only sweeps stay out of the browser bundle
  {const html=(await req(L.port,"GET","/")).body;const js=[...html.matchAll(/\/js\/(a\d+\.[0-9a-f]{10}\.js)/g)].map(m=>fs.readFileSync(path.join(ROOT,"public/js",m[1]),"utf8")).join("\n");const logic=fs.readFileSync(path.join(ROOT,"app-logic.js"),"utf8");
   ok(/function v9Sweep\(m\)\{return null\}/.test(js)&&/function v9Sweep\(m\)\{if\(!m\)return 0/.test(logic),"the reminder sweep runs on the server and isn't shipped to browsers");
